@@ -1,0 +1,88 @@
+Name:               tct
+Version:            3.0
+Author:
+  Martin Avanzini <martin.avanzini@uibk.ac.at>,
+  Georg Moser <georg.moser@uibk.ac.at>,
+  Michael Schaper <michael.schaper@uibk.ac.at>,
+  Maria Schett <maria.schett@uibk.ac.at>
+Category: Program Analysis
+Stability: Experimental
+License: BSD3
+License-file: LICENSE
+Homepage: http://cl-informatik.uibk.ac.at/software/tct/
+Synopsis: A Complexity Analyser for Term Rewrite Systems
+Description:
+  The Tyrolean Complexity Tool (TcT for short) is a tool
+  for proving upper bounds on the derivational and runtime complexity
+  of term rewriting systems automatically.
+
+cabal-version: >= 1.8
+build-type: Simple
+
+Executable tct
+ main-is: Tct/Main.hs
+ build-depends:
+  base == 4.*,
+  async == 2.*,
+  old-time == 1.1.*,
+  text == 1.1.*,
+  bytestring == 0.10.*,
+  containers >= 0.5 && < 0.6,
+  mtl >= 2.1 && < 2.2,
+  dyre == 0.8.*,
+  xmlgen >= 0.6 && < 0.7,
+  ho-rewriting >= 0.1 && < 0.2,
+  ansi-wl-pprint >= 0.6 && < 0.7,
+  parsec >= 3 && < 3.2
+ hs-source-dirs: src
+ ghc-options:
+   -threaded -Wall -O2 -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+ extensions: 
+  GeneralizedNewtypeDeriving,
+  TypeFamilies,
+  ConstraintKinds, 
+  GADTs, 
+  FlexibleContexts, 
+  MultiParamTypeClasses,
+  TypeSynonymInstances, 
+  DeriveFunctor, 
+  DeriveFoldable, 
+  DeriveTraversable
+
+Library
+ exposed-modules:
+  Tct.Core
+  Tct.Certificate
+  Tct.SemiRing
+  Tct.Xml
+  Tct.Pretty
+  Tct.Problem
+  Tct.Processors.Combinators
+  Tct.Core.Options
+
+ build-depends:
+  base == 4.*,
+  async == 2.*,
+  old-time == 1.1.*,
+  text == 1.1.*,
+  bytestring == 0.10.*,
+  containers >= 0.5 && < 0.6,
+  mtl >= 2.1 && < 2.2,
+  xmlgen >= 0.6 && < 0.7,
+  ho-rewriting >= 0.1 && < 0.2,
+  ansi-wl-pprint >= 0.6 && < 0.7,
+  parsec >= 3 && < 3.2
+ hs-source-dirs: src
+ ghc-options:
+   -threaded -Wall -O2 -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+ extensions: 
+  GeneralizedNewtypeDeriving,
+  TypeFamilies,
+  ConstraintKinds, 
+  GADTs, 
+  FlexibleContexts, 
+  MultiParamTypeClasses, 
+  TypeSynonymInstances,
+  DeriveFunctor, 
+  DeriveFoldable, 
+  DeriveTraversable
