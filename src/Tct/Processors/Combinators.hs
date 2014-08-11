@@ -1,13 +1,14 @@
 module Tct.Processors.Combinators where
 
+import Data.Typeable (Typeable)
 import Data.Maybe (fromMaybe)
 import           Tct.Options
 import qualified Tct.Core as C
 import Tct.Xml as Xml
 import Tct.Pretty as Pretty
 
-data TimeoutP p = TimeoutP { untilT :: Maybe Int, inT :: Maybe Int, procT :: p}
-  deriving Show
+data TimeoutP p = TimeoutP { untilT :: Maybe Int, inT :: Maybe Int, procT :: p }
+  deriving (Show, Typeable)
 
 data TimeoutProof p
   = Timeout Int

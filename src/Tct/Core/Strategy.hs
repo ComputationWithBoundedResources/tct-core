@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Tct.Core.Strategy
 where
 
@@ -5,6 +6,7 @@ import           Control.Monad (liftM)
 import           Control.Monad.Error (catchError)
 import           Data.Foldable as F
 import           Data.Traversable as T
+import           Data.Typeable
 
 import           Tct.Core.TctM
 import           Tct.Core.Processor
@@ -20,6 +22,9 @@ data Strategy prob where
   (:>||>:)   :: Strategy prob -> Strategy prob -> Strategy prob
   (:<>:)     :: Strategy prob -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
+  deriving Typeable
+
+instance Show (Strategy prob) where show _ = "ShowStrategy"
 
 try :: Strategy prob -> Strategy prob
 try s@(Trying _ _) = Trying True s
@@ -129,12 +134,28 @@ data StrategyProcessor prob = StrategyProc (Strategy prob)
 
 instance ProofData prob => Show (StrategyProcessor prob) where show = undefined
 
-instance ProofData prob => Processor (StrategyProcessor prob) where
-  type ProofObject (StrategyProcessor prob) = StrategyProof prob
-  type Forking (StrategyProcessor prob) = ProofTree
-  type Problem (StrategyProcessor prob) = prob
+--instance ProofData prob => Processor (StrategyProcessor prob) where
+  --type ProofObject (StrategyProcessor prob) = StrategyProof prob
+  --type Forking (StrategyProcessor prob) = ProofTree
+  --type Problem (StrategyProcessor prob) = prob
+  --name = const "Strategy Evaluation"
+  --solve (StrategyProc s) prob = do
+    --pt <- fromReturn `liftM` evaluate s prob
+    --return $ if progress pt
+      --then Success pt (StrategyProof pt) certfn
+      --else Fail (StrategyProof pt)
+    --where
+      ---- collect the results
+      --certfn (Open c)                      = c
+      --certfn (NoProgress _ subtree)        = certfn subtree
+      --certfn (Progress _ certfn' subtrees) = certfn' (certfn `fmap` subtrees)
+
+instance (Typeable prob, ProofData prob) => Processor (Strategy prob) where
+  type ProofObject (Strategy prob) = StrategyProof prob
+  type Forking (Strategy prob) = ProofTree
+  type Problem (Strategy prob) = prob
   name = const "Strategy Evaluation"
-  solve (StrategyProc s) prob = do
+  solve s prob = do
     pt <- fromReturn `liftM` evaluate s prob
     return $ if progress pt
       then Success pt (StrategyProof pt) certfn
@@ -144,4 +165,3 @@ instance ProofData prob => Processor (StrategyProcessor prob) where
       certfn (Open c)                      = c
       certfn (NoProgress _ subtree)        = certfn subtree
       certfn (Progress _ certfn' subtrees) = certfn' (certfn `fmap` subtrees)
-

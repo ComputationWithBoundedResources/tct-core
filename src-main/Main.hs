@@ -15,13 +15,9 @@ This module provides the main function of TcT.
 -}
 
 
-
-
-import Data.Void
-
 import Tct
 
 
 main :: IO ()
-main = tctl $ defaultTctConfig (undefined :: Void)
+main = tctl $ defaultTctConfig Void
 

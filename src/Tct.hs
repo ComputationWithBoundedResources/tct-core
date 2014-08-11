@@ -1,10 +1,10 @@
-module Tct where
+module Tct 
+where
 
 
 import qualified Config.Dyre as Dyre
 import           Control.Monad.Error (ErrorT, runErrorT)
 import           Control.Monad.Reader (runReaderT)
-import           Data.Void 
 import           System.FilePath ((</>))
 import           System.Directory (getHomeDirectory)
 import qualified System.Time as Time
@@ -13,7 +13,7 @@ import           Tct.Options
 import           Tct.Core (TctM, TctROState(..), runTct, Strategy)
 
 
-class Mode mode where
+class TctMode mode where
   type ModeProblem mode :: *
   parseProblem_         :: mode -> String -> ModeProblem mode
   strategies_           :: mode -> [Strategy (ModeProblem mode)]
@@ -21,7 +21,9 @@ class Mode mode where
   modeOptions_          :: mode -> Options () (ModeProblem mode)
 
 
-instance Mode Void where
+data Void = Void
+
+instance TctMode Void where
   type ModeProblem Void = Void
   parseProblem_        = undefined
   strategies_          = undefined
@@ -44,7 +46,7 @@ data TctConfig prob = TctConfig
   , modeOptions     :: Options () prob
   }
 
-defaultTctConfig :: Mode mode => mode -> TctConfig (ModeProblem mode)
+defaultTctConfig :: TctMode mode => mode -> TctConfig (ModeProblem mode)
 defaultTctConfig mode = TctConfig 
   { satSolver    = "/usr/bin/minisat"
   , smtSolver    = "/usr/bin/yices"
