@@ -1,9 +1,10 @@
 module Tct.SemiRing 
     (
-     Additive (..)
+      Additive (..)
     , Multiplicative (..)
     , SemiRing
     ) where
+
 
 -- | The commutative monoid underlying a 'SemiRing'. 
 class Additive a where
@@ -38,3 +39,4 @@ class Multiplicative a where
 --
 --      prop> zero `mult` a = a `mult` zero = zero
 type SemiRing a = (Additive a, Multiplicative a)
+

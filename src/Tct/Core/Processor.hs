@@ -1,15 +1,18 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 module Tct.Core.Processor 
   ( 
     Result (..)
   , Processor (..)
+  , ParsableProcessor (..)
   , SomeProcessor (..)
+  , Arguments (..)
+
+  , readAnyProc
+  , readAnyProcMaybe
 
   , Fork
   , ProofData
   , CertificateFn
-
+  
   , ErroneousProcessor (..)
   , ErroneousProof (..)
   ) where
@@ -17,15 +20,15 @@ module Tct.Core.Processor
 
 import           Data.Foldable as F
 import           Data.Traversable as T
-import           Data.Typeable
-import           Text.ParserCombinators.Parsec (CharParser, choice, string)
-import           Text.ParserCombinators.Parsec.Prim (getState, try) 
-import           Text.Parsec.Prim (parserFail)
+import           Data.Either (isRight)
+import           Data.List as L (find)
+import           Data.Maybe (fromMaybe)
+import           Data.Monoid (mempty)
+import qualified Options.Applicative as O
 
 import           Tct.Core.TctM
-import           Tct.Core.Forks (Id)
+import           Tct.Core.Forks (Id(..))
 import qualified Tct.Core.Certificate as C
-import qualified Tct.Options as O
 import qualified Tct.Pretty as PP
 import qualified Tct.Xml as Xml
 
@@ -44,7 +47,7 @@ data Result p
     , proofData     :: ProofObject p
     , certificateFn :: CertificateFn p }
 
-class (Typeable p, Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p)) => Processor p where
+class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p)) => Processor p where
   type ProofObject p :: *
   type Problem p     :: *
   type Forking p     :: * -> *
@@ -52,82 +55,48 @@ class (Typeable p, Show p, ProofData (ProofObject p), ProofData (Problem p), For
   name               :: p -> String
   description        :: p -> String
   description        = name
-  options            :: p -> O.Options [ SomeProcessor (Problem p) ] p
-  options            = const []
   solve              :: p -> Problem p -> TctM (Result p)
 
+data Arguments a = Unit | Args a
+
+class Processor p => ParsableProcessor p where
+  args          :: p -> [SomeProcessor (Problem p)] -> Arguments (O.Parser (SomeProcessor (Problem p)))
+  readProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either String (SomeProcessor (Problem p))
+  args _ _              = Unit
+  readProcessor p ps ss = case args p ps of
+    Unit       -> readUnit
+    Args pargs -> readArgs pargs
+    where
+      readUnit
+        | name p == ss = Right (SomeProc p)
+        | otherwise   = Left $ "unit argument (" ++ name p ++ ss ++ ")"
+      readArgs pargs 
+        | name p == t =
+          case O.execParserPure (O.prefs mempty) (O.info pargs O.briefDesc) ts of
+            O.Success a   -> Right a
+            O.Failure err -> Left $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
+            _             -> Left $ "optParser completion error (" ++ show ss ++ ")"
+        | otherwise = Left $ name p ++ ss
+        where (t:ts) = words ss
+
+readAnyProc :: 
+  (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob) 
+  => [SomeProcessor prob] -> String -> Either String (SomeProcessor prob)
+readAnyProc rs s =  def `fromMaybe` L.find isRight (map (\r -> readProcessor r rs s) rs)
+  where def = Left $ "readAnyProc: ("  ++ s ++ ")"
+
+readAnyProcMaybe :: 
+  (ParsableProcessor (SomeProcessor t), Problem (SomeProcessor t) ~ t) => 
+  [SomeProcessor t] -> String -> Maybe (SomeProcessor t)
+readAnyProcMaybe rs s = either (const Nothing) Just $ readAnyProc rs s
 
 
-class (Processor p, Typeable p) => ParsableProcessor p prob where
-  parseProcessor :: p -> ProcessParser p prob
+data SomeProcessor :: * -> * where
+  SomeProc :: (Processor p, ParsableProcessor p) => p -> SomeProcessor (Problem p)
 
-instance (Processor p, Problem p ~ prob) => ParsableProcessor p prob where
-  parseProcessor p = string (name p) >> return p
+instance Show (SomeProcessor prob) where
+  show (SomeProc p) = show p
 
-type ProcessParser p prob = CharParser [SomeProcessor prob] p 
-
-data SomeProcessor prob where
-  SomeProc :: (ParsableProcessor p prob, Problem p ~ prob) => p -> SomeProcessor prob
-  deriving Typeable
- 
-parseSomeProcessor :: Processor p => SomeProcessor prob -> ProcessParser p (Problem p)
-parseSomeProcessor (SomeProc p) = maybe (parserFail "parseSomeProcessor") parseProcessor $ cast p
-
-parseAnyProcessor :: Processor p => [SomeProcessor prob] -> ProcessParser p (Problem p)
-parseAnyProcessor ps = choice [ try $ parseSomeProcessor p | p <- ps]
-  
-  --
---
-  --
-
--- what to do;
--- save type representation in someproc; so that cast is more or less safe fore parsing; its either any way
-
-
-
-{-parseSomeProcessor :: (ParsableProcessor p, Processor p, Problem p ~ prob) => SomeProcessor prob -> ProcessParser p prob-}
-{-parseSomeProcessor (SomeProc proc) = parseProcessor proc-}
-
-{-parseAnyProcessor :: ProcessParser p prob-}
-{-parseAnyProcessor = getState >>= parseSomeProcessors-}
-
-{-parseSomeProcessors :: [SomeProcessor prob] -> ProcessParser p prob-}
-{-parseSomeProcessors = undefined-}
-
---data SomeProofObject = SomeProofObject deriving Show
---instance PP.Pretty SomeProofObject where pretty = PP.text . show
---data SomeForking a = SomeForking deriving (Show, Functor, Foldable , Traversable)
---data SomeProblem = SomeProblem deriving Show
---instance PP.Pretty SomeProblem where pretty = PP.text . show
-
---instance ProofData prob => Processor (SomeProcessor prob) where
-  --type ProofObject (SomeProcessor prob) = SomeProofObject
-  --type Problem (SomeProcessor prob)     = prob
-  --type Forking (SomeProcessor prob)     = SomeForking
-  --name (SomeProc p)                     = name p
-  --description (SomeProc p)              = description p
-  --solve (SomeProc _)                    = error "Tct.Core.Processor.solve: should not be called"
-
--- should not be; as we modify the instance with options
-
--- processor knows how to parse itself
---class (Processor p, Problem p ~ prob)  => ParsableProcessor p prob where
-  --parseProcessor :: p -> ProcessParser p
-
---instance (Processor p, Problem p ~ prob) => ParsableProcessor p prob where
-  --parseProcessor = undefined
-
-
---instance ProofData prob => ParsableProcessor (SomeProcessor prob) prob where
-  --parseProcessor (SomeProc p) = SomeProc `liftM` parseProcessor p
-
-{-instance (ProofData q,Processor p) => ParsableProcessor (SomeProcessor q) q where-}
-  {-parseProcessor = undefined-}
-
-{-instance ProofData q => Processor (SomeProcessor q) where-}
-
-
-{-instance Show (SomeProcessor prob) where show (SomeProc p) = show p-}
 
 -- Error Processor ----------------------------------------------------------- 
 data ErroneousProof p = ErroneousProof IOError p deriving Show
@@ -142,11 +111,13 @@ instance Processor p => PP.Pretty (ErroneousProof p) where
     PP.text "Processor" PP.<+> PP.squotes (PP.text (name p)) PP.<+> PP.text "signalled the following error:"
     PP.<$$> PP.indent 2 (PP.paragraph (show err))
 
-data ErroneousProcessor p = ErroneousProc IOError p deriving (Show, Typeable)
+data ErroneousProcessor p = ErroneousProc IOError p deriving Show
 
 instance Processor p => Processor (ErroneousProcessor p) where
-    type ProofObject (ErroneousProcessor p) = ErroneousProof p
-    type Problem (ErroneousProcessor p)     = Problem p
-    name (ErroneousProc err p)              = name p ++ "[error: " ++ show err ++ "]"
-    solve (ErroneousProc err p) _           = return (Fail (ErroneousProof err p))
+  type ProofObject (ErroneousProcessor p) = ErroneousProof p
+  type Problem (ErroneousProcessor p)     = Problem p
+  name (ErroneousProc err p)              = name p ++ "[error: " ++ show err ++ "]"
+  solve (ErroneousProc err p) _           = return (Fail (ErroneousProof err p))
+
+instance Processor p => ParsableProcessor (ErroneousProcessor p) where
 

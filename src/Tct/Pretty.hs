@@ -6,8 +6,10 @@ module Tct.Pretty
   , display
   ) where
 
+
 import Text.PrettyPrint.ANSI.Leijen
 import Data.List (transpose)
+
 
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 

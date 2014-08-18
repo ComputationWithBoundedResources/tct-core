@@ -1,4 +1,5 @@
 module Tct.Core.TctM
+
 where
 
 
@@ -42,13 +43,15 @@ toIO m = runReaderT (runTct m) `fmap` askState
 async :: TctM a -> TctM (Async.Async a)
 async m = toIO m >>= liftIO . Async.async
 
+-- TODO: check if works with calling minisat or so; does not work with foreign function calls
 timeout :: Int -> TctM a -> TctM (Maybe a)
-timeout n m = toIO m' >>= liftIO . Timeout.timeout n
+timeout n m = toIO m' >>= liftIO . Timeout.timeout n'
   where 
     m' = do 
       Time.TOD sec pico <- liftIO Time.getClockTime 
-      let newTime = Just (Time.TOD (sec + toInteger n) pico)
+      let newTime = Just (Time.TOD (sec + toInteger n') pico)
       local (\ r -> r { stopTime = min newTime (stopTime r) }) m
+    n' = n * 1000000
 
 wait :: Async.Async a -> TctM a
 wait = liftIO . Async.wait

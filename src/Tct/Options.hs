@@ -7,6 +7,7 @@ module Tct.Options
   , nat
   , (<#>)
   , Meaning
+  , Arg (..)
   ) where
 
 
@@ -14,7 +15,6 @@ import           Text.ParserCombinators.Parsec hiding (optional, option)
 import qualified Text.ParserCombinators.Parsec.Token as P
 import           Text.ParserCombinators.Parsec.Language (haskellDef)
 import           Control.Monad (liftM)
-
 
 lexer :: P.TokenParser st
 lexer = P.makeTokenParser haskellDef

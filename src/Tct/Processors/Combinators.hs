@@ -1,54 +1,99 @@
-module Tct.Processors.Combinators where
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ImpredicativeTypes #-}
+module Tct.Processors.Combinators 
+  ( 
+    -- * Trivial Combinators
 
-import Data.Typeable (Typeable)
-import Data.Maybe (fromMaybe)
-import           Tct.Options
-import qualified Tct.Core as C
-import Tct.Xml as Xml
-import Tct.Pretty as Pretty
+    failP
 
-data TimeoutP p = TimeoutP { untilT :: Maybe Int, inT :: Maybe Int, procT :: p }
-  deriving (Show, Typeable)
+    -- * Combinators
+
+    -- ** Timeout
+  , TimeoutProcessor (..)
+  , timeoutIn
+  , timeoutUntil
+
+    -- * Strategy Combinators
+  , exhaustively
+  )
+
+where
+
+import Control.Applicative
+
+import qualified Options.Applicative as O
+
+import           Tct.Core as C
+import qualified Tct.Pretty as PP
+-- import Tct.Xml as Xml
+
+
+data FailProcessor prob = FailProc deriving Show
+data FailProof = FailProof deriving Show
+instance PP.Pretty FailProof where
+  pretty _ = PP.paragraph "We apply FailProccessor."
+instance ProofData prob => Processor (FailProcessor prob) where
+  type ProofObject (FailProcessor prob) = FailProof
+  type Forking (FailProcessor prob) = Judgement
+  type Problem (FailProcessor prob) = prob
+  name _ = "FailProcessor"
+  solve _ _ = return $ Fail FailProof
+
+instance ProofData prob => ParsableProcessor (FailProcessor prob) where
+
+failP :: FailProcessor prob
+failP = FailProc
+
+data TimeoutProcessor p = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p } deriving Show
 
 data TimeoutProof p
   = Timeout Int
-  | NoTimeout (C.ProofObject p)
+  | NoTimeout (ProofObject p)
                       
-instance C.Processor p => Show (TimeoutProof p) where
+instance Processor p => Show (TimeoutProof p) where
   show (Timeout i)    = "Timeout " ++ show i
   show (NoTimeout po) = "NoTimeout (" ++ show po ++ ")"
 
---instance (C.Processor p) => Xml.Xml (TimeoutProof p) where
-    --toXml (Timeout i)     = Xml.elt "timeout" [] [Xml.int i]
-    --toXml (NoTimeout po) = toXml obj
-                                    
-instance C.Processor p => Pretty.Pretty (TimeoutProof p) where
-  pretty (Timeout i)    = Pretty.paragraph ("Computation aborted after a timeout of " ++ show i ++ " seconds")
-  pretty (NoTimeout po) = Pretty.pretty po
+instance Processor p => PP.Pretty (TimeoutProof p) where
+  pretty (Timeout i)    = PP.paragraph ("Computation aborted after a timeout of " ++ show i ++ " seconds")
+  pretty (NoTimeout po) = PP.pretty po
 
-instance C.Processor p => C.Processor (TimeoutP p) where
-  type ProofObject (TimeoutP p) = TimeoutProof p
-  type Forking (TimeoutP p)     = C.Forking p
-  type Problem (TimeoutP p)     = C.Problem p
-  name p = C.name (procT p)
-  options _ =
-      [ option { keyword = "until"
-                , meaning = (\ f n -> f { untilT = Just n}) <#> nat
-                , help = []}
-      , option { keyword = "in"
-                , meaning = (\ f n -> f { inT = Just n}) <#> nat } ]
-
+instance Processor p => Processor (TimeoutProcessor p) where
+  type ProofObject (TimeoutProcessor p) = TimeoutProof p
+  type Forking (TimeoutProcessor p)     = Forking p
+  type Problem (TimeoutProcessor p)     = Problem p
+  name _ = "TimeoutProcessor"
   solve proc prob = do
-    running <- C.runningTime `fmap` C.askStatus prob
-    let i = fromMaybe 0 (inT proc)
-        u = fromMaybe 0 (untilT proc)
-        t = max 0 (min i (u - running))
-    mr <- C.timeout t (C.solve (procT proc) prob)
+    running <- runningTime `fmap` askStatus prob
+    let 
+      t = case (inT proc, untilT proc) of
+        (Nothing, Just u ) -> max 0 (u - running)
+        (Just i , Nothing) -> max 0 i
+        (Just i , Just u ) -> max 0 (min i (max 0 (u - running)))
+        _                  -> 0
+    mr <- timeout t (solve (procT proc) prob)
     return $ case mr of
-      Nothing -> C.Fail (Timeout t)
-      Just (C.Fail p) -> C.Fail (NoTimeout p)
-      Just r@(C.Success {}) -> C.Success
-        { C.subProblems   = C.subProblems r
-        , C.proofData     = NoTimeout (C.proofData r)
-        , C.certificateFn = C.certificateFn r }
+      Nothing       -> Fail (Timeout t)
+      Just (Fail p) -> Fail (NoTimeout p)
+      Just r@(Success {}) -> Success
+        { subProblems   = subProblems r
+        , proofData     = NoTimeout (proofData r)
+        , certificateFn = certificateFn r }
+
+instance Processor p => ParsableProcessor (TimeoutProcessor p) where
+  args _ ps = Args $ O.liftA SomeProc $
+    TimeoutProc 
+    <$> O.optional (O.option (O.long "untilT")) 
+    <*> O.optional (O.option (O.long "inT")) 
+    <*> O.argument (readAnyProcMaybe ps) (O.metavar "procT")
+
+timeoutIn :: Int -> p -> TimeoutProcessor p
+timeoutIn n = TimeoutProc (Just n) Nothing
+
+timeoutUntil :: Int -> p -> TimeoutProcessor p
+timeoutUntil n = TimeoutProc Nothing (Just n)
+
+-- StrategyCombinator
+exhaustively :: Strategy prob -> Strategy prob
+exhaustively s =  s >>> try (exhaustively s)
 

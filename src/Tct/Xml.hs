@@ -32,3 +32,4 @@ putXml = BS.putStr . Xml.xrender
 
 toDocument :: XmlContent -> XmlDocument
 toDocument = Xml.doc Xml.defaultDocInfo
+

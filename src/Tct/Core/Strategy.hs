@@ -1,19 +1,32 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module Tct.Core.Strategy
-where
+  (
+    Strategy (..)
+  , evaluate
+  , Return
+  , fromReturn
+
+  , some
+  , try
+  , force 
+  , (>>>), (>||), (<|>)
+
+  , CustomStrategy (..)
+  , strategy
+  ) where
+
 
 import           Control.Monad (liftM)
 import           Control.Monad.Error (catchError)
+import           Data.Monoid (mempty)
 import           Data.Foldable as F
 import           Data.Traversable as T
-import           Data.Typeable
+import qualified Options.Applicative as O 
 
 import           Tct.Core.TctM
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
 import qualified Tct.Pretty as PP
-import qualified Tct.Xml as Xml
-
+--import qualified Tct.Xml as Xml
 
 data Strategy prob where
   Proc       :: SomeProcessor prob -> Strategy prob
@@ -22,9 +35,12 @@ data Strategy prob where
   (:>||>:)   :: Strategy prob -> Strategy prob -> Strategy prob
   (:<>:)     :: Strategy prob -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
-  deriving Typeable
 
 instance Show (Strategy prob) where show _ = "ShowStrategy"
+
+
+some :: (Processor p, ParsableProcessor p)  => p ->  Strategy (Problem p)
+some = Proc . SomeProc
 
 try :: Strategy prob -> Strategy prob
 try s@(Trying _ _) = Trying True s
@@ -35,6 +51,11 @@ force :: Strategy prob -> Strategy prob
 force s@(Trying _ _) = Trying False s
 force (WithStatus f) = WithStatus (force . f)
 force s              = Trying False s
+
+(>>>), (>||), (<|>) :: Strategy prob -> Strategy prob -> Strategy prob
+(>>>) = (:>>>:)
+(>||) = (:>||>:)
+(<|>) = (:<>:)
 
 
 data Return l = Continue l | Abort l deriving Show
@@ -124,44 +145,76 @@ evaluateTreePar s t = spawnTree t >>= collect
 
 -- Strategy Processor --------------------------------------------------------
 -- lift Strategies to Processor
-data StrategyProof prob = StrategyProof (ProofTree prob)
-instance Show (StrategyProof prob)      where show   = undefined
-instance Xml.Xml (StrategyProof prob)   where toXml  = undefined
-instance ProofData prob => PP.Pretty (StrategyProof prob) where 
-  pretty (StrategyProof pt) = PP.pretty pt
+data StrategyProof prob = StrategyProof (ProofTree prob) 
+instance Show (StrategyProof prob) where  show (StrategyProof _) = "StrategyProof"
+instance ProofData prob => PP.Pretty (StrategyProof prob) where  pretty (StrategyProof pt) = PP.pretty pt
 
-data StrategyProcessor prob = StrategyProc (Strategy prob)
-
-instance ProofData prob => Show (StrategyProcessor prob) where show = undefined
-
---instance ProofData prob => Processor (StrategyProcessor prob) where
-  --type ProofObject (StrategyProcessor prob) = StrategyProof prob
-  --type Forking (StrategyProcessor prob) = ProofTree
-  --type Problem (StrategyProcessor prob) = prob
-  --name = const "Strategy Evaluation"
-  --solve (StrategyProc s) prob = do
-    --pt <- fromReturn `liftM` evaluate s prob
-    --return $ if progress pt
-      --then Success pt (StrategyProof pt) certfn
-      --else Fail (StrategyProof pt)
-    --where
-      ---- collect the results
-      --certfn (Open c)                      = c
-      --certfn (NoProgress _ subtree)        = certfn subtree
-      --certfn (Progress _ certfn' subtrees) = certfn' (certfn `fmap` subtrees)
-
-instance (Typeable prob, ProofData prob) => Processor (Strategy prob) where
+instance ProofData prob => Processor (Strategy prob) where
   type ProofObject (Strategy prob) = StrategyProof prob
-  type Forking (Strategy prob) = ProofTree
-  type Problem (Strategy prob) = prob
+  type Forking (Strategy prob)     = ProofTree
+  type Problem (Strategy prob)     = prob
   name = const "Strategy Evaluation"
   solve s prob = do
     pt <- fromReturn `liftM` evaluate s prob
     return $ if progress pt
+      then Success pt (StrategyProof pt) collectCertificate
+      else Fail (StrategyProof pt)
+
+
+-- custom strategies
+strategy :: String -> O.Parser args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
+strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
+
+data CustomStrategy args prob = CustomStrategy 
+  { name_ :: String
+  , args_ :: args
+  , pargs_ :: O.Parser args
+  , strategy_ :: args -> Strategy prob }
+
+instance Show (CustomStrategy args prob) where show = show . name_
+
+instance ProofData prob => Processor (CustomStrategy arg prob) where
+  type ProofObject (CustomStrategy arg prob) = StrategyProof prob
+  type Forking (CustomStrategy arg prob)     = ProofTree
+  type Problem (CustomStrategy arg prob)     = prob
+  name                                       = name_
+  solve st prob = do
+    pt <- fromReturn `liftM` evaluate (strategy_ st (args_ st)) prob
+    return $ if progress pt
+      then Success pt (StrategyProof pt) collectCertificate
+      else Fail (StrategyProof pt)
+
+instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
+  -- args p _ = SomeProc `O.liftA` strategy_ p `O.liftA` pargs_ p
+  readProcessor p _ ss
+    | name p == t =
+      case O.execParserPure (O.prefs mempty) (O.info (pargs_ p) O.briefDesc) ts of
+        O.Success a   -> Right $ SomeProc $ p {args_ = a}
+        O.Failure err -> Left $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
+        _             -> Left $ "optParser completion error (" ++ show ss ++ ")"
+    | otherwise = Left $ name p ++ ss
+    where (t:ts) = words ss
+
+-- make Processor (SomeProcessor prob) mainly for parsing;
+data SomeProofObject               where SomeProofObj :: (ProofData obj) => obj -> SomeProofObject
+instance PP.Pretty SomeProofObject where pretty (SomeProofObj obj) = PP.pretty obj
+instance Show SomeProofObject      where show (SomeProofObj obj)   = show obj
+
+instance ProofData prob => Processor (SomeProcessor prob) where
+  type ProofObject (SomeProcessor prob) = StrategyProof prob
+  type Problem (SomeProcessor prob) = prob
+  type Forking (SomeProcessor prob) = ProofTree
+  name (SomeProc p) = name p
+  solve p prob = do
+    pt <- fromReturn `liftM` evaluate (Proc $ p) prob
+    return $ if progress pt
       then Success pt (StrategyProof pt) certfn
       else Fail (StrategyProof pt)
     where
-      -- collect the results
       certfn (Open c)                      = c
       certfn (NoProgress _ subtree)        = certfn subtree
       certfn (Progress _ certfn' subtrees) = certfn' (certfn `fmap` subtrees)
+
+instance ProofData prob => ParsableProcessor (SomeProcessor prob) where
+  readProcessor (SomeProc p) = readProcessor p
+

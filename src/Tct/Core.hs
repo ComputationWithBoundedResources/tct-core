@@ -1,7 +1,8 @@
 module Tct.Core
-  ( module M
-  )
-where
+  ( 
+    module M
+  ) where
+
 
 import Tct.Core.Certificate as M
 import Tct.Core.Forks as M

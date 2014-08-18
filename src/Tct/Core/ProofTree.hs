@@ -3,6 +3,7 @@ module Tct.Core.ProofTree
     ProofNode (..)
   , ProofTree (..)
   , certificate
+  , collectCertificate
   , resultToTree
   , progress
   , open
@@ -10,11 +11,12 @@ module Tct.Core.ProofTree
   , isClosed
   ) where
 
-import Control.Applicative as A ((<$>))
-import Data.Foldable as F
-import Data.Traversable as T
 
-import Tct.Core.Certificate
+import Control.Applicative as A ((<$>))
+import Data.Foldable as F (Foldable, foldr, foldMap, toList)
+import Data.Traversable as T (Traversable, traverse)
+
+import Tct.Core.Certificate (Certificate, unbounded)
 import Tct.Core.Processor
 import Tct.Pretty as PP
 
@@ -22,7 +24,7 @@ import Tct.Pretty as PP
 data ProofNode p = ProofNode
   { problem   :: Problem p
   , processor :: p
-  , proof     :: ProofObject p}
+  , proof     :: ProofObject p }
 
 data ProofTree l where
   Open       :: l -> ProofTree l
@@ -34,9 +36,12 @@ resultToTree prob p (Fail po)                    = NoProgress (ProofNode prob p 
 resultToTree prob p (Success subprobs po certfn) = Progress (ProofNode prob p po) certfn (Open `fmap` subprobs)
 
 certificate :: ProofTree l -> Certificate
-certificate Open {}              = unbounded
-certificate (NoProgress _ pt)    = certificate pt
-certificate (Progress _ cfn pts) = cfn (fmap certificate pts)
+certificate pt = collectCertificate $ const unbounded `fmap` pt
+
+collectCertificate :: ProofTree Certificate -> Certificate
+collectCertificate (Open c)                      = c
+collectCertificate (NoProgress _ subtree)        = certificate subtree
+collectCertificate (Progress _ certfn' subtrees) = certfn' (certificate `fmap` subtrees)
 
 progress :: ProofTree l -> Bool
 progress (Open _)          = False
@@ -51,6 +56,7 @@ isOpen = null . open
 
 isClosed :: ProofTree l -> Bool
 isClosed = not . isOpen
+
 
 instance Functor ProofTree where
   f `fmap` Open l              = Open (f l)
@@ -73,6 +79,9 @@ instance Processor p => Pretty (ProofNode p) where
     <$$> text "Applied Processor:" <$$> indent 2 (text $ name p)
     <$$> text "Proof:" <$$> indent 2 (pretty po)
 
+filler :: Doc
+filler = text "-------------------------------------------------------------------------------"
+
 instance Pretty l => Pretty (ProofTree l) where
   pretty (Open l) = 
     empty 
@@ -83,11 +92,10 @@ instance Pretty l => Pretty (ProofTree l) where
     <$$> filler
     <$$> pretty pn
     <$$> pretty pt
+    <$$> pretty (certificate pt)
   pretty (Progress pn _ pts) =
     empty
     <$$> filler
     <$$> pretty pn
     <$$> indent 2 (vcat $ pretty `fmap` toList pts)
 
-filler :: Doc
-filler = text "-------------------------------------------------------------------------------"

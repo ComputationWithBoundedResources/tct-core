@@ -17,7 +17,7 @@ module Tct.Core.Certificate
   , Certificate (..)
   , unbounded
 
-  -- ** Convenience Functions
+  -- * Convenience Functions
   , spaceUBCert
   , spaceLBCert
   , timeUBCert
@@ -29,6 +29,7 @@ module Tct.Core.Certificate
   ) where
 
 
+import Tct.Pretty
 import Tct.SemiRing
 
 
@@ -48,10 +49,10 @@ data Complexity
     deriving (Eq, Show)
 
 constant :: Complexity
-constant = Poly (Just 1)
+constant = Poly (Just 0)
 
 linear :: Complexity
-linear = Poly (Just 0)
+linear = Poly (Just 1)
 
 rank :: Complexity -> (Int, Int)
 rank (Poly (Just r)) = (42,r)
@@ -125,6 +126,8 @@ data Certificate = Certificate
   , timeUB  :: Complexity
   , timeLB  :: Complexity
   } deriving Show
+
+instance Pretty Certificate where pretty = text . show
 
 unbounded :: Certificate
 unbounded = Certificate 
