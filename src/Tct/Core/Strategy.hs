@@ -22,6 +22,7 @@ import           Data.Foldable as F
 import           Data.Traversable as T
 import qualified Options.Applicative as O 
 
+import           Tct.Error (TctError (..))
 import           Tct.Core.TctM
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
@@ -190,9 +191,9 @@ instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
     | name p == t =
       case O.execParserPure (O.prefs mempty) (O.info (pargs_ p) O.briefDesc) ts of
         O.Success a   -> Right $ SomeProc $ p {args_ = a}
-        O.Failure err -> Left $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
-        _             -> Left $ "optParser completion error (" ++ show ss ++ ")"
-    | otherwise = Left $ name p ++ ss
+        O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
+        _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
+    | otherwise = Left $ TctParseError $ name p ++ ss
     where (t:ts) = words ss
 
 -- make Processor (SomeProcessor prob) mainly for parsing;

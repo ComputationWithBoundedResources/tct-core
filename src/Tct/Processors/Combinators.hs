@@ -4,7 +4,7 @@ module Tct.Processors.Combinators
   ( 
     -- * Trivial Combinators
 
-    failP
+    FailProcessor (..)
 
     -- * Combinators
 
@@ -41,8 +41,6 @@ instance ProofData prob => Processor (FailProcessor prob) where
 
 instance ProofData prob => ParsableProcessor (FailProcessor prob) where
 
-failP :: FailProcessor prob
-failP = FailProc
 
 data TimeoutProcessor p = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p } deriving Show
 

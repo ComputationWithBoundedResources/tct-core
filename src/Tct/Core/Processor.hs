@@ -30,6 +30,7 @@ import           Tct.Core.TctM
 import           Tct.Core.Forks (Id(..))
 import qualified Tct.Core.Certificate as C
 import qualified Tct.Pretty as PP
+import           Tct.Error (TctError (..))
 import qualified Tct.Xml as Xml
 
 
@@ -61,7 +62,7 @@ data Arguments a = Unit | Args a
 
 class Processor p => ParsableProcessor p where
   args          :: p -> [SomeProcessor (Problem p)] -> Arguments (O.Parser (SomeProcessor (Problem p)))
-  readProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either String (SomeProcessor (Problem p))
+  readProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either TctError (SomeProcessor (Problem p))
   args _ _              = Unit
   readProcessor p ps ss = case args p ps of
     Unit       -> readUnit
@@ -69,21 +70,21 @@ class Processor p => ParsableProcessor p where
     where
       readUnit
         | name p == ss = Right (SomeProc p)
-        | otherwise   = Left $ "unit argument (" ++ name p ++ ss ++ ")"
+        | otherwise   = Left $ TctParseError $ "unit argument (" ++ name p ++ ss ++ ")"
       readArgs pargs 
         | name p == t =
           case O.execParserPure (O.prefs mempty) (O.info pargs O.briefDesc) ts of
             O.Success a   -> Right a
-            O.Failure err -> Left $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
-            _             -> Left $ "optParser completion error (" ++ show ss ++ ")"
-        | otherwise = Left $ name p ++ ss
+            O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
+            _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
+        | otherwise = Left $ TctParseError $ name p ++ ss
         where (t:ts) = words ss
 
 readAnyProc :: 
   (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob) 
-  => [SomeProcessor prob] -> String -> Either String (SomeProcessor prob)
+  => [SomeProcessor prob] -> String -> Either TctError (SomeProcessor prob)
 readAnyProc rs s =  def `fromMaybe` L.find isRight (map (\r -> readProcessor r rs s) rs)
-  where def = Left $ "readAnyProc: ("  ++ s ++ ")"
+  where def = Left $ TctParseError $ "readAnyProc: ("  ++ s ++ ")"
 
 readAnyProcMaybe :: 
   (ParsableProcessor (SomeProcessor t), Problem (SomeProcessor t) ~ t) => 

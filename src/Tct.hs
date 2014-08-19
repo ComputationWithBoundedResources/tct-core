@@ -3,26 +3,32 @@ where
 
 
 import qualified Config.Dyre as Dyre
-import           Control.Monad (liftM)
-import           Control.Monad.Error (ErrorT, runErrorT)
+import           Control.Applicative
+import Data.Monoid
+import           Control.Monad
 import           Control.Monad.Reader (runReaderT)
-import           System.Environment (getArgs)
 import           System.FilePath ((</>))
+import System.IO (hPutStrLn, stderr)
 import           System.Directory (getHomeDirectory)
 import qualified System.Time as Time
+import System.Exit (exitSuccess, exitFailure)
 
-import           Tct.Options
+import qualified Options.Applicative as O
+
+import           Tct.Error
 import           Tct.Core
 import           Tct.Processors.Combinators
 import           Tct.Pretty (Pretty, string, pretty, display)
 
 
-class TctMode mode where
+class ProofData (ModeProblem mode) => TctMode mode where
   type ModeProblem mode :: *
-  parseProblem_         :: mode -> String -> ModeProblem mode
-  strategies_           :: mode -> [SomeProcessor (ModeProblem mode)]
-  defaultStrategy_      :: mode -> SomeProcessor (ModeProblem mode)
-  modeOptions_          :: mode -> Options () (ModeProblem mode)
+  type ModeOptions mode :: *
+  modeParser            :: mode -> String -> Either TctError (ModeProblem mode)
+  modeStrategies        :: mode -> [SomeProcessor (ModeProblem mode)]
+  modeDefaultStrategy   :: mode -> SomeProcessor (ModeProblem mode)
+  modeOptions           :: mode -> O.Parser (ModeOptions mode)
+  modeModifyer          :: mode -> modeOptions -> ModeProblem mode -> ModeProblem mode
 
 data Void = Void deriving (Show, Read)
 
@@ -30,37 +36,56 @@ instance Pretty Void where pretty = const $ string "Void"
 
 instance TctMode Void where
   type ModeProblem Void = Void
-  parseProblem_          = const read
-  strategies_            = const []
-  defaultStrategy_       = const $ SomeProc failP
-  modeOptions_           = const []
+  type ModeOptions Void = Void
+  modeParser _ _        = Right Void
+  modeStrategies _      = []
+  modeDefaultStrategy _ = SomeProc $ FailProc
+  modeOptions _         = pure Void
+  modeModifyer _ _      = id
+  
 
-type ErroneousIO = ErrorT String IO
 
-runErroneousIO :: ErroneousIO a -> IO (Either String a)
-runErroneousIO = runErrorT
 
-data TctConfig prob = TctConfig 
+
+data TctOptions m = TctOptions
+  { version_      :: Bool
+  , help_         :: Bool
+  , satSolver_    :: Maybe FilePath
+  , smtSolver_    :: Maybe FilePath
+  , modeOptions_  :: m
+  , strategyName_ :: Maybe String
+  , problemFile_  :: FilePath
+  }
+
+mkParser :: O.Parser m -> O.Parser (TctOptions m)
+mkParser mparser = TctOptions
+  <$> O.switch (O.long "version" <> O.help "Show Version.")
+  <*> O.switch (O.long "help"    <> O.help "Show help")
+  <*> O.optional (O.strOption (O.long "satPath" <> O.help "Set path to minisat."))
+  <*> O.optional (O.strOption (O.long "smtPath" <> O.help "Set path to minismt."))
+  <*> O.subparser (O.command "mode" (O.info mparser O.idm))
+  <*> O.optional (O.strOption (O.long "strategy" <> O.help "The strategy to apply."))
+  <*> O.argument O.str (O.metavar "File")
+
+data TctConfig prob = TctConfig
   { satSolver       :: FilePath
   , smtSolver       :: FilePath
-  , errMsg          :: String
-
-  , parseProblem    :: String -> prob
   , strategies      :: [SomeProcessor prob]
   , defaultStrategy :: SomeProcessor prob
-  , modeOptions     :: Options () prob
   }
+
+
+defaultStrategies :: ProofData prob => [SomeProcessor prob]
+defaultStrategies = 
+  [ SomeProc $ TimeoutProc Nothing Nothing FailProc
+  ]
 
 defaultTctConfig :: TctMode mode => mode -> TctConfig (ModeProblem mode)
 defaultTctConfig mode = TctConfig 
-  { satSolver    = "/usr/bin/minisat"
-  , smtSolver    = "/usr/bin/yices"
-  , errMsg       = ""
-
-  , parseProblem    = parseProblem_ mode
-  , strategies      = strategies_ mode
-  , defaultStrategy = defaultStrategy_ mode
-  , modeOptions     = modeOptions_ mode
+  { satSolver       = "/usr/bin/minisat"
+  , smtSolver       = "/usr/bin/yices"
+  , strategies      = defaultStrategies ++ modeStrategies mode
+  , defaultStrategy = modeDefaultStrategy mode
   }
   
 run :: TctConfig prob -> TctM a -> IO a
@@ -74,38 +99,67 @@ run cfg m = do
       , stopTime     = Nothing }
   runReaderT (runTct m) state
 
-realMain :: (ProofData prob) => TctConfig prob -> IO ()
-realMain cfg = do
-  (st:fn:_) <- getArgs
-  let ps1 = strategies cfg
-      ps2 = SomeProc (timeoutIn 20 (SomeProc failP))
-      ps3 = ps2 : ps1
-  prb <- parseProblem cfg `liftM` readFile fn
-  print prb
-  print ps3
-  let 
-    pr = either (\err -> error ("not found " ++ err)) id (readAnyProc ps3 st)
-    --pr = fromString ps3 st
-  
-  pt <- fromReturn `liftM` (run cfg $ evaluate (Proc $  pr) prb)
-  --pt <- fromReturn `liftM` (run cfg $ evaluate (Proc $ defaultStrategy cfg) prb)
-  putStrLn $ "ProofTree:"
-  putStrLn . display $ pretty pt
-  putStrLn $ "Certificate:"
-  putStrLn . display . pretty $ certificate pt
-  r <- runErroneousIO $
-    return cfg
-  case r of
-    Left s     -> putStrLn s
-    Right cfg' -> print $ errMsg cfg' 
+realMain :: TctMode mode => TctDyreConfig mode -> IO ()
+realMain dcfg = do
+  r <- runErroneousIO $ do
+    mode <- liftEither dcfg
+    opts <- liftIO $ O.execParser $ O.info (mkParser (modeOptions mode) ) O.briefDesc
+    let 
+      cfg = defaultTctConfig mode
+      TctOptions
+        { version_      = showVersion
+        , help_         = showHelp
+        , strategyName_ = strategyNameM
+        , problemFile_  = problemFile
+        } = opts
+    liftIO $ do
+      when showVersion $ print "version" >> exitSuccess
+      when showHelp $ print "help" >> exitSuccess
+    -- do checks
 
-tctl :: (ProofData prob) => TctConfig prob -> IO ()
+    prob <- liftEither $ modeModifyer mode (modeOptions_ opts)`liftM` modeParser mode problemFile
+    strat <- maybe (return $ modeDefaultStrategy mode) (liftEither . readAnyProc (strategies cfg)) strategyNameM
+    pt <- liftIO $ fromReturn `liftM` (run cfg $ evaluate (Proc $ strat) prob)
+    liftIO $ do
+      putStrLn "Problem:"
+      putStrLn . display $ pretty prob
+      putStrLn "ProofTree:"
+      putStrLn . display $ pretty pt
+      putStrLn "Certificate:"
+      putStrLn . display $ pretty $ certificate pt
+  case r of
+    Left err -> hPutStrLn stderr (show err) >> exitFailure
+    Right _  -> exitSuccess
+
+
+
+  --(st:fn:_) <- getArgs
+  --let ps1 = strategies cfg
+      --ps2 = SomeProc (timeoutIn 20 (SomeProc failP))
+      --ps3 = ps2 : ps1
+  --prb <- parseProblem cfg `liftM` readFile fn
+  --print prb
+  --print ps3
+  --let 
+    --pr = either (\err -> error ("not found " ++ err)) id (readAnyProc ps3 st)
+    ----pr = fromString ps3 st
+  
+  --pt <- fromReturn `liftM` (run cfg $ evaluate (Proc $  pr) prb)
+  ----pt <- fromReturn `liftM` (run cfg $ evaluate (Proc $ defaultStrategy cfg) prb)
+  --putStrLn $ "ProofTree:"
+  --putStrLn . display $ pretty pt
+  --putStrLn $ "Certificate:"
+  --putStrLn . display . pretty $ certificate pt
+
+type TctDyreConfig mode = Either TctError mode
+
+tctl :: TctMode mode => TctDyreConfig mode -> IO ()
 tctl = Dyre.wrapMain $ Dyre.defaultParams
   { Dyre.projectName = "tctl"
   , Dyre.realMain    = realMain
   , Dyre.configDir   = Just tctldir
   , Dyre.cacheDir    = Just tctldir
-  , Dyre.showError   = \cfg emsg -> cfg { errMsg = emsg }
+  , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
   , Dyre.ghcOpts     = ["-threaded", "-package tct-3.0"] }
   --, Dyre.ghcOpts     = ["-threaded"] }
   where tctldir = getHomeDirectory >>= \home -> return (home </> "tctl") 
