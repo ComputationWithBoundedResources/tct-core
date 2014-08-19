@@ -48,24 +48,26 @@ instance TctMode Void where
 
 
 data TctOptions m = TctOptions
-  { version_      :: Bool
-  , help_         :: Bool
-  , satSolver_    :: Maybe FilePath
+  { satSolver_    :: Maybe FilePath
   , smtSolver_    :: Maybe FilePath
   , modeOptions_  :: m
   , strategyName_ :: Maybe String
   , problemFile_  :: FilePath
   }
 
-mkParser :: O.Parser m -> O.Parser (TctOptions m)
-mkParser mparser = TctOptions
-  <$> O.switch (O.long "version" <> O.help "Show Version.")
-  <*> O.switch (O.long "help"    <> O.help "Show help")
-  <*> O.optional (O.strOption (O.long "satPath" <> O.help "Set path to minisat."))
-  <*> O.optional (O.strOption (O.long "smtPath" <> O.help "Set path to minismt."))
-  <*> O.subparser (O.command "mode" (O.info mparser O.idm))
-  <*> O.optional (O.strOption (O.long "strategy" <> O.help "The strategy to apply."))
-  <*> O.argument O.str (O.metavar "File")
+
+mkParser :: O.Parser m -> O.ParserInfo (TctOptions m)
+mkParser mparser = O.info (versioned <*> O.helper <*> tctp) desc
+  where 
+    versioned = O.infoOption "version" $ O.long "version" <> O.short 'v' <> O.help "Show Version" <> O.hidden
+    tctp = TctOptions
+      <$> O.optional (O.strOption (O.long "satPath" <> O.help "Set path to minisat."))
+      <*> O.optional (O.strOption (O.long "smtPath" <> O.help "Set path to minismt."))
+      -- <*> O.subparser (O.command "mode" (O.info mparser O.idm))
+      <*> mparser
+      <*> O.optional (O.strOption (O.long "strategy" <> O.help "The strategy to apply."))
+      <*> O.argument O.str (O.metavar "File")
+    desc = O.briefDesc <> O.progDesc "TcT -- Tyrolean Complexity Tool"
 
 data TctConfig prob = TctConfig
   { satSolver       :: FilePath
@@ -99,23 +101,17 @@ run cfg m = do
       , stopTime     = Nothing }
   runReaderT (runTct m) state
 
-realMain :: TctMode mode => TctDyreConfig mode -> IO ()
+realMain :: TctMode mode => TctModeConfig mode -> IO ()
 realMain dcfg = do
   r <- runErroneousIO $ do
     mode <- liftEither dcfg
-    opts <- liftIO $ O.execParser $ O.info (mkParser (modeOptions mode) ) O.briefDesc
-    let 
+    opts <- liftIO $ O.execParser (mkParser (modeOptions mode))
+    let
       cfg = defaultTctConfig mode
       TctOptions
-        { version_      = showVersion
-        , help_         = showHelp
-        , strategyName_ = strategyNameM
+        { strategyName_ = strategyNameM
         , problemFile_  = problemFile
         } = opts
-    liftIO $ do
-      when showVersion $ print "version" >> exitSuccess
-      when showHelp $ print "help" >> exitSuccess
-    -- do checks
 
     prob <- liftEither $ modeModifyer mode (modeOptions_ opts)`liftM` modeParser mode problemFile
     strat <- maybe (return $ modeDefaultStrategy mode) (liftEither . readAnyProc (strategies cfg)) strategyNameM
@@ -151,9 +147,12 @@ realMain dcfg = do
   --putStrLn $ "Certificate:"
   --putStrLn . display . pretty $ certificate pt
 
-type TctDyreConfig mode = Either TctError mode
+applyMode :: TctMode mode => mode -> TctModeConfig mode
+applyMode = Right 
 
-tctl :: TctMode mode => TctDyreConfig mode -> IO ()
+type TctModeConfig mode = Either TctError mode
+
+tctl :: TctMode mode => TctModeConfig mode -> IO ()
 tctl = Dyre.wrapMain $ Dyre.defaultParams
   { Dyre.projectName = "tctl"
   , Dyre.realMain    = realMain

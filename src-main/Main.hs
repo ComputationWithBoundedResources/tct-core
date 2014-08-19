@@ -14,9 +14,9 @@ This module provides the main function of TcT.
 
 -}
 
-import Tct
+import Tct (tctl, applyMode, Void (..))
 
 
 main :: IO ()
-main = tctl $ defaultTctConfig Void
+main = tctl $ applyMode Void
 
