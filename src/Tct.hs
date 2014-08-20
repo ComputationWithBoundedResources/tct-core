@@ -2,35 +2,34 @@ module Tct
 where
 
 
-import qualified Config.Dyre as Dyre
-import           Control.Applicative
-import Data.Monoid
-import           Control.Monad
-import           Control.Monad.Reader (runReaderT)
-import           System.FilePath ((</>))
-import System.IO (hPutStrLn, stderr)
-import           System.Directory (getHomeDirectory)
-import qualified System.Time as Time
-import System.Exit (exitSuccess, exitFailure)
+import qualified Config.Dyre                as Dyre (Params (..), defaultParams, wrapMain)
+import           Control.Applicative        (pure, (<$>), (<*>))
+import           Control.Monad              (liftM)
+import           Control.Monad.Reader       (runReaderT)
+import           Data.Monoid                ((<>))
+import qualified Options.Applicative        as O
+import           System.Directory           (getHomeDirectory)
+import           System.Exit                (exitFailure, exitSuccess)
+import           System.FilePath            ((</>))
+import           System.IO                  (hPrint, stderr)
+import qualified System.Time                as Time
 
-import qualified Options.Applicative as O
-
-import           Tct.Error
 import           Tct.Core
+import           Tct.Error
+import           Tct.Pretty                 (Pretty, display, pretty, string)
 import           Tct.Processors.Combinators
-import           Tct.Pretty (Pretty, string, pretty, display)
 
 
 -- TODO
 -- get rid of redundancy in TctOptions, TctConfig
 
 
-data TctMode prob opt = ProofData prob => TctMode
-  { modeParser            :: String -> Either TctError prob
-  , modeStrategies        :: [SomeProcessor prob]
-  , modeDefaultStrategy   :: SomeProcessor prob
-  , modeOptions           :: O.Parser opt
-  , modeModifyer          :: prob -> opt -> prob }
+data TctMode prob opt = TctMode
+  { modeParser          :: String -> Either TctError prob
+  , modeStrategies      :: [SomeProcessor prob]
+  , modeDefaultStrategy :: SomeProcessor prob
+  , modeOptions         :: O.Parser opt
+  , modeModifyer        :: prob -> opt -> prob }
 
 
 data Void = Void deriving (Show, Read)
@@ -41,7 +40,7 @@ void :: TctMode Void Void
 void = TctMode
   { modeParser          = const $ Right Void
   , modeStrategies      = []
-  , modeDefaultStrategy = SomeProc $ FailProc
+  , modeDefaultStrategy = SomeProc FailProc
   , modeOptions         = pure Void
   , modeModifyer        = const id }
 
@@ -118,10 +117,10 @@ realMain dcfg = do
         , problemFile_  = theProblemFile
         , modeOptions_  = theOptions
         } = opts
-    file  <- liftIO $ readFile theProblemFile
+    file  <- tryIO $ readFile theProblemFile
     prob  <- liftEither $ theProblemParser file >>= \prob -> return (theModifyer prob theOptions)
     strat <- maybe (return theDefaultStrategy) (liftEither . readAnyProc (strategies cfg)) theStrategyName
-    pt    <- liftIO $ fromReturn `liftM` (run cfg $ evaluate (Proc $ strat) prob)
+    pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate (Proc strat) prob)
     liftIO $ do
       print $ strategies cfg
       putStrLn "Problem:"
@@ -131,7 +130,7 @@ realMain dcfg = do
       putStrLn "Certificate:"
       putStrLn . display $ pretty $ certificate pt
   case r of
-    Left err -> hPutStrLn stderr (show err) >> exitFailure
+    Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
 
 

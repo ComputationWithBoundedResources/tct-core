@@ -1,5 +1,5 @@
 module Tct.Core.Forks
-  ( 
+  (
   -- * Forks
     Judgement (..)
   , judgement
@@ -9,9 +9,9 @@ module Tct.Core.Forks
 where
 
 
-import Control.Applicative ((<$>), liftA2)
-import Data.Foldable as F (Foldable (..))
-import Data.Traversable as T (Traversable (..))
+import Control.Applicative (liftA2, (<$>))
+import Data.Foldable       as F (Foldable (..))
+import Data.Traversable    as T (Traversable (..))
 
 
 -- | 'Judgement' representst a node with no successor.
@@ -23,7 +23,7 @@ judgement :: a -> Judgement b -> a
 judgement a _ = a
 
 -- | 'Id' represents a node with one successor.
-newtype Id a = Id a 
+newtype Id a = Id a
   deriving (Foldable, Functor, Traversable)
 
 -- | 'Pair' represents a node with two successors.

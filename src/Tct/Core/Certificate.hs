@@ -33,7 +33,7 @@ import Tct.Pretty
 import Tct.SemiRing
 
 
-data Complexity 
+data Complexity
   = Poly (Maybe Int) -- ^ Polynomial. If argument is @Just k@, then
                      --   @k@ gives the degree of the polynomial
   | Exp (Maybe Int)  -- ^ Exponential. If argument is @Nothing@, then
@@ -46,7 +46,7 @@ data Complexity
   | Multrec          -- ^ Multiple recursive.
   | Rec              -- ^ Recursive.
   | Unknown          -- ^ Unknown.
-    deriving (Eq, Show)
+  deriving (Eq, Show)
 
 constant :: Complexity
 constant = Poly (Just 0)
@@ -87,7 +87,7 @@ compose :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `compose` a
   | n == 0 = Poly (Just 0)
   | n == 1 = a
-a `compose` (Poly (Just m)) 
+a `compose` (Poly (Just m))
   | m == 0 = Poly (Just 0)
   | m == 1 = a
 (Poly (Just n)) `compose` (Poly (Just m)) = Poly . Just $ n * m
@@ -101,19 +101,19 @@ a `compose` (Poly (Just m))
 a               `compose` b               = maximum [Primrec, a, b]
 
 iter :: Complexity -> Complexity -> Complexity
-(Poly (Just n)) `iter` _ 
+(Poly (Just n)) `iter` _
   | n == 0 = Poly $ Just 0
-(Poly (Just n)) `iter` (Poly m) 
+(Poly (Just n)) `iter` (Poly m)
   | n == 1 = case m of
     Just 0 -> Poly $ Just 1
     Just 1 -> Exp $ Just 1
     _      -> Exp $ Just 2
-(Poly n) `iter` (Exp _) 
+(Poly n) `iter` (Exp _)
   | n == Just 0 = Exp Nothing
   | n == Just 1 = Supexp
   | otherwise = Primrec
 (Poly _) `iter` b = max Primrec b
-(Exp _) `iter` (Poly m) 
+(Exp _) `iter` (Poly m)
   | m == Just 0 = Exp Nothing
   | m == Just 1 = Supexp
   | otherwise = Primrec
@@ -130,7 +130,7 @@ data Certificate = Certificate
 instance Pretty Certificate where pretty = text . show
 
 unbounded :: Certificate
-unbounded = Certificate 
+unbounded = Certificate
   { spaceUB = Unknown
   , spaceLB = Unknown
   , timeUB  = Unknown

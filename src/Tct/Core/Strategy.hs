@@ -7,7 +7,7 @@ module Tct.Core.Strategy
 
   , some
   , try
-  , force 
+  , force
   , (>>>), (>||), (<|>)
 
   , CustomStrategy (..)
@@ -15,19 +15,19 @@ module Tct.Core.Strategy
   ) where
 
 
-import           Control.Monad (liftM)
+import           Control.Monad       (liftM)
 import           Control.Monad.Error (catchError)
-import           Data.Monoid (mempty)
-import           Data.Foldable as F
-import           Data.Traversable as T
-import qualified Options.Applicative as O 
+import           Data.Foldable       as F
+import           Data.Monoid         (mempty)
+import           Data.Traversable    as T
+import qualified Options.Applicative as O
 
-import           Tct.Error (TctError (..))
-import           Tct.Core.TctM
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
-import qualified Tct.Pretty as PP
-import Tct.Parser(tokenize)
+import           Tct.Core.TctM
+import           Tct.Error           (TctError (..))
+import           Tct.Parser          (tokenize)
+import qualified Tct.Pretty          as PP
 --import qualified Tct.Xml as Xml
 
 data Strategy prob where
@@ -147,7 +147,7 @@ evaluateTreePar s t = spawnTree t >>= collect
 
 -- Strategy Processor --------------------------------------------------------
 -- lift Strategies to Processor
-data StrategyProof prob = StrategyProof (ProofTree prob) 
+data StrategyProof prob = StrategyProof (ProofTree prob)
 instance Show (StrategyProof prob) where  show (StrategyProof _) = "StrategyProof"
 instance ProofData prob => PP.Pretty (StrategyProof prob) where  pretty (StrategyProof pt) = PP.pretty pt
 
@@ -167,10 +167,10 @@ instance ProofData prob => Processor (Strategy prob) where
 strategy :: String -> O.Parser args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
 strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
 
-data CustomStrategy args prob = CustomStrategy 
-  { name_ :: String
-  , args_ :: args
-  , pargs_ :: O.Parser args
+data CustomStrategy args prob = CustomStrategy
+  { name_     :: String
+  , args_     :: args
+  , pargs_    :: O.Parser args
   , strategy_ :: args -> Strategy prob }
 
 instance Show (CustomStrategy args prob) where show = show . name_

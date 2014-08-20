@@ -1,18 +1,23 @@
-module Tct.Error 
-  (module Control.Monad.Error
+{-# LANGUAGE ScopedTypeVariables #-}
+module Tct.Error
+  (
+    module Control.Monad.Error
   , TctError (..)
   , runErroneousIO
+  , tryIO
   , liftEither
   , liftMaybe
   , hush
   , note
   ) where
 
-import Control.Monad.Error (Error, ErrorT (..), runErrorT, liftIO)
+import Control.Exception   (IOException, try)
+import Control.Monad.Error (Error, ErrorT (..), liftIO, runErrorT)
 
 data TctError
   = TctDyreError String
   | TctParseError String
+  | TctIOError String
   deriving Show
 
 instance Error TctError where
@@ -21,6 +26,11 @@ type ErroneousIO e = ErrorT e IO
 
 runErroneousIO :: ErroneousIO e a -> IO (Either e a)
 runErroneousIO = runErrorT
+
+tryIO :: IO a -> ErroneousIO TctError a
+tryIO io = ErrorT . liftIO $ do
+  e :: Either IOException a <- try io
+  return $ either (Left . TctIOError . show) Right e
 
 liftEither :: Either e a -> ErroneousIO e a
 liftEither = ErrorT . return

@@ -1,7 +1,5 @@
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE ImpredicativeTypes #-}
-module Tct.Processors.Combinators 
-  ( 
+module Tct.Processors.Combinators
+  (
     -- * Trivial Combinators
 
     FailProcessor (..)
@@ -19,12 +17,13 @@ module Tct.Processors.Combinators
 
 where
 
-import Control.Applicative
+import           Control.Applicative
 
 import qualified Options.Applicative as O
 
-import           Tct.Core as C
-import qualified Tct.Pretty as PP
+import           Tct.Core            as C
+import           Tct.Options
+import qualified Tct.Pretty          as PP
 -- import Tct.Xml as Xml
 
 
@@ -47,7 +46,7 @@ data TimeoutProcessor p = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, p
 data TimeoutProof p
   = Timeout Int
   | NoTimeout (ProofObject p)
-                      
+
 instance Processor p => Show (TimeoutProof p) where
   show (Timeout i)    = "Timeout " ++ show i
   show (NoTimeout po) = "NoTimeout (" ++ show po ++ ")"
@@ -63,7 +62,7 @@ instance Processor p => Processor (TimeoutProcessor p) where
   name _ = "TimeoutProcessor"
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
-    let 
+    let
       t = case (inT proc, untilT proc) of
         (Nothing, Just u ) -> max 0 (u - running)
         (Just i , Nothing) -> max 0 i
@@ -80,10 +79,10 @@ instance Processor p => Processor (TimeoutProcessor p) where
 
 instance Processor p => ParsableProcessor (TimeoutProcessor p) where
   args _ ps = Args $ O.liftA SomeProc $
-    TimeoutProc 
-    <$> O.optional (O.option (O.long "untilT")) 
-    <*> O.optional (O.option (O.long "inT")) 
-    <*> O.argument (readAnyProcMaybe ps) (O.metavar "procT")
+    TimeoutProc
+    <$> optional (anyArg "untilT" "iSec" (PP.string "stops when ..") (-1))
+    <*> optional (anyArg "inT" "iSec" (PP.string "aborts after iSec seconds") (-1))
+    <*> arguArg (readAnyProcMaybe ps) "proc" (PP.string "the applied subprocessor")
 
 timeoutIn :: Int -> p -> TimeoutProcessor p
 timeoutIn n = TimeoutProc (Just n) Nothing

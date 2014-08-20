@@ -12,13 +12,13 @@ module Tct.Core.ProofTree
   ) where
 
 
-import Control.Applicative as A ((<$>))
-import Data.Foldable as F (Foldable, foldr, foldMap, toList)
-import Data.Traversable as T (Traversable, traverse)
+import Control.Applicative  as A ((<$>))
+import Data.Foldable        as F (Foldable, foldMap, foldr, toList)
+import Data.Traversable     as T (Traversable, traverse)
 
 import Tct.Core.Certificate (Certificate, unbounded)
 import Tct.Core.Processor
-import Tct.Pretty as PP
+import Tct.Pretty           as PP
 
 
 data ProofNode p = ProofNode
@@ -74,7 +74,7 @@ instance Traversable ProofTree where
   f `traverse` (Progress pn cfn pts) = Progress pn cfn A.<$> (f `traverse`) `traverse` pts
 
 instance Processor p => Pretty (ProofNode p) where
-  pretty (ProofNode prob p po) = 
+  pretty (ProofNode prob p po) =
     text "Considered Problem:" <$$> indent 2 (pretty prob)
     <$$> text "Applied Processor:" <$$> indent 2 (text $ name p)
     <$$> text "Proof:" <$$> indent 2 (pretty po)
@@ -83,11 +83,11 @@ filler :: Doc
 filler = text "-------------------------------------------------------------------------------"
 
 instance Pretty l => Pretty (ProofTree l) where
-  pretty (Open l) = 
-    empty 
+  pretty (Open l) =
+    empty
     <$$> filler
     <$$> text "?" <+> pretty l
-  pretty (NoProgress pn pt) = 
+  pretty (NoProgress pn pt) =
     empty
     <$$> filler
     <$$> pretty pn

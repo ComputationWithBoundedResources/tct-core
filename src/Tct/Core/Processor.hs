@@ -18,23 +18,21 @@ module Tct.Core.Processor
   ) where
 
 
-import           Data.Foldable as F
-import           Data.Traversable as T
-import           Data.Either (isRight)
-import           Data.List as L (find)
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid (mempty)
-import qualified Options.Applicative as O
+import           Data.Either          (isRight)
+import           Data.Foldable        as F
+import           Data.List            as L( find)
+import           Data.Maybe           (fromMaybe)
+import           Data.Monoid          (mempty)
+import           Data.Traversable     as T
+import qualified Options.Applicative  as O
 
-import           Tct.Core.TctM
-import           Tct.Core.Forks (Id(..))
 import qualified Tct.Core.Certificate as C
-import qualified Tct.Pretty as PP
-import           Tct.Parser (tokenize)
-import           Tct.Error (TctError (..))
-import qualified Tct.Xml as Xml
-
-import Debug.Trace
+import           Tct.Core.Forks       (Id( ..))
+import           Tct.Core.TctM
+import           Tct.Error            (TctError( ..))
+import           Tct.Parser           (tokenize)
+import qualified Tct.Pretty           as PP
+import qualified Tct.Xml              as Xml
 
 -- Processor ----------------------------------------------------------------- 
 type Fork t      = (Foldable t, Functor t, Traversable t)

@@ -1,24 +1,24 @@
-module Tct.SemiRing 
-    (
-      Additive (..)
-    , Multiplicative (..)
-    , SemiRing
-    ) where
+module Tct.SemiRing
+  (
+    Additive (..)
+  , Multiplicative (..)
+  , SemiRing
+  ) where
 
 
--- | The commutative monoid underlying a 'SemiRing'. 
+-- | The commutative monoid underlying a 'SemiRing'.
 class Additive a where
     add :: a -> a -> a
-    zero :: a 
+    zero :: a
 
--- | The monoid underlying a 'SemiRing'. 
+-- | The monoid underlying a 'SemiRing'.
 class Multiplicative a where
   mult :: a -> a -> a
-  one :: a 
+  one :: a
 
--- | The 'Additive' and 'Multiplicative' instances 
+-- | The 'Additive' and 'Multiplicative' instances
 -- should satisfy the following laws:
--- 
+--
 -- * (a,'add') is a commutative monoid with identity 'zero':
 --
 --      prop> a `add` (b `add` c) = (a `add` b) `add` c
@@ -29,7 +29,7 @@ class Multiplicative a where
 --
 --      prop> a `mult` (b `mult` c) = (a `mult` b) `mult` c
 --      prop> one `mult` a = a `mult` one = a
--- 
+--
 -- * 'mult' left and right distributes over 'add':
 --
 --      prop> a `mult` (b `add` c) = (a `mult` b) `add` (a `mult` c)
