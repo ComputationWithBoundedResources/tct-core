@@ -30,9 +30,11 @@ import           Tct.Core.TctM
 import           Tct.Core.Forks (Id(..))
 import qualified Tct.Core.Certificate as C
 import qualified Tct.Pretty as PP
+import           Tct.Parser (tokenize)
 import           Tct.Error (TctError (..))
 import qualified Tct.Xml as Xml
 
+import Debug.Trace
 
 -- Processor ----------------------------------------------------------------- 
 type Fork t      = (Foldable t, Functor t, Traversable t)
@@ -71,18 +73,19 @@ class Processor p => ParsableProcessor p where
       readUnit
         | name p == ss = Right (SomeProc p)
         | otherwise   = Left $ TctParseError $ "unit argument (" ++ name p ++ ss ++ ")"
-      readArgs pargs 
-        | name p == t =
-          case O.execParserPure (O.prefs mempty) (O.info pargs O.briefDesc) ts of
+      readArgs pargs = do
+        (t,ts) <- tokenize ss
+        if name p == t
+          then case O.execParserPure (O.prefs mempty) (O.info pargs O.briefDesc) ts of
             O.Success a   -> Right a
             O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
             _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
-        | otherwise = Left $ TctParseError $ name p ++ ss
-        where (t:ts) = words ss
+          else Left $ TctParseError $ "optParser"
 
 readAnyProc :: 
   (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob) 
   => [SomeProcessor prob] -> String -> Either TctError (SomeProcessor prob)
+-- readAnyProc rs ss | trace (show $ tokenize ss) False = undefined
 readAnyProc rs s =  def `fromMaybe` L.find isRight (map (\r -> readProcessor r rs s) rs)
   where def = Left $ TctParseError $ "readAnyProc: ("  ++ s ++ ")"
 

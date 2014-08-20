@@ -27,6 +27,7 @@ import           Tct.Core.TctM
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
 import qualified Tct.Pretty as PP
+import Tct.Parser(tokenize)
 --import qualified Tct.Xml as Xml
 
 data Strategy prob where
@@ -185,16 +186,17 @@ instance ProofData prob => Processor (CustomStrategy arg prob) where
       then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
 
+-- TODO: refactor with Processor
 instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
   -- args p _ = SomeProc `O.liftA` strategy_ p `O.liftA` pargs_ p
-  readProcessor p _ ss
-    | name p == t =
-      case O.execParserPure (O.prefs mempty) (O.info (pargs_ p) O.briefDesc) ts of
+  readProcessor p _ ss = do
+    (t,ts) <- tokenize ss
+    if name p == t
+      then case O.execParserPure (O.prefs mempty) (O.info (pargs_ p) O.briefDesc) ts of
         O.Success a   -> Right $ SomeProc $ p {args_ = a}
         O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
         _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
-    | otherwise = Left $ TctParseError $ name p ++ ss
-    where (t:ts) = words ss
+      else Left $ TctParseError $ name p ++ ss
 
 -- make Processor (SomeProcessor prob) mainly for parsing;
 data SomeProofObject               where SomeProofObj :: (ProofData obj) => obj -> SomeProofObject
