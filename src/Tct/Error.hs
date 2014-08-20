@@ -33,3 +33,4 @@ hush = either (const Nothing) Just
 
 note :: a -> Maybe b -> Either a b
 note a = maybe (Left a) Right
+

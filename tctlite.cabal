@@ -20,6 +20,20 @@ Description:
 cabal-version: >= 1.8
 build-type: Simple
 
+-- Executable tctw
+--   hs-source-dirs: src-w
+--   main-is: tctl.hs
+--   build-depends:
+--     containers           >= 0.5 && < 0.6,
+--     optparse-applicative == 0.9.*,
+--     mtl                  >= 2.1 && < 2.2,
+--     base == 4.*,
+-- 
+--     smtlib == 0.*,
+--     tct  == 3.*
+--   ghc-options:
+--     -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+
 Executable tctl
   hs-source-dirs: src-main
   main-is: Main.hs
@@ -39,6 +53,7 @@ Library
     Tct.Core.ProofTree
     Tct.Core.Strategy
     Tct.Core.TctM
+    Tct.Error
     Tct.Options
     Tct.Pretty
     Tct.Processors.Combinators
