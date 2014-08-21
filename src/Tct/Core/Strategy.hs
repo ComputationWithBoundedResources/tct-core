@@ -189,7 +189,7 @@ instance ProofData prob => Processor (CustomStrategy arg prob) where
 -- TODO: refactor with Processor
 instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
   -- args p _ = SomeProc `O.liftA` strategy_ p `O.liftA` pargs_ p
-  readProcessor p _ ss = do
+  parseProcessor p _ ss = do
     (t,ts) <- tokenize ss
     if name p == t
       then case O.execParserPure (O.prefs mempty) (O.info (pargs_ p) O.briefDesc) ts of
@@ -209,7 +209,7 @@ instance ProofData prob => Processor (SomeProcessor prob) where
   type Forking (SomeProcessor prob) = ProofTree
   name (SomeProc p) = name p
   solve p prob = do
-    pt <- fromReturn `liftM` evaluate (Proc $ p) prob
+    pt <- fromReturn `liftM` evaluate (Proc p) prob
     return $ if progress pt
       then Success pt (StrategyProof pt) certfn
       else Fail (StrategyProof pt)
@@ -219,5 +219,5 @@ instance ProofData prob => Processor (SomeProcessor prob) where
       certfn (Progress _ certfn' subtrees) = certfn' (certfn `fmap` subtrees)
 
 instance ProofData prob => ParsableProcessor (SomeProcessor prob) where
-  readProcessor (SomeProc p) = readProcessor p
+  parseProcessor (SomeProc p) = parseProcessor p
 

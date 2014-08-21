@@ -19,8 +19,6 @@ where
 
 import           Control.Applicative
 
-import qualified Options.Applicative as O
-
 import           Tct.Core            as C
 import           Tct.Options
 import qualified Tct.Pretty          as PP
@@ -78,11 +76,13 @@ instance Processor p => Processor (TimeoutProcessor p) where
         , certificateFn = certificateFn r }
 
 instance Processor p => ParsableProcessor (TimeoutProcessor p) where
-  args _ ps = Args $ O.liftA SomeProc $
-    TimeoutProc
-    <$> optional (anyArg "untilT" "iSec" (PP.string "stops when ..") (-1))
-    <*> optional (anyArg "inT" "iSec" (PP.string "aborts after iSec seconds") (-1))
-    <*> arguArg (readAnyProcMaybe ps) "proc" (PP.string "the applied subprocessor")
+  args _ ps = argsParser pargs desc
+    where 
+      pargs = TimeoutProc
+        <$> optional (anyArg "untilT" "iSec" (PP.string "stops when ..") (-1))
+        <*> optional (anyArg "inT" "iSec" (PP.string "aborts after iSec seconds") (-1))
+        <*> arguArg (parseSomeProcessorMaybe ps) "proc" (PP.string "the applied subprocessor")
+      desc = PP.string "the timeoutprocessor"
 
 timeoutIn :: Int -> p -> TimeoutProcessor p
 timeoutIn n = TimeoutProc (Just n) Nothing

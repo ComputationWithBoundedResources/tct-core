@@ -13,6 +13,7 @@ import Text.PrettyPrint.ANSI.Leijen
 
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
+
 table :: [(Align, [Doc])] -> Doc
 table cols = vcat [ pprow row | row <- rows]
   where

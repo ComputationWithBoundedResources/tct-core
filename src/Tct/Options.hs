@@ -28,6 +28,9 @@ flagArg flg doc def alt = flag def alt $ mconcat [long flg, helpDoc (Just doc), 
 arguArg :: (String -> Maybe a) -> Meta -> Help -> Parser a
 arguArg red met doc = argument red $ mconcat [metavar met, helpDoc (Just doc)]
 
+
+
+
 {-lexer :: P.TokenParser st-}
 {-lexer = P.makeTokenParser haskellDef-}
 

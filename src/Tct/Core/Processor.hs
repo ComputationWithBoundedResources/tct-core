@@ -1,18 +1,24 @@
 module Tct.Core.Processor 
   ( 
+    -- * Processor
     Result (..)
   , Processor (..)
-  , ParsableProcessor (..)
-  , SomeProcessor (..)
-  , Arguments (..)
-
-  , readAnyProc
-  , readAnyProcMaybe
-
   , Fork
   , ProofData
   , CertificateFn
-  
+
+    -- * Existential Type
+  , SomeProcessor (..)
+
+    -- * Parsable Procesor
+  , ParsableProcessor (..)
+  , unitParser  
+  , argsParser
+  , mkDescription
+  , parseSomeProcessor
+  , parseSomeProcessorMaybe
+
+    -- * IOError handling
   , ErroneousProcessor (..)
   , ErroneousProof (..)
   ) where
@@ -25,11 +31,12 @@ import           Data.Maybe           (fromMaybe)
 import           Data.Monoid          (mempty)
 import           Data.Traversable     as T
 import qualified Options.Applicative  as O
+import qualified Options.Applicative.Help  as O
 
 import qualified Tct.Core.Certificate as C
 import           Tct.Core.Forks       (Id( ..))
 import           Tct.Core.TctM
-import           Tct.Error            (TctError( ..))
+import           Tct.Error            (TctError( ..), hush)
 import           Tct.Parser           (tokenize)
 import qualified Tct.Pretty           as PP
 import qualified Tct.Xml              as Xml
@@ -58,39 +65,56 @@ class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p
   description        = name
   solve              :: p -> Problem p -> TctM (Result p)
 
-data Arguments a = Unit | Args a
+
+-- Parsable Processor -------------------------------------------------------- 
+type ArgumentParser p = O.ParserInfo (SomeProcessor (Problem p))
+type Description      = PP.Doc
 
 class Processor p => ParsableProcessor p where
-  args          :: p -> [SomeProcessor (Problem p)] -> Arguments (O.Parser (SomeProcessor (Problem p)))
-  readProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either TctError (SomeProcessor (Problem p))
-  args _ _              = Unit
-  readProcessor p ps ss = case args p ps of
-    Unit       -> readUnit
-    Args pargs -> readArgs pargs
-    where
-      readUnit
-        | name p == ss = Right (SomeProc p)
-        | otherwise   = Left $ TctParseError $ "unit argument (" ++ name p ++ ss ++ ")"
-      readArgs pargs = do
-        (t,ts) <- tokenize ss
-        if name p == t
-          then case O.execParserPure (O.prefs mempty) (O.info pargs O.briefDesc) ts of
-            O.Success a   -> Right a
-            O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
-            _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
-          else Left $ TctParseError $ "optParser"
+  args           :: p -> [SomeProcessor (Problem p)] -> ArgumentParser p
+  parseProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either TctError (SomeProcessor (Problem p))
+  args p _              = unitParser p (PP.paragraph $ description p)
+  parseProcessor p ps ss = do
+    (t,ts) <- tokenize ss
+    if name p == t
+      then case O.execParserPure (O.prefs mempty) (args p ps) ts of
+        O.Success a   -> Right a
+        O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
+        _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
+      else Left $ TctParseError "optParser"
 
-readAnyProc :: 
-  (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob) 
+-- | Default processor (argument) parser without arguments.
+unitParser :: ParsableProcessor a => a -> Description -> ArgumentParser a
+unitParser p desc = SomeProc `fmap` O.info (O.pure p) (O.progDescDoc (Just desc))
+
+-- | Define custom processor (argument) parser.
+argsParser :: ParsableProcessor a => O.Parser a -> Description -> ArgumentParser a
+argsParser parser desc = SomeProc `fmap` O.info parser (O.progDescDoc (Just desc))
+
+mkDescription :: [SomeProcessor prob] -> PP.Doc
+mkDescription ps = PP.vcat $ map (mkDescription' ps) ps where
+
+mkDescription' :: [SomeProcessor prob] -> SomeProcessor prob  -> PP.Doc
+mkDescription' ps (SomeProc p) = 
+  PP.string "--" PP.<+> PP.string (name p) PP.<+> PP.string (replicate (74 - length (name p)) '-')
+  PP.<$$>  
+  PP.indent 2 (PP.empty
+  PP.<$$> O.helpText (O.parserHelp (O.prefs O.idm) (O.infoParser parser))
+  PP.<$$> (PP.empty `fromMaybe`  O.unChunk (O.infoProgDesc parser))
+  PP.<$$> PP.empty)
+  where 
+    parser = args p ps
+  
+parseSomeProcessor :: (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob) 
   => [SomeProcessor prob] -> String -> Either TctError (SomeProcessor prob)
 -- readAnyProc rs ss | trace (show $ tokenize ss) False = undefined
-readAnyProc rs s =  def `fromMaybe` L.find isRight (map (\r -> readProcessor r rs s) rs)
+parseSomeProcessor rs s =  def `fromMaybe` L.find isRight (map (\r -> parseProcessor r rs s) rs)
   where def = Left $ TctParseError $ "readAnyProc: ("  ++ s ++ ")"
 
-readAnyProcMaybe :: 
+parseSomeProcessorMaybe :: 
   (ParsableProcessor (SomeProcessor t), Problem (SomeProcessor t) ~ t) => 
   [SomeProcessor t] -> String -> Maybe (SomeProcessor t)
-readAnyProcMaybe rs s = either (const Nothing) Just $ readAnyProc rs s
+parseSomeProcessorMaybe rs s = hush $ parseSomeProcessor rs s
 
 
 data SomeProcessor :: * -> * where

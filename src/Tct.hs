@@ -6,7 +6,7 @@ import qualified Config.Dyre                as Dyre (Params (..), defaultParams,
 import           Control.Applicative        (pure, (<$>), (<*>))
 import           Control.Monad              (liftM)
 import           Control.Monad.Reader       (runReaderT)
-import           Data.Monoid                ((<>))
+import           Data.Monoid                ((<>), mconcat)
 import qualified Options.Applicative        as O
 import           System.Directory           (getHomeDirectory)
 import           System.Exit                (exitFailure, exitSuccess)
@@ -16,7 +16,7 @@ import qualified System.Time                as Time
 
 import           Tct.Core
 import           Tct.Error
-import           Tct.Pretty                 (Pretty, display, pretty, string)
+import qualified Tct.Pretty                 as PP
 import           Tct.Processors.Combinators
 
 
@@ -34,7 +34,7 @@ data TctMode prob opt = TctMode
 
 data Void = Void deriving (Show, Read)
 
-instance Pretty Void where pretty = const $ string "Void"
+instance PP.Pretty Void where pretty = const $ PP.string "Void"
 
 void :: TctMode Void Void
 void = TctMode
@@ -53,10 +53,11 @@ data TctOptions m = TctOptions
   }
 
 
-mkParser :: O.Parser m -> O.ParserInfo (TctOptions m)
-mkParser mparser = O.info (versioned <*> O.helper <*> tctp) desc
+mkParser :: [SomeProcessor proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
+mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
   where
-    versioned = O.infoOption "version" $ O.long "version" <> O.short 'v' <> O.help "Show Version" <> O.hidden
+    listed = O.infoOption (PP.display $ mkDescription ps) $ O.long "list" <> O.help "Display list of strategies."
+    versioned = O.infoOption version  $ O.long "version" <> O.short 'v' <> O.help "Display Version." <> O.hidden
     tctp = TctOptions
       <$> O.optional (O.strOption (O.long "satPath" <> O.help "Set path to minisat."))
       <*> O.optional (O.strOption (O.long "smtPath" <> O.help "Set path to minismt."))
@@ -64,7 +65,19 @@ mkParser mparser = O.info (versioned <*> O.helper <*> tctp) desc
       <*> mparser
       <*> O.optional (O.strOption (O.long "strategy" <> O.short 's' <> O.help "The strategy to apply."))
       <*> O.argument O.str (O.metavar "File")
-    desc = O.briefDesc <> O.progDesc "TcT -- Tyrolean Complexity Tool"
+    desc = mconcat
+      [ O.headerDoc   . Just $ PP.string "TcT -- Tyrolean Complexity Tool"
+      , O.progDescDoc . Just $ PP.string "TcT is a transformer framweork for automated complexity analysis."
+      , O.footerDoc   . Just $ PP.string "version" PP.<+> PP.string version PP.<> PP.char ',' PP.<+> PP.string licence
+      ]
+        
+
+version :: String
+version = "3.0.0"
+
+licence :: String
+licence = "some licence"
+    
 
 data TctConfig prob = TctConfig
   { satSolver       :: FilePath
@@ -109,7 +122,7 @@ realMain dcfg = do
         , modeOptions           = theOptionParser
         , modeModifyer          = theModifyer
         } = mode
-    opts <- liftIO $ O.execParser (mkParser theOptionParser)
+    opts <- liftIO $ O.execParser (mkParser (defaultStrategies ++ modeStrategies mode) theOptionParser)
     let
       cfg = defaultTctConfig mode
       TctOptions
@@ -119,16 +132,16 @@ realMain dcfg = do
         } = opts
     file  <- tryIO $ readFile theProblemFile
     prob  <- liftEither $ theProblemParser file >>= \prob -> return (theModifyer prob theOptions)
-    strat <- maybe (return theDefaultStrategy) (liftEither . readAnyProc (strategies cfg)) theStrategyName
+    strat <- maybe (return theDefaultStrategy) (liftEither . parseSomeProcessor (strategies cfg)) theStrategyName
     pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate (Proc strat) prob)
     liftIO $ do
       print $ strategies cfg
       putStrLn "Problem:"
-      putStrLn . display $ pretty prob
+      putStrLn . PP.display $ PP.pretty prob
       putStrLn "ProofTree:"
-      putStrLn . display $ pretty pt
+      putStrLn . PP.display $ PP.pretty pt
       putStrLn "Certificate:"
-      putStrLn . display $ pretty $ certificate pt
+      putStrLn . PP.display $ PP.pretty $ certificate pt
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
@@ -146,7 +159,7 @@ tctl = Dyre.wrapMain $ Dyre.defaultParams
   , Dyre.configDir   = Just tctldir
   , Dyre.cacheDir    = Just tctldir
   , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
-  , Dyre.ghcOpts     = ["-threaded", "-package tct-3.0"] }
+  , Dyre.ghcOpts     = ["-threaded", "-package tct-" ++ version] }
   --, Dyre.ghcOpts     = ["-threaded"] }
   where tctldir = getHomeDirectory >>= \home -> return (home </> "tctl")
 
