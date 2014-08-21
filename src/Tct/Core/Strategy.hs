@@ -164,13 +164,13 @@ instance ProofData prob => Processor (Strategy prob) where
 
 
 -- custom strategies
-strategy :: String -> O.Parser args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
+strategy :: String -> O.ParserInfo args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
 strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
 
 data CustomStrategy args prob = CustomStrategy
   { name_     :: String
   , args_     :: args
-  , pargs_    :: O.Parser args
+  , pargs_    :: O.ParserInfo args
   , strategy_ :: args -> Strategy prob }
 
 instance Show (CustomStrategy args prob) where show = show . name_
@@ -188,11 +188,11 @@ instance ProofData prob => Processor (CustomStrategy arg prob) where
 
 -- TODO: refactor with Processor
 instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
-  -- args p _ = SomeProc `O.liftA` strategy_ p `O.liftA` pargs_ p
+  args p _ = SomeProc `fmap` const p `fmap` pargs_ p
   parseProcessor p _ ss = do
     (t,ts) <- tokenize ss
     if name p == t
-      then case O.execParserPure (O.prefs mempty) (O.info (pargs_ p) O.briefDesc) ts of
+      then case O.execParserPure (O.prefs mempty) (pargs_ p) ts of
         O.Success a   -> Right $ SomeProc $ p {args_ = a}
         O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
         _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"

@@ -61,13 +61,12 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
     tctp = TctOptions
       <$> O.optional (O.strOption (O.long "satPath" <> O.help "Set path to minisat."))
       <*> O.optional (O.strOption (O.long "smtPath" <> O.help "Set path to minismt."))
-      -- <*> O.subparser (O.command "mode" (O.info mparser O.idm))
       <*> mparser
       <*> O.optional (O.strOption (O.long "strategy" <> O.short 's' <> O.help "The strategy to apply."))
       <*> O.argument O.str (O.metavar "File")
     desc = mconcat
       [ O.headerDoc   . Just $ PP.string "TcT -- Tyrolean Complexity Tool"
-      , O.progDescDoc . Just $ PP.string "TcT is a transformer framweork for automated complexity analysis."
+      , O.progDescDoc . Just $ PP.string owl
       , O.footerDoc   . Just $ PP.string "version" PP.<+> PP.string version PP.<> PP.char ',' PP.<+> PP.string licence
       ]
         
@@ -78,6 +77,14 @@ version = "3.0.0"
 licence :: String
 licence = "some licence"
     
+owl :: String
+owl = unlines
+  [ " ,___, "
+  , " [O.o]   - TcT is a transformer framework for automated complexity analysis."
+  , "/)___) " 
+  , "--\"-\"-"
+  ]
+
 
 data TctConfig prob = TctConfig
   { satSolver       :: FilePath
