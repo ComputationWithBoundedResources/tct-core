@@ -1,5 +1,5 @@
 Name:               tct
-Version:            3.0
+Version:            3.0.0
 Author:
   Martin Avanzini <martin.avanzini@uibk.ac.at>,
   Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
@@ -20,19 +20,19 @@ Description:
 cabal-version: >= 1.8
 build-type: Simple
 
---Executable tctw
---  hs-source-dirs: src-w
---  main-is: tctl.hs
---  build-depends:
---    containers           >= 0.5 && < 0.6,
---    optparse-applicative == 0.9.*,
---    mtl                  >= 2.1 && < 2.2,
---    base == 4.*,
---
---    smtlib == 0.*,
---    tct  == 3.*
---  ghc-options:
---    -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+-- Executable tctw
+--   hs-source-dirs: src-w
+--   main-is: tctl.hs
+--   build-depends:
+--     containers           >= 0.5 && < 0.6,
+--     optparse-applicative == 0.9.*,
+--     mtl                  >= 2.1 && < 2.2,
+--     base == 4.*,
+-- 
+--     smtlib == 0.*,
+--     tct  == 3.*
+--   ghc-options:
+--     -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
 
 Executable tctl
   hs-source-dirs: src-main
