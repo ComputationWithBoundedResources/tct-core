@@ -1,66 +1,51 @@
 module Tct.Options
-  ( 
-    anyArg
-  , boolArg
-  , flagArg
-  , arguArg
+  (
+    eopt
+  , option
+  , switch
+  , flag
+  , argument
+  , withArgLong
+  , withDefault
+  , withHelpDoc
+  , withMetavar
+  , mkArgParser
   ) where
 
 
-import Data.Monoid
-import Options.Applicative
+import           Data.Monoid                          (Monoid, (<>))
+import qualified Options.Applicative                  as O
+import qualified Options.Applicative.Builder.Internal as O
 
-import Tct.Pretty (Doc)
+import           Tct.Pretty                           (Doc)
 
-type Flag = String
-type Meta = String
-type Help = Doc
+withArgLong :: O.HasName f => O.Mod f a -> String -> O.Mod f a
+opt `withArgLong` str = opt <> O.long str
 
-anyArg :: (Show a, Read a) => Flag -> Meta -> Help -> a -> Parser a
-anyArg flg met doc def = option $ mconcat [long flg, metavar met, helpDoc (Just doc), value def, showDefault]
+withDefault :: (O.HasValue f, Show a) => O.Mod f a -> a -> O.Mod f a
+opt `withDefault` a = opt <> O.showDefault <> O.value a
 
-boolArg :: Flag -> Help -> Parser Bool
-boolArg flg doc = switch $ mconcat [long flg, helpDoc (Just doc), showDefault]
+withHelpDoc :: O.Mod f a -> Doc -> O.Mod f a
+opt `withHelpDoc` doc = opt <> O.helpDoc (Just doc)
 
-flagArg :: Show a => Flag -> Help -> a -> a -> Parser a
-flagArg flg doc def alt = flag def alt $ mconcat [long flg, helpDoc (Just doc), showDefault]
+withMetavar :: O.HasMetavar f => O.Mod f a -> String -> O.Mod f a
+opt `withMetavar` str = opt <> O.metavar str
 
-arguArg :: (String -> Maybe a) -> Meta -> Help -> Parser a
-arguArg red met doc = argument red $ mconcat [metavar met, helpDoc (Just doc)]
+eopt :: Monoid m => m
+eopt = O.idm
 
+option :: Read a => O.Mod O.OptionFields a -> O.Parser a
+option = O.option
 
+flag :: a -> a -> O.Mod O.FlagFields a -> O.Parser a
+flag = O.flag
 
+switch :: O.Mod O.FlagFields Bool -> O.Parser Bool
+switch = O.switch
 
-{-lexer :: P.TokenParser st-}
-{-lexer = P.makeTokenParser haskellDef-}
+argument :: (String -> Maybe a) -> O.Mod O.ArgumentFields a -> O.Parser a
+argument = O.argument
 
-{-type Meaning s a = a -> CharParser s a-}
-
-{-data Option s a = Option -}
-  {-{ keyword  :: String-}
-  {-, optional :: Bool-}
-  {-, meaning  :: Meaning s a-}
-  {-, help     :: [String] }-}
-
-{-option :: Option s a -}
-{-option = Option -}
-  {-{ keyword  = undefined-}
-  {-, optional = True-}
-  {-, meaning  = undefined-}
-  {-, help     = [] }-}
-
-{-type Options s a = [Option s a]-}
-
-{-data Arg s a = Arg (Maybe String) (CharParser s a)-}
-
-{-(<#>) :: (b -> a -> b) -> Arg s a -> Meaning s b-}
-{-(<#>) f (Arg expected p) b = do -}
-  {-a <- maybe p (\ s -> p <?> s) expected-}
-  {-return (f b a)-}
-  
-{-none :: Arg s ()-}
-{-none = Arg Nothing $ return ()-}
-
-{-nat :: Arg s Int-}
-{-nat = Arg (Just "<nat>") $ fromIntegral `liftM` P.natural lexer-}
+mkArgParser :: Show a => O.Parser a -> Doc -> O.ParserInfo a
+mkArgParser par doc = O.info par (O.progDescDoc $ Just doc)
 

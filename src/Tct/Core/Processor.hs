@@ -38,6 +38,7 @@ import           Tct.Core.Forks       (Id( ..))
 import           Tct.Core.TctM
 import           Tct.Error            (TctError( ..), hush)
 import           Tct.Parser           (tokenize)
+import           Tct.Options
 import qualified Tct.Pretty           as PP
 import qualified Tct.Xml              as Xml
 
@@ -89,7 +90,7 @@ unitParser p desc = SomeProc `fmap` O.info (O.pure p) (O.progDescDoc (Just desc)
 
 -- | Define custom processor (argument) parser.
 argsParser :: ParsableProcessor a => O.Parser a -> Description -> ArgumentParser a
-argsParser parser desc = SomeProc `fmap` O.info parser (O.progDescDoc (Just desc))
+argsParser parser desc = SomeProc `fmap` mkArgParser parser desc
 
 mkDescription :: [SomeProcessor prob] -> PP.Doc
 mkDescription ps = PP.vcat $ map (mkDescription' ps) ps where
@@ -107,7 +108,6 @@ mkDescription' ps (SomeProc p) =
   
 parseSomeProcessor :: (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob) 
   => [SomeProcessor prob] -> String -> Either TctError (SomeProcessor prob)
--- readAnyProc rs ss | trace (show $ tokenize ss) False = undefined
 parseSomeProcessor rs s =  def `fromMaybe` L.find isRight (map (\r -> parseProcessor r rs s) rs)
   where def = Left $ TctParseError $ "readAnyProc: ("  ++ s ++ ")"
 

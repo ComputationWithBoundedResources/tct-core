@@ -79,9 +79,17 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
   args _ ps = argsParser pargs desc
     where 
       pargs = TimeoutProc
-        <$> optional (anyArg "untilT" "iSec" (PP.string "stops when ..") (-1))
-        <*> optional (anyArg "inT" "iSec" (PP.string "aborts after iSec seconds") (-1))
-        <*> arguArg (parseSomeProcessorMaybe ps) "proc" (PP.string "the applied subprocessor")
+        <$> optional (option $ eopt
+            `withArgLong` "untilT" 
+            `withMetavar` "iSec" 
+            `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
+        <*> optional (option $ eopt
+            `withArgLong` "inT" 
+            `withMetavar` "iSec" 
+            `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
+        <*> argument  (parseSomeProcessorMaybe ps) (eopt 
+            `withMetavar` "proc" 
+            `withHelpDoc` PP.string "The applied subprocessor.")
       desc = PP.string "the timeoutprocessor"
 
 timeoutIn :: Int -> p -> TimeoutProcessor p
@@ -93,4 +101,5 @@ timeoutUntil n = TimeoutProc Nothing (Just n)
 -- StrategyCombinator
 exhaustively :: Strategy prob -> Strategy prob
 exhaustively s =  s >>> try (exhaustively s)
+
 
