@@ -13,6 +13,7 @@ module Tct.Processors.Combinators
   , best
 
   , exhaustively
+  , ite
 
     -- * Processor Combinators
 
@@ -93,6 +94,9 @@ best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
 
 exhaustively :: Strategy prob -> Strategy prob
 exhaustively s =  s >>> try (exhaustively s)
+
+ite :: Strategy prob -> Strategy prob -> Strategy prob -> Strategy prob
+ite s sthen selse = s >>> try sthen <|> selse
 
 
 -- Trivial Combinators -------------------------------------------------------

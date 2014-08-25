@@ -7,11 +7,13 @@ module Tct.Core.TctM
   , askStatus
 
     -- * lift IO functions
+  , toIO
   , async
   , wait
   , waitEither
   , waitBoth
   , cancel
+  , race
 
   , timeout
   ) where
@@ -71,9 +73,23 @@ wait = liftIO . Async.wait
 cancel :: Async.Async a -> TctM ()
 cancel = liftIO . Async.cancel
 
---TODO: use withAsync rather than async for ProofTree
---withAsync :: TctM a -> TctM b
---withAsync m = toIO m >>= liftIO . withAsync
+race :: (a -> Bool) -> TctM a -> TctM a -> TctM a
+race p m1 m2 = do
+  io1 <- toIO m1
+  io2 <- toIO m2
+  liftIO $ race' p io1 io2
+  where 
+
+race' :: (a -> Bool) -> IO a -> IO a -> IO a
+race' p m1 m2 = 
+  Async.withAsync m1 $ \a1 ->
+    Async.withAsync m2 $ \a2 -> do
+      r1 <- Async.wait a1
+      if p r1
+        then Async.cancel a2 >> return r1 
+        else Async.wait a2
+
+
 
 -- | Wraps the computation into 'Timeout.timeout' and updates 'stopTime'.
 --   If the first argument is negative, the computation may run forever.

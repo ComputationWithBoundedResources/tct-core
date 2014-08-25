@@ -93,19 +93,13 @@ evaluate (s1 `Alt` s2) prob = do
     else evaluate s2 prob
 
 evaluate (s1 `OrFaster` s2) prob = do
-  a1 <- async $ evaluate s1 prob
-  a2 <- async $ evaluate s2 prob
-  e  <- waitEither a1 a2
-  case e of
-    Left  r1 -> progressA r1 a2
-    Right r2 -> progressA r2 a1
-  where
-    progressA r a =
-      let pt = fromReturn r in
-      if  progress pt
-        then cancel a >> return (Continue pt)
-        else wait a
-        
+  r <- race p (evaluate s1 prob) (evaluate s2 prob)
+  let pt = fromReturn r
+  return $ if progress pt
+    then Continue pt
+    else Abort pt
+  where p = progress . fromReturn
+
 -- TODO: a time delta; use asyncWith ??
 evaluate (OrBetter cmp s1 s2) prob = do
   toM <- remainingTime `fmap` askStatus prob
@@ -158,16 +152,16 @@ evaluateTreePar s t = spawnTree t >>= collect
     collect (Progress n certfn subtrees) = liftProgress n certfn `fmap` (collect `T.mapM` subtrees)
 
 
--- Error Processor ----------------------------------------------------------- 
+-- Error Processor -----------------------------------------------------------
 data ErroneousProof p = ErroneousProof IOError p deriving Show
 
 --instance Processor p => Xml.Xml (ErroneousProof p) where
-  --toXml (ErroneousProof err p) = 
+  --toXml (ErroneousProof err p) =
     --Xml.elt "error" [] [ Xml.elt "processor" [] [Xml.text (name p)]
                        --, Xml.elt "message" [] [Xml.text (show err)] ]
 
-instance Processor p => PP.Pretty (ErroneousProof p) where 
-  pretty (ErroneousProof err p) = 
+instance Processor p => PP.Pretty (ErroneousProof p) where
+  pretty (ErroneousProof err p) =
     PP.text "Processor" PP.<+> PP.squotes (PP.text (name p)) PP.<+> PP.text "signalled the following error:"
     PP.<$$> PP.indent 2 (PP.paragraph (show err))
 
