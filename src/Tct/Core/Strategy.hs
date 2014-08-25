@@ -5,11 +5,6 @@ module Tct.Core.Strategy
   , Return
   , fromReturn
 
-  , some
-  , try
-  , force
-  , (>>>), (>||), (<|>)
-
   , CustomStrategy (..)
   , strategy
   ) where
@@ -18,6 +13,7 @@ module Tct.Core.Strategy
 import           Control.Monad       (liftM)
 import           Control.Monad.Error (catchError)
 import           Data.Foldable       as F
+import           Data.Maybe          (fromMaybe)
 import           Data.Monoid         (mempty)
 import           Data.Traversable    as T
 import qualified Options.Applicative as O
@@ -33,31 +29,15 @@ import qualified Tct.Pretty          as PP
 data Strategy prob where
   Proc       :: SomeProcessor prob -> Strategy prob
   Trying     :: Bool -> Strategy prob -> Strategy prob
-  (:>>>:)    :: Strategy prob -> Strategy prob -> Strategy prob
-  (:>||>:)   :: Strategy prob -> Strategy prob -> Strategy prob
-  (:<>:)     :: Strategy prob -> Strategy prob -> Strategy prob
+  Then       :: Strategy prob -> Strategy prob -> Strategy prob
+  ThenPar    :: Strategy prob -> Strategy prob -> Strategy prob
+  Alt        :: Strategy prob -> Strategy prob -> Strategy prob
+  OrFaster   :: Strategy prob -> Strategy prob -> Strategy prob
+  OrBetter   :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
+  WithProof  :: (ProofTree prob -> Strategy prob) -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
 
 instance Show (Strategy prob) where show _ = "ShowStrategy"
-
-
-some :: (Processor p, ParsableProcessor p)  => p ->  Strategy (Problem p)
-some = Proc . SomeProc
-
-try :: Strategy prob -> Strategy prob
-try s@(Trying _ _) = Trying True s
-try (WithStatus f) = WithStatus (try . f)
-try s              = Trying True s
-
-force :: Strategy prob -> Strategy prob
-force s@(Trying _ _) = Trying False s
-force (WithStatus f) = WithStatus (force . f)
-force s              = Trying False s
-
-(>>>), (>||), (<|>) :: Strategy prob -> Strategy prob -> Strategy prob
-(>>>) = (:>>>:)
-(>||) = (:>||>:)
-(<|>) = (:<>:)
 
 
 data Return l = Continue l | Abort l deriving Show
@@ -89,34 +69,66 @@ evaluate (WithStatus f) prob = do
   st <- askStatus prob
   evaluate (f st) prob
 
-evaluate (s1 :>>>: s2) prob = do
+evaluate (WithProof f s) prob = do
+  pt <- fromReturn `fmap` evaluate s prob
+  evaluateTree (f pt) pt
+
+evaluate (s1 `Then` s2) prob = do
   r1 <- evaluate s1 prob
   case r1 of
     Abort pt1 -> return (Abort pt1)
     Continue pt1 -> evaluateTree s2 pt1
 
-evaluate (s1 :>||>: s2) prob = do
+evaluate (s1 `ThenPar` s2) prob = do
   r1 <- evaluate s1 prob
   case r1 of
     Abort pt1 -> return (Abort pt1)
     Continue pt1 -> evaluateTreePar s2 pt1
 
-evaluate (s1 :<>: s2) prob = do
-  r1 <- evaluate s1 prob
-  case r1 of
-    Continue pt1
-        | progress pt1 -> return (Continue pt1)
-        | otherwise -> do
-            r2 <- evaluate s2 prob
-            case r2 of
-              Abort _ -> return (Continue pt1)
-              Continue pt2 -> return (Continue pt2)
-    Abort pt1 -> return (Abort pt1)
+-- overrides Trying
+evaluate (s1 `Alt` s2) prob = do
+  pt1 <- fromReturn `fmap` evaluate s1 prob
+  if progress pt1
+    then return $ Continue pt1
+    else evaluate s2 prob
 
+evaluate (s1 `OrFaster` s2) prob = do
+  a1 <- async $ evaluate s1 prob
+  a2 <- async $ evaluate s2 prob
+  e  <- waitEither a1 a2
+  case e of
+    Left  r1 -> progressA r1 a2
+    Right r2 -> progressA r2 a1
+  where
+    progressA r a =
+      let pt = fromReturn r in
+      if  progress pt
+        then cancel a >> return (Continue pt)
+        else wait a
+
+evaluate (OrBetter cmp s1 s2) prob = do
+  toM <- remainingTime `fmap` askStatus prob
+  let to = (-1) `fromMaybe` toM
+  a1 <- async $ timeout to (evaluate s1 prob)
+  a2 <- async $ timeout to (evaluate s2 prob)
+  (r1,r2) <- waitBoth a1 a2
+  return $ case (fromReturn `fmap` r1, fromReturn `fmap` r2) of
+    (Just pt1, Just pt2)
+      | progress pt1 && progress pt2 -> maxBy cmp pt1 pt2
+      | progress pt1 -> Continue pt1
+      | progress pt2 -> Continue pt2
+      | otherwise -> def
+    (Just pt1, Nothing ) | progress pt1 -> Continue pt1
+    (Nothing , Just pt2) | progress pt2 -> Continue pt2
+    _ -> def
+  where
+    def = Abort (Open prob)
+    maxBy cm pt1 pt2 =
+      Continue $ if cm pt1 pt2 == LT then pt2 else pt1
 
 liftNoProgress :: Processor p => ProofNode p -> Return (ProofTree l) -> Return (ProofTree l)
 liftNoProgress n (Continue pt) = Continue (NoProgress n pt)
-liftNoProgress n (Abort pt) = Abort (NoProgress n pt)
+liftNoProgress n (Abort pt)    = Abort (NoProgress n pt)
 
 liftProgress :: Processor p => ProofNode p -> CertificateFn p -> Forking p (Return (ProofTree l)) -> Return (ProofTree l)
 liftProgress n certfn rs
@@ -145,6 +157,30 @@ evaluateTreePar s t = spawnTree t >>= collect
     collect (Progress n certfn subtrees) = liftProgress n certfn `fmap` (collect `T.mapM` subtrees)
 
 
+-- Error Processor ----------------------------------------------------------- 
+data ErroneousProof p = ErroneousProof IOError p deriving Show
+
+--instance Processor p => Xml.Xml (ErroneousProof p) where
+  --toXml (ErroneousProof err p) = 
+    --Xml.elt "error" [] [ Xml.elt "processor" [] [Xml.text (name p)]
+                       --, Xml.elt "message" [] [Xml.text (show err)] ]
+
+instance Processor p => PP.Pretty (ErroneousProof p) where 
+  pretty (ErroneousProof err p) = 
+    PP.text "Processor" PP.<+> PP.squotes (PP.text (name p)) PP.<+> PP.text "signalled the following error:"
+    PP.<$$> PP.indent 2 (PP.paragraph (show err))
+
+data ErroneousProcessor p = ErroneousProc IOError p deriving Show
+
+instance Processor p => Processor (ErroneousProcessor p) where
+  type ProofObject (ErroneousProcessor p) = ErroneousProof p
+  type Problem (ErroneousProcessor p)     = Problem p
+  name (ErroneousProc err p)              = name p ++ "[error: " ++ show err ++ "]"
+  solve (ErroneousProc err p) _           = return (Fail (ErroneousProof err p))
+
+instance Processor p => ParsableProcessor (ErroneousProcessor p) where
+
+
 -- Strategy Processor --------------------------------------------------------
 -- lift Strategies to Processor
 data StrategyProof prob = StrategyProof (ProofTree prob)
@@ -162,6 +198,15 @@ instance ProofData prob => Processor (Strategy prob) where
       then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
 
+
+-- FIXME:
+-- to make an instance for custom strategies arg has to be provided but is ignored anyway
+-- awkward to provide unit instance
+--
+-- provide two strategies;
+-- named strategy { name ... , strategie }
+-- and custom { name , arg -> strategie , parser args }
+-- when parsing do from custom -> namede (may not work out because of prob?)
 
 -- custom strategies
 strategy :: String -> O.ParserInfo args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
@@ -211,12 +256,8 @@ instance ProofData prob => Processor (SomeProcessor prob) where
   solve p prob = do
     pt <- fromReturn `liftM` evaluate (Proc p) prob
     return $ if progress pt
-      then Success pt (StrategyProof pt) certfn
+      then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
-    where
-      certfn (Open c)                      = c
-      certfn (NoProgress _ subtree)        = certfn subtree
-      certfn (Progress _ certfn' subtrees) = certfn' (certfn `fmap` subtrees)
 
 instance ProofData prob => ParsableProcessor (SomeProcessor prob) where
   parseProcessor (SomeProc p) = parseProcessor p

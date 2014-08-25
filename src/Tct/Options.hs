@@ -13,7 +13,7 @@ module Tct.Options
   ) where
 
 
-import           Data.Monoid                          (Monoid, (<>))
+import           Data.Monoid                          ((<>))
 import qualified Options.Applicative                  as O
 import qualified Options.Applicative.Builder.Internal as O
 
@@ -23,7 +23,7 @@ withArgLong :: O.HasName f => O.Mod f a -> String -> O.Mod f a
 opt `withArgLong` str = opt <> O.long str
 
 withDefault :: (O.HasValue f, Show a) => O.Mod f a -> a -> O.Mod f a
-opt `withDefault` a = opt <> O.showDefault <> O.value a
+opt `withDefault` a = opt <> O.value a
 
 withHelpDoc :: O.Mod f a -> Doc -> O.Mod f a
 opt `withHelpDoc` doc = opt <> O.helpDoc (Just doc)
@@ -31,8 +31,8 @@ opt `withHelpDoc` doc = opt <> O.helpDoc (Just doc)
 withMetavar :: O.HasMetavar f => O.Mod f a -> String -> O.Mod f a
 opt `withMetavar` str = opt <> O.metavar str
 
-eopt :: Monoid m => m
-eopt = O.idm
+eopt :: Show a => O.Mod f a
+eopt = O.idm <> O.showDefault
 
 option :: Read a => O.Mod O.OptionFields a -> O.Parser a
 option = O.option
@@ -47,5 +47,5 @@ argument :: (String -> Maybe a) -> O.Mod O.ArgumentFields a -> O.Parser a
 argument = O.argument
 
 mkArgParser :: Show a => O.Parser a -> Doc -> O.ParserInfo a
-mkArgParser par doc = O.info par (O.progDescDoc $ Just doc)
+mkArgParser par doc = O.info par (O.fullDesc <> O.progDescDoc (Just doc))
 

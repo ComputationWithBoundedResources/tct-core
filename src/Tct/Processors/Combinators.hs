@@ -1,29 +1,101 @@
 module Tct.Processors.Combinators
   (
-    -- * Trivial Combinators
+    -- * Strategy Combinators
+    some
+  , (>>>), (>||>), (<|>), (<?>), (<||>)
+  , try, force
+  , withState
 
-    FailProcessor (..)
+  , NList (..)
+  , sequence
+  , alternative
+  , fastest
+  , best
 
-    -- * Combinators
+  , exhaustively
 
-    -- ** Timeout
+    -- * Processor Combinators
+
+    -- ** Trivial Combinators
+
+  , FailProcessor (..)
+
+    -- ** Time
   , TimeoutProcessor (..)
   , timeoutIn
   , timeoutUntil
 
-    -- * Strategy Combinators
-  , exhaustively
   )
 
 where
 
-import           Control.Applicative
+import           Control.Applicative hiding (some, (<|>))
+import           Prelude             hiding (sequence)
 
 import           Tct.Core            as C
 import           Tct.Options
 import qualified Tct.Pretty          as PP
 -- import Tct.Xml as Xml
 
+
+
+-- Strategy Combinators ------------------------------------------------------
+
+-- TODO: check associativity
+-- `Then` etc have infixl 9
+-- remove <?> with default cmp
+-- some conditioinal on prooftree is missing; to express fexample ifprogress
+
+infixr 6 >>>, >||>
+infixr 6 <|>, <||>
+
+(>>>), (>||>), (<|>), (<||>) :: Strategy prob -> Strategy prob -> Strategy prob
+(>>>)  = Then
+(>||>) = ThenPar
+(<|>)  = Alt
+(<||>) = OrFaster
+
+(<?>) :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
+(<?>) = OrBetter
+
+some :: (Processor p, ParsableProcessor p)  => p ->  Strategy (Problem p)
+some = Proc . SomeProc
+
+try :: Strategy prob -> Strategy prob
+try s@(Trying _ _) = Trying True s
+try (WithStatus f) = WithStatus (try . f)
+try s              = Trying True s
+
+force :: Strategy prob -> Strategy prob
+force s@(Trying _ _) = Trying False s
+force (WithStatus f) = WithStatus (force . f)
+force s              = Trying False s
+
+withState :: (TctStatus prob -> Strategy prob) -> Strategy prob
+withState = WithStatus
+
+
+-- list version
+data NList a = a :| [a] deriving Show
+
+sequence :: NList (Strategy prob) -> Strategy prob
+sequence (s:|ss) = foldr1 (>>>) (s:ss)
+
+alternative :: NList (Strategy prob) -> Strategy prob
+alternative (s:|ss) = foldr1 (<|>) (s:ss)
+
+fastest :: NList (Strategy prob) -> Strategy prob
+fastest (s:|ss) = foldr1 (<||>) (s:ss)
+
+best :: (ProofTree prob -> ProofTree prob -> Ordering) -> NList (Strategy prob) -> Strategy prob
+best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
+
+
+exhaustively :: Strategy prob -> Strategy prob
+exhaustively s =  s >>> try (exhaustively s)
+
+
+-- Trivial Combinators -------------------------------------------------------
 
 data FailProcessor prob = FailProc deriving Show
 data FailProof = FailProof deriving Show
@@ -37,6 +109,27 @@ instance ProofData prob => Processor (FailProcessor prob) where
   solve _ _ = return $ Fail FailProof
 
 instance ProofData prob => ParsableProcessor (FailProcessor prob) where
+
+
+data NamedProcessor p = NamedProc String p deriving Show
+data NamedProof p = NamedProof String (ProofObject p)
+
+instance Processor p => Show (NamedProof p) where
+  show (NamedProof st po) = st ++ "(" ++ show po ++ ")"
+instance Processor p => PP.Pretty (NamedProof p) where
+  pretty (NamedProof nm po) = PP.string nm PP.<$$> PP.indent 2 (PP.pretty po)
+
+instance Processor p => Processor (NamedProcessor p) where
+  type ProofObject (NamedProcessor p) = NamedProof p
+  type Forking (NamedProcessor p) = Forking p
+  type Problem (NamedProcessor p) = Problem p
+  name (NamedProc nm _) = nm
+  solve (NamedProc nm p) prob = do
+    res <- solve p prob
+    case res of
+      Success fn po certfn -> return $ Success fn (NamedProof nm po) certfn
+      Fail po              -> return $ Fail (NamedProof nm po)
+
 
 
 data TimeoutProcessor p = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p } deriving Show
@@ -77,18 +170,18 @@ instance Processor p => Processor (TimeoutProcessor p) where
 
 instance Processor p => ParsableProcessor (TimeoutProcessor p) where
   args _ ps = argsParser pargs desc
-    where 
+    where
       pargs = TimeoutProc
         <$> optional (option $ eopt
-            `withArgLong` "untilT" 
-            `withMetavar` "iSec" 
+            `withArgLong` "untilT"
+            `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
         <*> optional (option $ eopt
-            `withArgLong` "inT" 
-            `withMetavar` "iSec" 
+            `withArgLong` "inT"
+            `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
-        <*> argument  (parseSomeProcessorMaybe ps) (eopt 
-            `withMetavar` "proc" 
+        <*> argument  (parseSomeProcessorMaybe ps) (eopt
+            `withMetavar` "proc"
             `withHelpDoc` PP.string "The applied subprocessor.")
       desc = PP.string "the timeoutprocessor"
 
@@ -97,9 +190,4 @@ timeoutIn n = TimeoutProc (Just n) Nothing
 
 timeoutUntil :: Int -> p -> TimeoutProcessor p
 timeoutUntil n = TimeoutProc Nothing (Just n)
-
--- StrategyCombinator
-exhaustively :: Strategy prob -> Strategy prob
-exhaustively s =  s >>> try (exhaustively s)
-
 

@@ -17,10 +17,6 @@ module Tct.Core.Processor
   , mkDescription
   , parseSomeProcessor
   , parseSomeProcessorMaybe
-
-    -- * IOError handling
-  , ErroneousProcessor (..)
-  , ErroneousProof (..)
   ) where
 
 
@@ -40,7 +36,8 @@ import           Tct.Error            (TctError( ..), hush)
 import           Tct.Parser           (tokenize)
 import           Tct.Options
 import qualified Tct.Pretty           as PP
-import qualified Tct.Xml              as Xml
+--import qualified Tct.Xml              as Xml
+
 
 -- Processor ----------------------------------------------------------------- 
 type Fork t      = (Foldable t, Functor t, Traversable t)
@@ -123,27 +120,4 @@ data SomeProcessor :: * -> * where
 instance Show (SomeProcessor prob) where
   show (SomeProc p) = show p
 
-
--- Error Processor ----------------------------------------------------------- 
-data ErroneousProof p = ErroneousProof IOError p deriving Show
-
-instance Processor p => Xml.Xml (ErroneousProof p) where
-  toXml (ErroneousProof err p) = 
-    Xml.elt "error" [] [ Xml.elt "processor" [] [Xml.text (name p)]
-                       , Xml.elt "message" [] [Xml.text (show err)] ]
-
-instance Processor p => PP.Pretty (ErroneousProof p) where 
-  pretty (ErroneousProof err p) = 
-    PP.text "Processor" PP.<+> PP.squotes (PP.text (name p)) PP.<+> PP.text "signalled the following error:"
-    PP.<$$> PP.indent 2 (PP.paragraph (show err))
-
-data ErroneousProcessor p = ErroneousProc IOError p deriving Show
-
-instance Processor p => Processor (ErroneousProcessor p) where
-  type ProofObject (ErroneousProcessor p) = ErroneousProof p
-  type Problem (ErroneousProcessor p)     = Problem p
-  name (ErroneousProc err p)              = name p ++ "[error: " ++ show err ++ "]"
-  solve (ErroneousProc err p) _           = return (Fail (ErroneousProof err p))
-
-instance Processor p => ParsableProcessor (ErroneousProcessor p) where
 
