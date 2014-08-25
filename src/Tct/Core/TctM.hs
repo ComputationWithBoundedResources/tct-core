@@ -19,6 +19,7 @@ module Tct.Core.TctM
 
 import           Control.Applicative (Applicative)
 import qualified Control.Concurrent.Async as Async
+import           Control.Monad (liftM)
 import           Control.Monad.Error (MonadError)
 import           Control.Monad.Reader (liftIO, MonadIO, ask, local, runReaderT, MonadReader, ReaderT)
 import qualified System.Time as Time
@@ -70,19 +71,21 @@ wait = liftIO . Async.wait
 cancel :: Async.Async a -> TctM ()
 cancel = liftIO . Async.cancel
 
---TODO: withAsync rather than async for ProofTree
+--TODO: use withAsync rather than async for ProofTree
 --withAsync :: TctM a -> TctM b
 --withAsync m = toIO m >>= liftIO . withAsync
 
--- TODO: check if works with calling minisat or so; does not work with foreign function calls
--- how does it behave with negative values
+-- | Wraps the computation into 'Timeout.timeout' and updates 'stopTime'.
+--   If the first argument is negative, the computation may run forever.
 timeout :: Int -> TctM a -> TctM (Maybe a)
-timeout n m = toIO m' >>= liftIO . Timeout.timeout n'
-  where 
-    m' = do 
-      Time.TOD sec pico <- liftIO Time.getClockTime 
-      let newTime = Just (Time.TOD (sec + toInteger n') pico)
+timeout n m
+  | n < 0 = Just `liftM` m
+  | n == 0 = return Nothing
+  | otherwise = toIO m' >>= liftIO . Timeout.timeout (toSec n)
+  where
+    m' = do
+      Time.TOD sec pico <- liftIO Time.getClockTime
+      let newTime = Just $ Time.TOD (sec + toSec (toInteger n)) pico
       local (\ r -> r { stopTime = min newTime (stopTime r) }) m
-    n' = n * 1000000
-
+    toSec i = i * 1000000
 

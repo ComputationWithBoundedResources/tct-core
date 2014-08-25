@@ -105,7 +105,8 @@ evaluate (s1 `OrFaster` s2) prob = do
       if  progress pt
         then cancel a >> return (Continue pt)
         else wait a
-
+        
+-- TODO: a time delta; use asyncWith ??
 evaluate (OrBetter cmp s1 s2) prob = do
   toM <- remainingTime `fmap` askStatus prob
   let to = (-1) `fromMaybe` toM
