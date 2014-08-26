@@ -17,7 +17,7 @@ import qualified System.Time                as Time
 import           Tct.Core
 import           Tct.Common.Error
 import qualified Tct.Common.Pretty                 as PP
-import           Tct.Processors.Combinators
+import           Tct.Combinators
 
 
 -- TODO

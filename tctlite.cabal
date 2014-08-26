@@ -46,6 +46,7 @@ Executable tctl
 Library
   exposed-modules:
     Tct
+    Tct.Combinators
     Tct.Common.Error
     Tct.Common.Options
     Tct.Common.Parser
@@ -59,7 +60,6 @@ Library
     Tct.Core.ProofTree
     Tct.Core.Strategy
     Tct.Core.TctM
-    Tct.Processors.Combinators
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,
     async                == 2.*,

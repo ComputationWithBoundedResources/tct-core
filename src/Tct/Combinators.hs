@@ -1,4 +1,4 @@
-module Tct.Processors.Combinators
+module Tct.Combinators
   (
     -- * Strategy Combinators
     some
