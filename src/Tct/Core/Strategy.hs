@@ -34,13 +34,12 @@ data Strategy prob where
   Alt        :: Strategy prob -> Strategy prob -> Strategy prob
   OrFaster   :: Strategy prob -> Strategy prob -> Strategy prob
   OrBetter   :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
-  WithProof  :: (ProofTree prob -> Strategy prob) -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
 
 instance Show (Strategy prob) where show _ = "ShowStrategy"
 
 
-data Return l = Continue l | Abort l deriving Show
+data Return l = Continue l | Abort l deriving (Show, Functor)
 
 fromReturn :: Return l -> l
 fromReturn (Continue l) = l
@@ -69,10 +68,6 @@ evaluate (WithStatus f) prob = do
   st <- askStatus prob
   evaluate (f st) prob
 
-evaluate (WithProof f s) prob = do
-  pt <- fromReturn `fmap` evaluate s prob
-  evaluateTree (f pt) pt
-
 evaluate (s1 `Then` s2) prob = do
   r1 <- evaluate s1 prob
   case r1 of
@@ -93,20 +88,17 @@ evaluate (s1 `Alt` s2) prob = do
     else evaluate s2 prob
 
 evaluate (s1 `OrFaster` s2) prob = do
-  r <- race p (evaluate s1 prob) (evaluate s2 prob)
+  r <- raceWith p (evaluate s1 prob) (evaluate s2 prob)
   let pt = fromReturn r
   return $ if progress pt
     then Continue pt
     else Abort pt
   where p = progress . fromReturn
 
--- TODO: a time delta; use asyncWith ??
 evaluate (OrBetter cmp s1 s2) prob = do
   toM <- remainingTime `fmap` askStatus prob
   let to = (-1) `fromMaybe` toM
-  a1 <- async $ timeout to (evaluate s1 prob)
-  a2 <- async $ timeout to (evaluate s2 prob)
-  (r1,r2) <- waitBoth a1 a2
+  (r1, r2) <- waitBothTimed to (evaluate s1 prob) (evaluate s2 prob)
   return $ case (fromReturn `fmap` r1, fromReturn `fmap` r2) of
     (Just pt1, Just pt2)
       | progress pt1 && progress pt2 -> maxBy cmp pt1 pt2
@@ -139,17 +131,21 @@ evaluateTree s (Open p)                     = evaluate s p
 evaluateTree s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateTree s subtree
 evaluateTree s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateTree s `T.mapM` subtrees)
 
+
+-- TODO :
+-- test if threads leak in combination of timeout
+-- if so; try using withAsync, concurrently, or at least invoke them within timeout
 evaluateTreePar :: Strategy prob -> ProofTree prob -> TctM (Return (ProofTree prob))
 evaluateTreePar s t = spawnTree t >>= collect
-    where
-    --spawnTree :: ProofTree prob -> TctM (ProofTree (Async (Return (ProofTree prob))))
+  where
     spawnTree (Open p)                     = Open `fmap` async (evaluate s p)
     spawnTree (NoProgress n subtree)       = NoProgress n `fmap` spawnTree subtree
     spawnTree (Progress n certfn subtrees) = Progress n certfn `fmap` (spawnTree `T.mapM` subtrees)
-    --collect :: ProofTree (Async.Async (Return (ProofTree prob))) -> TctM (Return (ProofTree prob))
+
     collect (Open a)                     = wait a
     collect (NoProgress n subtree)       = liftNoProgress n `fmap` collect subtree
     collect (Progress n certfn subtrees) = liftProgress n certfn `fmap` (collect `T.mapM` subtrees)
+
 
 
 -- Error Processor -----------------------------------------------------------

@@ -10,22 +10,20 @@ module Tct.Core.TctM
   , toIO
   , async
   , wait
-  , waitEither
-  , waitBoth
-  , cancel
-  , race
-
   , timeout
+  , raceWith
+  , waitBothTimed
+
   ) where
 
 
 import           Control.Applicative (Applicative)
+import           Control.Concurrent (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad (liftM)
 import           Control.Monad.Error (MonadError)
 import           Control.Monad.Reader (liftIO, MonadIO, ask, local, runReaderT, MonadReader, ReaderT)
 import qualified System.Time as Time
-import qualified System.Timeout as Timeout
 
 
 data TctROState = TctROState
@@ -61,47 +59,57 @@ toIO m = runReaderT (runTct m) `fmap` askState
 async :: TctM a -> TctM (Async.Async a)
 async m = toIO m >>= liftIO . Async.async
 
-waitEither :: Async.Async a -> Async.Async b -> TctM (Either a b)
-waitEither a1 a2 = liftIO $ Async.waitEither a1 a2
-
-waitBoth :: Async.Async a -> Async.Async b -> TctM (a,b)
-waitBoth a1 a2 = liftIO $ Async.waitBoth a1 a2
-
 wait :: Async.Async a -> TctM a
 wait = liftIO . Async.wait
 
-cancel :: Async.Async a -> TctM ()
-cancel = liftIO . Async.cancel
+--waitEither :: Async.Async a -> Async.Async b -> TctM (Either a b)
+--waitEither a1 a2 = liftIO $ Async.waitEither a1 a2
 
-race :: (a -> Bool) -> TctM a -> TctM a -> TctM a
-race p m1 m2 = do
+--waitBoth :: Async.Async a -> Async.Async b -> TctM (a,b)
+--waitBoth a1 a2 = liftIO $ Async.waitBoth a1 a2
+
+--cancel :: Async.Async a -> TctM ()
+--cancel = liftIO . Async.cancel
+
+--concurrently :: TctM a -> TctM (Async.Concurrently a)
+--concurrently m = Async.Concurrently `liftM` toIO m
+
+
+waitBothTimed :: Int -> TctM a -> TctM b -> TctM (Maybe a, Maybe b)
+waitBothTimed n m1 m2 = do
+  io1 <- toIO $ timeout n m1 
+  io2 <- toIO $ timeout n m2
+  liftIO $ Async.withAsync io1 $ \a1 ->  
+    liftIO $ Async.withAsync io2 $ \a2 -> 
+    liftIO $ Async.waitBoth a1 a2
+
+raceWith :: (a -> Bool) -> TctM a -> TctM a -> TctM a
+raceWith p m1 m2 = do
   io1 <- toIO m1
   io2 <- toIO m2
-  liftIO $ race' p io1 io2
-  where 
+  liftIO $ raceWithIO p io1 io2
 
-race' :: (a -> Bool) -> IO a -> IO a -> IO a
-race' p m1 m2 = 
+raceWithIO :: (a -> Bool) -> IO a -> IO a -> IO a
+raceWithIO p m1 m2 = 
   Async.withAsync m1 $ \a1 ->
-    Async.withAsync m2 $ \a2 -> do
-      r1 <- Async.wait a1
-      if p r1
-        then Async.cancel a2 >> return r1 
-        else Async.wait a2
+  Async.withAsync m2 $ \a2 -> do
+    e <- Async.waitEither a1 a2
+    case e of
+      Left  r1 -> if p r1 then Async.cancel a2 >> return r1 else Async.wait a2
+      Right r2 -> if p r2 then Async.cancel a1 >> return r2 else Async.wait a1
 
 
-
--- | Wraps the computation into 'Timeout.timeout' and updates 'stopTime'.
---   If the first argument is negative, the computation may run forever.
 timeout :: Int -> TctM a -> TctM (Maybe a)
 timeout n m
   | n < 0 = Just `liftM` m
   | n == 0 = return Nothing
-  | otherwise = toIO m' >>= liftIO . Timeout.timeout (toSec n)
-  where
-    m' = do
-      Time.TOD sec pico <- liftIO Time.getClockTime
-      let newTime = Just $ Time.TOD (sec + toSec (toInteger n)) pico
-      local (\ r -> r { stopTime = min newTime (stopTime r) }) m
-    toSec i = i * 1000000
+  | otherwise = do 
+    e <- toIO m' >>= liftIO . Async.race (threadDelay n)
+    return $ either (const Nothing) Just e
+    where
+      m' = do
+        Time.TOD sec pico <- liftIO Time.getClockTime
+        let newTime = Just $ Time.TOD (sec + toSec (toInteger n)) pico
+        local (\ r -> r { stopTime = min newTime (stopTime r) }) m
+      toSec i = i*1000000
 
