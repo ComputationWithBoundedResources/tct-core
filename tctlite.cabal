@@ -50,13 +50,13 @@ Library
     Tct.Common.Options
     Tct.Common.Parser
     Tct.Common.Pretty
+    Tct.Common.SemiRing
     Tct.Common.Xml
     Tct.Core
     Tct.Core.Certificate
     Tct.Core.Forks
     Tct.Core.Processor
     Tct.Core.ProofTree
-    Tct.Core.SemiRing
     Tct.Core.Strategy
     Tct.Core.TctM
     Tct.Processors.Combinators

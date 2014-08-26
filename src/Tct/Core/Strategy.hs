@@ -22,7 +22,7 @@ import           Tct.Core.Processor
 import           Tct.Core.ProofTree
 import           Tct.Core.TctM
 import           Tct.Common.Error           (TctError (..))
-import           Tct.Common.Parser          (tokenize)
+import           Tct.Common.Parser          (tokenise)
 import qualified Tct.Common.Pretty          as PP
 --import qualified Tct.Xml as Xml
 
@@ -226,7 +226,7 @@ instance ProofData prob => Processor (CustomStrategy arg prob) where
 instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
   args p _ = SomeProc `fmap` const p `fmap` pargs_ p
   parseProcessor p _ ss = do
-    (t,ts) <- tokenize ss
+    (t,ts) <- tokenise ss
     if name p == t
       then case O.execParserPure (O.prefs mempty) (pargs_ p) ts of
         O.Success a   -> Right $ SomeProc $ p {args_ = a}

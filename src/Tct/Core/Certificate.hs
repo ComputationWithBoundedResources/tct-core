@@ -1,3 +1,4 @@
+-- | This module provides the 'Certificate' type.
 module Tct.Core.Certificate
   (
   -- * Complexity Functions
@@ -30,7 +31,7 @@ module Tct.Core.Certificate
 
 
 import Tct.Common.Pretty
-import Tct.Core.SemiRing
+import Tct.Common.SemiRing
 
 
 data Complexity
@@ -48,9 +49,11 @@ data Complexity
   | Unknown          -- ^ Unknown.
   deriving (Eq, Show)
 
+-- | prop> constant = Poly (Just 0)
 constant :: Complexity
 constant = Poly (Just 0)
 
+-- | prop> linear = Poly (Just 1)
 linear :: Complexity
 linear = Poly (Just 1)
 
@@ -120,15 +123,17 @@ iter :: Complexity -> Complexity -> Complexity
 a `iter` b = maximum [Primrec, a, b]
 
 
+-- | A fixed type for the complexity 'Certificate'.
 data Certificate = Certificate
-  { spaceUB :: Complexity
-  , spaceLB :: Complexity
-  , timeUB  :: Complexity
-  , timeLB  :: Complexity
+  { spaceUB :: Complexity -- ^ Space upper bound.
+  , spaceLB :: Complexity -- ^ Space lower bound.
+  , timeUB  :: Complexity -- ^ Time upper bound.
+  , timeLB  :: Complexity -- ^ Time lower bound.
   } deriving Show
 
 instance Pretty Certificate where pretty = text . show
 
+-- | Defines the identity 'Certificate'. Sets all components to 'Unknown'.
 unbounded :: Certificate
 unbounded = Certificate
   { spaceUB = Unknown
@@ -136,12 +141,15 @@ unbounded = Certificate
   , timeUB  = Unknown
   , timeLB  = Unknown }
 
+-- | Constructs a 'Certificate' from the given 'Complexity'.
+-- Sets only the specified component; all others are 'Unknown'.
 spaceUBCert, spaceLBCert, timeUBCert, timeLBCert :: Complexity -> Certificate
 spaceUBCert c = unbounded { spaceUB = c }
 spaceLBCert c = unbounded { spaceLB = c }
 timeUBCert c  = unbounded { timeUB  = c }
 timeLBCert c  = unbounded { timeLB  = c }
 
+-- | Updates a component in the 'Certificate'.
 updateSpaceUBCert, updateSpaceLBCert, updateTimeUBCert, updateTimeLBCert
  :: Certificate -> (Complexity -> Complexity) -> Certificate
 updateSpaceUBCert cert f = cert { spaceUB = f $ spaceUB cert }

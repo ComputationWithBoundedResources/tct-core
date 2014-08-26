@@ -1,6 +1,11 @@
+-- | This module re-exports
+-- <http://hackage.haskell.org/package/ansi-wl-pprint Text.PrettyPrint.ANSI.Leijen>
+-- and provides suplementary pretty-printing functions.
 module Tct.Common.Pretty
   (
     module Text.PrettyPrint.ANSI.Leijen
+
+  , Align (..)
   , table
   , paragraph
   , display
@@ -12,7 +17,6 @@ import Text.PrettyPrint.ANSI.Leijen
 
 
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
-
 
 table :: [(Align, [Doc])] -> Doc
 table cols = vcat [ pprow row | row <- rows]
@@ -26,23 +30,25 @@ table cols = vcat [ pprow row | row <- rows]
                 , let cs' = [ lines $ show c | c <- cs ++ replicate (numrows - length cs) empty]
                       len = maximum $ concat [ map length c | c <- cs']]
     numrows = maximum $ 0 : [length cs | (_,cs) <- cols ]
-    pprow row = 
+    pprow row =
       vcat [ hcat [ text $ pad al len c | (al, len, c) <- rl ]
            | rl <- transpose [ [(al, len, s) | s <- ls ++ replicate (height - length ls) ""] | (al, len, ls) <- row] ]
-      where 
+      where
         height = maximum $ 0 : [length ls | (_, _, ls) <- row]
         pad AlignLeft len s   = s ++ ws (len - length s)
         pad AlignRight len s  = ws (len - length s) ++ s
         pad AlignCenter len s = ws l ++ s ++ ws r
-          where 
+          where
             diff = len - length s
             l    = floor $ fromIntegral diff / (2.0 :: Double)
             r    = diff - l
         ws n = replicate n ' '
 
+-- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc
 paragraph s = vcat [ fillSep [text w | w <- words l] | l <- lines s]
 
+-- | Default 'Doc' rendering.
 display :: Doc -> String
 display d = displayS (renderPretty 0.9 1000 d) ""
 

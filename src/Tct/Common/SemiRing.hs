@@ -1,4 +1,5 @@
-module Tct.Core.SemiRing
+-- | This module provides the abstract 'SemiRing' type.
+module Tct.Common.SemiRing
   (
     Additive (..)
   , Multiplicative (..)
@@ -8,13 +9,13 @@ module Tct.Core.SemiRing
 
 -- | The commutative monoid underlying a 'SemiRing'.
 class Additive a where
-    add :: a -> a -> a
-    zero :: a
+  add  :: a -> a -> a
+  zero :: a
 
 -- | The monoid underlying a 'SemiRing'.
 class Multiplicative a where
   mult :: a -> a -> a
-  one :: a
+  one  :: a
 
 -- | The 'Additive' and 'Multiplicative' instances
 -- should satisfy the following laws:

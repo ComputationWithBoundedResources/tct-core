@@ -1,9 +1,9 @@
+-- | This module ..
 module Tct.Core.Processor 
   ( 
     -- * Processor
     Result (..)
   , Processor (..)
-  , Fork
   , ProofData
   , CertificateFn
 
@@ -21,26 +21,23 @@ module Tct.Core.Processor
 
 
 import           Data.Either          (isRight)
-import           Data.Foldable        as F
 import           Data.List            as L( find)
 import           Data.Maybe           (fromMaybe)
 import           Data.Monoid          (mempty)
-import           Data.Traversable     as T
 import qualified Options.Applicative  as O
 import qualified Options.Applicative.Help  as O
 
 import qualified Tct.Core.Certificate as C
-import           Tct.Core.Forks       (Id( ..))
+import           Tct.Core.Forks       (Fork, Id( ..))
 import           Tct.Core.TctM
 import           Tct.Common.Error            (TctError( ..), hush)
-import           Tct.Common.Parser           (tokenize)
+import           Tct.Common.Parser           (tokenise)
 import           Tct.Common.Options
 import qualified Tct.Common.Pretty           as PP
 --import qualified Tct.Xml              as Xml
 
 
 -- Processor ----------------------------------------------------------------- 
-type Fork t      = (Foldable t, Functor t, Traversable t)
 type ProofData d = (PP.Pretty d, Show d)
 --type ProofData d = (Xml.Xml d, PP.Pretty d, Show d)
 
@@ -73,7 +70,7 @@ class Processor p => ParsableProcessor p where
   parseProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either TctError (SomeProcessor (Problem p))
   args p _              = unitParser p (PP.paragraph $ description p)
   parseProcessor p ps ss = do
-    (t,ts) <- tokenize ss
+    (t,ts) <- tokenise ss
     if name p == t
       then case O.execParserPure (O.prefs mempty) (args p ps) ts of
         O.Success a   -> Right a
