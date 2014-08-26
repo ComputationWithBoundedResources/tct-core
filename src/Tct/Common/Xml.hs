@@ -1,4 +1,4 @@
-module Tct.Xml where
+module Tct.Common.Xml where
 
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as Txt

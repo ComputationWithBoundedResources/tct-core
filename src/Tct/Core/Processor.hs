@@ -32,10 +32,10 @@ import qualified Options.Applicative.Help  as O
 import qualified Tct.Core.Certificate as C
 import           Tct.Core.Forks       (Id( ..))
 import           Tct.Core.TctM
-import           Tct.Error            (TctError( ..), hush)
-import           Tct.Parser           (tokenize)
-import           Tct.Options
-import qualified Tct.Pretty           as PP
+import           Tct.Common.Error            (TctError( ..), hush)
+import           Tct.Common.Parser           (tokenize)
+import           Tct.Common.Options
+import qualified Tct.Common.Pretty           as PP
 --import qualified Tct.Xml              as Xml
 
 

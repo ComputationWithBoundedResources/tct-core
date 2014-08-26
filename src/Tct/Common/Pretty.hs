@@ -1,4 +1,4 @@
-module Tct.Pretty
+module Tct.Common.Pretty
   (
     module Text.PrettyPrint.ANSI.Leijen
   , table

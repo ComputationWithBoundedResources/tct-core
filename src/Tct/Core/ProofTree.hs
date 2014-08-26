@@ -18,7 +18,7 @@ import Data.Traversable     as T (Traversable, traverse)
 
 import Tct.Core.Certificate (Certificate, unbounded)
 import Tct.Core.Processor
-import Tct.Pretty           as PP
+import Tct.Common.Pretty           as PP
 
 
 data ProofNode p = ProofNode

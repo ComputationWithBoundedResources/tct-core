@@ -1,4 +1,4 @@
-module Tct.SemiRing
+module Tct.Core.SemiRing
   (
     Additive (..)
   , Multiplicative (..)

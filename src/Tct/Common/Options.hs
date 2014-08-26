@@ -1,4 +1,4 @@
-module Tct.Options
+module Tct.Common.Options
   (
     eopt
   , option
@@ -17,7 +17,7 @@ import           Data.Monoid                          ((<>))
 import qualified Options.Applicative                  as O
 import qualified Options.Applicative.Builder.Internal as O
 
-import           Tct.Pretty                           (Doc)
+import           Tct.Common.Pretty                           (Doc)
 
 withArgLong :: O.HasName f => O.Mod f a -> String -> O.Mod f a
 opt `withArgLong` str = opt <> O.long str

@@ -1,11 +1,11 @@
-module Tct.Parser
+module Tct.Common.Parser
   (
   tokenize
   ) where
 
 import Data.Char (isSpace)
 
-import Tct.Error (TctError (..))
+import Tct.Common.Error (TctError (..))
 
 tokenize :: String -> Either TctError (String, [String])
 tokenize cs = do

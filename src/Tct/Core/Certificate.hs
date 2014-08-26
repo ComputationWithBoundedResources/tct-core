@@ -29,8 +29,8 @@ module Tct.Core.Certificate
   ) where
 
 
-import Tct.Pretty
-import Tct.SemiRing
+import Tct.Common.Pretty
+import Tct.Core.SemiRing
 
 
 data Complexity

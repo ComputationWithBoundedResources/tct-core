@@ -15,8 +15,8 @@ import           System.IO                  (hPrint, stderr)
 import qualified System.Time                as Time
 
 import           Tct.Core
-import           Tct.Error
-import qualified Tct.Pretty                 as PP
+import           Tct.Common.Error
+import qualified Tct.Common.Pretty                 as PP
 import           Tct.Processors.Combinators
 
 

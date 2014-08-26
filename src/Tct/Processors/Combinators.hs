@@ -34,8 +34,8 @@ import           Control.Applicative hiding (some, (<|>))
 import           Prelude             hiding (sequence)
 
 import           Tct.Core            as C
-import           Tct.Options
-import qualified Tct.Pretty          as PP
+import           Tct.Common.Options
+import qualified Tct.Common.Pretty          as PP
 -- import Tct.Xml as Xml
 
 

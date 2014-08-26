@@ -21,9 +21,9 @@ import qualified Options.Applicative as O
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
 import           Tct.Core.TctM
-import           Tct.Error           (TctError (..))
-import           Tct.Parser          (tokenize)
-import qualified Tct.Pretty          as PP
+import           Tct.Common.Error           (TctError (..))
+import           Tct.Common.Parser          (tokenize)
+import qualified Tct.Common.Pretty          as PP
 --import qualified Tct.Xml as Xml
 
 data Strategy prob where

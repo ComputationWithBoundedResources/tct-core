@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Tct.Error
+module Tct.Common.Error
   (
     module Control.Monad.Error
   , TctError (..)
