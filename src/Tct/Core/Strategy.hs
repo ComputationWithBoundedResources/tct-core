@@ -1,10 +1,11 @@
+-- | This module provides the 'Strategy' type.
 module Tct.Core.Strategy
   (
     Strategy (..)
+  , Return (..)
   , evaluate
-  , Return
-  , fromReturn
 
+  -- * Customised Strategy
   , CustomStrategy (..)
   , strategy
   ) where
@@ -26,6 +27,11 @@ import           Tct.Common.Parser          (tokenise)
 import qualified Tct.Common.Pretty          as PP
 --import qualified Tct.Xml as Xml
 
+-- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
+-- For a detailed description of the control flow constructs see "Combinators".
+-- 'Strategy' is an instance of 'Processor', hence they can be used in processor combinators. For example,
+--
+-- > timoutIn 20 (s1 >>> s2)
 data Strategy prob where
   Proc       :: SomeProcessor prob -> Strategy prob
   Trying     :: Bool -> Strategy prob -> Strategy prob
@@ -38,13 +44,23 @@ data Strategy prob where
 
 instance Show (Strategy prob) where show _ = "ShowStrategy"
 
+-- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
+-- See "Combinators" for a detailed description.
+data Return l 
+  = Continue { fromReturn :: l } 
+  | Abort    { fromReturn :: l } 
+  deriving (Show, Functor)
 
-data Return l = Continue l | Abort l deriving (Show, Functor)
+isContinuing :: Return (ProofTree prob) -> Bool
+isContinuing (Continue _) = True
+isContinuing _            = False
 
-fromReturn :: Return l -> l
-fromReturn (Continue l) = l
-fromReturn (Abort l)    = l
+isProgressing :: Return (ProofTree prob) -> Bool
+isProgressing (Continue pt) = progress pt
+isProgressing _             = False
 
+-- | @'evaluate' s prob@ defines the application of @s@ to a problem.
+-- See "Combinators" for a detailed description.
 evaluate :: Strategy prob -> prob -> TctM (Return (ProofTree prob))
 evaluate (Proc (SomeProc p)) prob = (f `fmap` solve p prob) `catchError` errNode
   where
@@ -58,11 +74,11 @@ evaluate (Trying True s) prob = f `fmap` evaluate s prob
     f pt         = pt
 
 evaluate (Trying False s) prob = f `fmap` evaluate s prob
-    where
-      f (Continue pt)
-          | progress pt = Continue pt
-          | otherwise = Abort pt
-      f pt = pt
+  where
+    f (Continue pt)
+      | progress pt = Continue pt
+      | otherwise = Abort pt
+    f pt = pt
 
 evaluate (WithStatus f) prob = do
   st <- askStatus prob
@@ -71,7 +87,7 @@ evaluate (WithStatus f) prob = do
 evaluate (s1 `Then` s2) prob = do
   r1 <- evaluate s1 prob
   case r1 of
-    Abort pt1 -> return (Abort pt1)
+    Abort pt1    -> return (Abort pt1)
     Continue pt1 -> evaluateTree s2 pt1
 
 evaluate (s1 `ThenPar` s2) prob = do
@@ -80,38 +96,39 @@ evaluate (s1 `ThenPar` s2) prob = do
     Abort pt1 -> return (Abort pt1)
     Continue pt1 -> evaluateTreePar s2 pt1
 
--- overrides Trying
 evaluate (s1 `Alt` s2) prob = do
-  pt1 <- fromReturn `fmap` evaluate s1 prob
-  if progress pt1
-    then return $ Continue pt1
-    else evaluate s2 prob
+  r1 <- evaluate s1 prob
+  case r1 of  
+    Continue pt1 
+      | progress pt1 -> return (Continue pt1)
+      | otherwise    -> do
+          r2 <- evaluate s2 prob
+          case r2 of  
+            Abort _      -> return (Continue pt1)
+            Continue pt2 -> return (Continue pt2)
+    Abort _ -> evaluate s2 prob
 
-evaluate (s1 `OrFaster` s2) prob = do
-  r <- raceWith p (evaluate s1 prob) (evaluate s2 prob)
-  let pt = fromReturn r
-  return $ if progress pt
-    then Continue pt
-    else Abort pt
-  where p = progress . fromReturn
+evaluate (s1 `OrFaster` s2) prob =
+  raceWith isProgressing isContinuing (evaluate s1 prob) (evaluate s2 prob)
 
 evaluate (OrBetter cmp s1 s2) prob = do
   toM <- remainingTime `fmap` askStatus prob
   let to = (-1) `fromMaybe` toM
-  (r1, r2) <- waitBothTimed to (evaluate s1 prob) (evaluate s2 prob)
-  return $ case (fromReturn `fmap` r1, fromReturn `fmap` r2) of
-    (Just pt1, Just pt2)
-      | progress pt1 && progress pt2 -> maxBy cmp pt1 pt2
-      | progress pt1 -> Continue pt1
-      | progress pt2 -> Continue pt2
-      | otherwise -> def
-    (Just pt1, Nothing ) | progress pt1 -> Continue pt1
-    (Nothing , Just pt2) | progress pt2 -> Continue pt2
+  (r1M, r2M) <- waitBothTimed to (evaluate s1 prob) (evaluate s2 prob)
+  return $ case (r1M, r2M) of
+    (Just r1, Just r2)
+      | isProgressing r1 && isProgressing r2 -> maxBy cmp (fromReturn r1) (fromReturn r2)
+      | isProgressing r1 -> r1
+      | isProgressing r2 -> r2
+      | isContinuing r1  -> r1
+      | otherwise        -> r2
+    (Just r1, Nothing ) -> r1
+    (Nothing , Just r2) -> r2
     _ -> def
   where
     def = Abort (Open prob)
     maxBy cm pt1 pt2 =
-      Continue $ if cm pt1 pt2 == LT then pt2 else pt1
+      Continue $ if cm pt2 pt1 == GT then pt2 else pt1
 
 liftNoProgress :: Processor p => ProofNode p -> Return (ProofTree l) -> Return (ProofTree l)
 liftNoProgress n (Continue pt) = Continue (NoProgress n pt)
@@ -199,10 +216,27 @@ instance ProofData prob => Processor (Strategy prob) where
 -- and custom { name , arg -> strategie , parser args }
 -- when parsing do from custom -> namede (may not work out because of prob?)
 
--- custom strategies
+-- | @'strategy' name argumentParser strategy defaultArguments@ constructs a 'CostumStrategy'.
 strategy :: String -> O.ParserInfo args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
 strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
 
+-- | 'CustomStrategy' implements 'Processor' and 'ParsableProcessor' and is used to generate a parser for strategies.
+-- For example:
+--
+-- @
+-- direct i = timeoutIn $ strat1 >>> strat2
+-- strat1 = strategy "direct" pargs direct (-1)
+--   where 
+--     cargs = option $ eopt
+--       `withArgLong` "timeout" 
+--       `withHelpDoc` PP.paragraph "abort after nSec seconds" 
+--       `withMetavar` "nSec"
+--     pargs = mkArgParser cargs (PP.paragraph  "do strat1 and strat2 with timeout")
+-- @
+-- The string @"direct --timeout 10"@ is parsed successfully.
+--
+-- If a custom strategy is used within another strategy the default arguments 'args_' are used.
+--
 data CustomStrategy args prob = CustomStrategy
   { name_     :: String
   , args_     :: args

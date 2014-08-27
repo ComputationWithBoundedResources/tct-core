@@ -16,12 +16,14 @@ import Data.List                    (transpose)
 import Text.PrettyPrint.ANSI.Leijen
 
 
+-- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
+-- | Provides a tabular pretty printing.
 table :: [(Align, [Doc])] -> Doc
 table cols = vcat [ pprow row | row <- rows]
   where
-    rows      = transpose [ [ (al,len,c) | c <- cs ] | (al,len,cs) <- cols']
+    rows     = transpose [ [ (al,len,c) | c <- cs ] | (al,len,cs) <- cols']
     -- rows'     = [ [(al, h, c) | (al,c) <- r ]
     --             | r <- rows
     --             , let h = maximum $ 0 : [length c | (_, c) <- r]]

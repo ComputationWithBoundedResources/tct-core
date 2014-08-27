@@ -1,4 +1,4 @@
--- | This module provides the 'Certificate' type.
+-- | This module provides the 'Complexity' and 'Certificate' type.
 module Tct.Core.Certificate
   (
   -- * Complexity Functions
@@ -11,14 +11,14 @@ module Tct.Core.Certificate
   , add
   , one
   , mult
-  , compose
-  , iter
+  -- , compose
+  -- , iter
 
   -- * Certificates
   , Certificate (..)
   , unbounded
 
-  -- * Convenience Functions
+  -- * Setter/Getter
   , spaceUBCert
   , spaceLBCert
   , timeUBCert
@@ -86,6 +86,8 @@ instance Multiplicative Complexity where
   a               `mult` b               = max a b
   one = Poly (Just 0)
 
+{-
+TODO: check
 compose :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `compose` a
   | n == 0 = Poly (Just 0)
@@ -102,6 +104,7 @@ a `compose` (Poly (Just m))
 (Exp Nothing)   `compose` (Exp _)         = Exp Nothing
 (Exp _)         `compose` (Exp Nothing)   = Exp Nothing
 a               `compose` b               = maximum [Primrec, a, b]
+
 
 iter :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `iter` _
@@ -121,14 +124,14 @@ iter :: Complexity -> Complexity -> Complexity
   | m == Just 1 = Supexp
   | otherwise = Primrec
 a `iter` b = maximum [Primrec, a, b]
-
+-}
 
 -- | A fixed type for the complexity 'Certificate'.
 data Certificate = Certificate
-  { spaceUB :: Complexity -- ^ Space upper bound.
-  , spaceLB :: Complexity -- ^ Space lower bound.
-  , timeUB  :: Complexity -- ^ Time upper bound.
-  , timeLB  :: Complexity -- ^ Time lower bound.
+  { spaceUB :: Complexity
+  , spaceLB :: Complexity
+  , timeUB  :: Complexity
+  , timeLB  :: Complexity
   } deriving Show
 
 instance Pretty Certificate where pretty = text . show

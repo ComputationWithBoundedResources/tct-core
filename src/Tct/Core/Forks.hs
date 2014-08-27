@@ -2,7 +2,8 @@
 -- A fork instance defines the branching of a node in the 'Tct.Core.ProofTree'.
 module Tct.Core.Forks
   (
-    Fork
+  Fork
+  
   -- * Forks
   , Judgement (..)
   , judgement
@@ -15,7 +16,7 @@ import Control.Applicative (liftA2, (<$>))
 import Data.Foldable       as F (Foldable (..))
 import Data.Traversable    as T (Traversable (..))
 
--- | 'Fork' is abstract that provides the "Foldable", "Functor" and "Traversable" interface.
+-- | 'Fork' is an abstract type that provides the "Foldable", "Functor" and "Traversable" interface.
 type Fork t      = (Foldable t, Functor t, Traversable t)
 
 -- | 'Judgement' representst a node with no successor.

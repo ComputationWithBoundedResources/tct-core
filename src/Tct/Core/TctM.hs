@@ -1,19 +1,19 @@
+-- | This module provides the Tct monad.
 module Tct.Core.TctM
   (
-    TctM (..)
+  -- * Tct Monad
+  TctM (..)
   , TctROState (..) 
 
   , TctStatus (..)
   , askStatus
 
-    -- * lift IO functions
-  , toIO
+  -- * Lifted IO functions
   , async
   , wait
   , timeout
   , raceWith
   , waitBothTimed
-
   ) where
 
 
@@ -26,15 +26,18 @@ import           Control.Monad.Reader (liftIO, MonadIO, ask, local, runReaderT, 
 import qualified System.Time as Time
 
 
+-- | Provides Tct runtime options.
 data TctROState = TctROState
   { satSolverExe :: FilePath
   , smtSolverExe :: FilePath
   , startTime    :: Time.ClockTime
   , stopTime     :: Maybe Time.ClockTime }
 
+-- | The Tct monad.
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
     deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
+-- | Defines (dynamic) runtime status.
 data TctStatus prob = TctStatus
   { currentProblem :: prob 
   , runningTime    :: Int
@@ -43,6 +46,7 @@ data TctStatus prob = TctStatus
 askState :: TctM TctROState
 askState = ask
 
+-- | Returns 'TctStatus' which is derived from 'TctROState' during runtime.
 askStatus :: prob -> TctM (TctStatus prob)
 askStatus prob = do
   st <- askState
@@ -56,9 +60,11 @@ askStatus prob = do
 toIO :: TctM a -> TctM (IO a)
 toIO m = runReaderT (runTct m) `fmap` askState
 
+-- | Lifts 'Async.async'.
 async :: TctM a -> TctM (Async.Async a)
 async m = toIO m >>= liftIO . Async.async
 
+-- | Lifts 'Async.wait'.
 wait :: Async.Async a -> TctM a
 wait = liftIO . Async.wait
 
@@ -75,6 +81,9 @@ wait = liftIO . Async.wait
 --concurrently m = Async.Concurrently `liftM` toIO m
 
 
+-- | Variant of 'Async.waitBoth'.
+-- @'waitBothTimed' i m1 m2@ runs @'timeout' n m1@ and @'timeout' n m2@ in parallel
+-- and returns both results.
 waitBothTimed :: Int -> TctM a -> TctM b -> TctM (Maybe a, Maybe b)
 waitBothTimed n m1 m2 = do
   io1 <- toIO $ timeout n m1 
@@ -83,22 +92,34 @@ waitBothTimed n m1 m2 = do
     liftIO $ Async.withAsync io2 $ \a2 -> 
     liftIO $ Async.waitBoth a1 a2
 
-raceWith :: (a -> Bool) -> TctM a -> TctM a -> TctM a
-raceWith p m1 m2 = do
+-- | "'raceWith' p1 p2 m1 m2" runs @m1@ and @m2@ in parallel.
+-- (i) Returns the first result that fulfils @p1@.
+-- (ii) Returns the first result that fulfils @p2@, if not (i).
+-- (iii) Returns the latter result, if not (ii).
+raceWith :: (a -> Bool) -> (a -> Bool) -> TctM a -> TctM a -> TctM a
+raceWith p1 p2 m1 m2 = do
   io1 <- toIO m1
   io2 <- toIO m2
-  liftIO $ raceWithIO p io1 io2
+  liftIO $ raceWithIO p1 p2 io1 io2
 
-raceWithIO :: (a -> Bool) -> IO a -> IO a -> IO a
-raceWithIO p m1 m2 = 
+raceWithIO :: (a -> Bool) -> (a -> Bool)-> IO a -> IO a -> IO a
+raceWithIO p1 p2 m1 m2 = 
   Async.withAsync m1 $ \a1 ->
   Async.withAsync m2 $ \a2 -> do
     e <- Async.waitEither a1 a2
     case e of
-      Left  r1 -> if p r1 then Async.cancel a2 >> return r1 else Async.wait a2
-      Right r2 -> if p r2 then Async.cancel a1 >> return r2 else Async.wait a1
+      Left  r1 
+        | p1 r1     -> Async.cancel a2 >> return r1
+        | p2 r1     -> Async.wait a2 >>= \r2 -> return (if p1 r2 then r2 else r1)
+        | otherwise -> Async.wait a2
+      Right r2
+        | p1 r2     -> Async.cancel a1 >> return r2
+        | p2 r2     -> Async.wait a1 >>= \r1 -> return (if p1 r2 then r1 else r2)
+        | otherwise -> Async.wait a1
 
-
+-- | @'timeout' i m@ wraps the Tct action into a timeout, and locally sets 'stopTime'.
+-- If @i@ is negative @m@ may run forever.
+-- Returns 'Nothing'  if @m@ does not end before the timeout.
 timeout :: Int -> TctM a -> TctM (Maybe a)
 timeout n m
   | n < 0 = Just `liftM` m

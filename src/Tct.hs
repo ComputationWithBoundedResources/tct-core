@@ -1,3 +1,9 @@
+{- | This modules 
+
+
+
+
+-}
 module Tct
 where
 
@@ -6,7 +12,7 @@ import qualified Config.Dyre                as Dyre (Params (..), defaultParams,
 import           Control.Applicative        (pure, (<$>), (<*>))
 import           Control.Monad              (liftM)
 import           Control.Monad.Reader       (runReaderT)
-import           Data.Monoid                ((<>), mconcat)
+import           Data.Monoid                (mconcat)
 import qualified Options.Applicative        as O
 import           System.Directory           (getHomeDirectory)
 import           System.Exit                (exitFailure, exitSuccess)
@@ -40,7 +46,7 @@ void :: TctMode Void Void
 void = TctMode
   { modeParser          = const $ Right Void
   , modeStrategies      = []
-  , modeDefaultStrategy = SomeProc FailProc
+  , modeDefaultStrategy = SomeProc abort
   , modeOptions         = pure Void
   , modeModifyer        = const id }
 
@@ -56,13 +62,13 @@ data TctOptions m = TctOptions
 mkParser :: [SomeProcessor proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
 mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
   where
-    listed = O.infoOption (PP.display $ mkDescription ps) $ O.long "list" <> O.help "Display list of strategies."
-    versioned = O.infoOption version  $ O.long "version" <> O.short 'v' <> O.help "Display Version." <> O.hidden
+    listed = O.infoOption (PP.display $ mkDescription ps) $ mconcat [O.long "list", O.help "Display list of strategies."]
+    versioned = O.infoOption version  $ mconcat [O.long "version", O.short 'v', O.help "Display Version.",  O.hidden]
     tctp = TctOptions
-      <$> O.optional (O.strOption (O.long "satPath" <> O.help "Set path to minisat."))
-      <*> O.optional (O.strOption (O.long "smtPath" <> O.help "Set path to minismt."))
+      <$> O.optional (O.strOption (mconcat [O.long "satPath", O.help "Set path to minisat."]))
+      <*> O.optional (O.strOption (mconcat [O.long "smtPath", O.help "Set path to minismt."]))
       <*> mparser
-      <*> O.optional (O.strOption (O.long "strategy" <> O.short 's' <> O.help "The strategy to apply."))
+      <*> O.optional (O.strOption (mconcat [O.long "strategy", O.short 's', O.help "The strategy to apply."]))
       <*> O.argument O.str (O.metavar "File")
     desc = mconcat
       [ O.headerDoc   . Just $ PP.string "TcT -- Tyrolean Complexity Tool"
@@ -95,9 +101,7 @@ data TctConfig prob = TctConfig
 
 
 defaultStrategies :: ProofData prob => [SomeProcessor prob]
-defaultStrategies =
-  [ SomeProc $ TimeoutProc Nothing Nothing FailProc
-  ]
+defaultStrategies = processors
 
 defaultTctConfig :: ProofData prob => TctMode prob opt -> TctConfig prob
 defaultTctConfig mode = TctConfig

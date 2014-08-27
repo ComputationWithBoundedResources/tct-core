@@ -1,105 +1,183 @@
+-- | This module provides common 'Strategy' and 'Processor' combinators.
 module Tct.Combinators
   (
-    -- * Strategy Combinators
-    some
-  , (>>>), (>||>), (<|>), (<?>), (<||>)
-  , try, force
-  , withState
-
+  -- * Strategy Combinators
+  -- | We define right-associative infix versions of 'Strategy' constructors.
+  -- Following precedence holds: optionally,stateful > alternative > sequential.
+  -- For example,
+  --
+  -- prop> try s1 >>> s2 >||> s3 <> s4 = (try s1) >>> (>||> s2 (s3 <> s4)
+  --   
+  -- We say that a @'Strategy' s@
+  --
+  --  * is continuing if the evaluation return @'Continue' pt@,
+  --  * is progressing if additionally 'progress' pt = True,
+  --  * is failing if it is not continuing.
+  some
   , NList (..)
-  , sequence
+  -- ** Sequential
+  , (>>>), (>||>)
+  , chain
+  -- ** Alternative
+  , (<>), (<||>), (<?>)
   , alternative
   , fastest
   , best
+  -- ** Optional
+  , try, force
+  -- ** Stateful
+  , withState
 
+  -- ** Combinators
   , exhaustively
   , ite
 
     -- * Processor Combinators
 
     -- ** Trivial Combinators
-
-  , FailProcessor (..)
+  , abort
 
     -- ** Time
-  , TimeoutProcessor (..)
   , timeoutIn
   , timeoutUntil
 
+  -- * Processor List
+  , processors
   )
 
 where
 
-import           Control.Applicative hiding (some, (<|>))
-import           Prelude             hiding (sequence)
+import           Control.Applicative ((<$>),(<*>),optional)
+import           Prelude
 
-import           Tct.Core            as C
 import           Tct.Common.Options
-import qualified Tct.Common.Pretty          as PP
--- import Tct.Xml as Xml
+import qualified Tct.Common.Pretty   as PP
+import           Tct.Core            as C
 
 
+-- | List of default processor combinators.
+-- 'SomeProcessor' are parsable and provide a description.
+processors :: ProofData prob => [SomeProcessor prob]
+processors =
+  [ SomeProc failProcessor
+  , SomeProc timeoutProcessor
+  ]
 
--- Strategy Combinators ------------------------------------------------------
 
--- TODO: check associativity
--- `Then` etc have infixl 9
--- remove <?> with default cmp
--- some conditioinal on prooftree is missing; to express fexample ifprogress
+-- Strategy Combinators ------------------------------------------------------------------------------------------------
 
-infixr 6 >>>, >||>
-infixr 6 <|>, <||>
-
-(>>>), (>||>), (<|>), (<||>) :: Strategy prob -> Strategy prob -> Strategy prob
-(>>>)  = Then
-(>||>) = ThenPar
-(<|>)  = Alt
-(<||>) = OrFaster
-
-(<?>) :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
-(<?>) = OrBetter
-
+-- | Lifts a processor to a 'Strategy'.
 some :: (Processor p, ParsableProcessor p)  => p ->  Strategy (Problem p)
 some = Proc . SomeProc
 
+infixr 5 >>>, >||>
+infixr 6 <>, <||>
+
+-- | Infix version of 'Then'.
+-- @s1 '>>>' s2@ applies @s1@ before @s2@.
+-- Fails if @s1@ or @s2@ fails.
+--
+-- prop> s1 >>> (s2 >>> s3) = (s1 >>> s2) >>> s3 = s1 >>> s2 >>> s3
+(>>>) :: Strategy prob -> Strategy prob -> Strategy prob
+(>>>)  = Then
+
+-- | Infix version of 'ThenPar'.
+-- Like ('>>>') but applies s2 on all problems in parallel.
+(>||>) :: Strategy prob -> Strategy prob -> Strategy prob
+(>||>) = ThenPar
+
+
+-- | Infix version of 'Alt'.
+-- @s1 '<>' s2@ applies @s2@ if @s1@ is not progressing.
+-- If both are continuing but not progressing the result of @s2@ is returned.
+-- Fails, if @s1@ and @s2@ are failing.
+--
+-- prop> s1 <> (s2 <> s3) = (s1 <> s2) <> s3 = s1 <> s2 <> s3
+-- prop> Trying b s1 <> Trying b2 s2 = s1 <> s2
+(<>):: Strategy prob -> Strategy prob -> Strategy prob
+(<>)  = Alt
+
+-- | Infix version of 'OrFaster'.
+-- Like ('<>') but applies the strategies in parallel.
+-- Returns the result from the first progressing strategy.
+-- If both strategies are continuing but not progressing the prooftree of the first finished strategy is returned.
+-- Fails, if both strategies are failing.
+(<||>) :: Strategy prob -> Strategy prob -> Strategy prob
+(<||>) = OrFaster
+
+-- | Alternative version of 'Orbetter'.
+--
+-- @('<?>') cmp s1 s2@ applies @'timeout' n s1@ and @'timeout' n s2@ in parallel and waits until both strategies have
+-- finished. Here @n@ depens on 'remainingTime'. We consider following cases:
+--
+--   * Both strategies end before the timeout:
+--     If both strategies are progressing then @pt2@ is taken only if @pt2 > pt1@ wrt. to @cmp@.
+--     Here @pt1@ and @pt2@ are the prooftrees from evaluating @s1@ and @s2@. Otherwise it behaves like @s1 '<>' s2@.
+--   * One strategy ends before the timeout: Its result is returned.
+--   * None of the strategies end before the timeout: The whole strategy fails.
+-- An example implementation of cmp is:
+--
+-- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
+(<?>) :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
+(<?>) = OrBetter
+
+-- | @'try' s@ is continuing even if @s@ is not.
+--
+-- prop> try (force s) = try s
 try :: Strategy prob -> Strategy prob
 try s@(Trying _ _) = Trying True s
 try (WithStatus f) = WithStatus (try . f)
 try s              = Trying True s
 
+-- | @'force' s@ fails if @s@ is not progressing.
+--
+-- prop> force (try s) = force s
 force :: Strategy prob -> Strategy prob
 force s@(Trying _ _) = Trying False s
 force (WithStatus f) = WithStatus (force . f)
 force s              = Trying False s
 
+-- | prop> withState = 'WithStatus'
 withState :: (TctStatus prob -> Strategy prob) -> Strategy prob
 withState = WithStatus
 
 
--- list version
-data NList a = a :| [a] deriving Show
+-- | Defines a non-empty list.
+data NList a = a :| [a] deriving (Eq, Ord, Show)
 
-sequence :: NList (Strategy prob) -> Strategy prob
-sequence (s:|ss) = foldr1 (>>>) (s:ss)
+-- | List version of ('>>>').
+chain :: NList (Strategy prob) -> Strategy prob
+chain (s:|ss) = foldr1 (>>>) (s:ss)
 
+-- | List version of ('<>').
 alternative :: NList (Strategy prob) -> Strategy prob
-alternative (s:|ss) = foldr1 (<|>) (s:ss)
+alternative (s:|ss) = foldr1 (<>) (s:ss)
 
+-- | List version of ('<||>').
 fastest :: NList (Strategy prob) -> Strategy prob
 fastest (s:|ss) = foldr1 (<||>) (s:ss)
 
+-- | List version of ('<?>').
 best :: (ProofTree prob -> ProofTree prob -> Ordering) -> NList (Strategy prob) -> Strategy prob
 best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
 
 
+-- | @exhaustively s@ repeatedly applies @s@ until @s@ fails.
+-- Fails if the first application of @s@ fails.
 exhaustively :: Strategy prob -> Strategy prob
 exhaustively s =  s >>> try (exhaustively s)
 
+-- | @when s then@ applies @then@ if @s@ is progressing. Never fails.
+when :: Strategy prob -> Strategy prob -> Strategy prob
+when s sthen = try $ force s >>> sthen
+
+-- | @ite cond then else@ applies @then@ if @cond@ is progressing, otherwise @else@.
+-- Fails if corresponding branch fails.
 ite :: Strategy prob -> Strategy prob -> Strategy prob -> Strategy prob
-ite s sthen selse = s >>> try sthen <|> selse
+ite s sthen selse = (force s >>> try sthen) <> selse
 
 
--- Trivial Combinators -------------------------------------------------------
+-- Processor Combinators ------------------------------------------------------
 
 data FailProcessor prob = FailProc deriving Show
 data FailProof = FailProof deriving Show
@@ -107,36 +185,25 @@ instance PP.Pretty FailProof where
   pretty _ = PP.paragraph "We apply FailProccessor."
 instance ProofData prob => Processor (FailProcessor prob) where
   type ProofObject (FailProcessor prob) = FailProof
-  type Forking (FailProcessor prob) = Judgement
   type Problem (FailProcessor prob) = prob
   name _ = "FailProcessor"
   solve _ _ = return $ Fail FailProof
 
 instance ProofData prob => ParsableProcessor (FailProcessor prob) where
 
+-- | Default 'FailProcessor' instance.
+failProcessor :: FailProcessor prob
+failProcessor = FailProc
 
-data NamedProcessor p = NamedProc String p deriving Show
-data NamedProof p = NamedProof String (ProofObject p)
-
-instance Processor p => Show (NamedProof p) where
-  show (NamedProof st po) = st ++ "(" ++ show po ++ ")"
-instance Processor p => PP.Pretty (NamedProof p) where
-  pretty (NamedProof nm po) = PP.string nm PP.<$$> PP.indent 2 (PP.pretty po)
-
-instance Processor p => Processor (NamedProcessor p) where
-  type ProofObject (NamedProcessor p) = NamedProof p
-  type Forking (NamedProcessor p) = Forking p
-  type Problem (NamedProcessor p) = Problem p
-  name (NamedProc nm _) = nm
-  solve (NamedProc nm p) prob = do
-    res <- solve p prob
-    case res of
-      Success fn po certfn -> return $ Success fn (NamedProof nm po) certfn
-      Fail po              -> return $ Fail (NamedProof nm po)
+-- | @abort@ always return 'Fail' and therfore 'Abort'.
+-- Does not necessarily abort the whole evaluation.
+abort :: FailProcessor prob
+abort = FailProc
 
 
-
-data TimeoutProcessor p = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p } deriving Show
+data TimeoutProcessor p 
+  = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p }
+  deriving Show
 
 data TimeoutProof p
   = Timeout Int
@@ -189,9 +256,17 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
             `withHelpDoc` PP.string "The applied subprocessor.")
       desc = PP.string "the timeoutprocessor"
 
+-- | Default 'TimeoutProcessor' instance.
+timeoutProcessor :: TimeoutProcessor (FailProcessor prob)
+timeoutProcessor = TimeoutProc Nothing Nothing failProcessor
+
+-- | @timoutIn i p@ aborts the application of @p@ after @i@ seconds.
+-- If @i@ is negative the processor may run forever.
 timeoutIn :: Int -> p -> TimeoutProcessor p
 timeoutIn n = TimeoutProc (Just n) Nothing
 
+-- | @timeoutUntil i p@ aborts the application of @p@ until i seconds wrt. to the starting time.
+-- If @i@ is negative the processor may run forever.
 timeoutUntil :: Int -> p -> TimeoutProcessor p
 timeoutUntil n = TimeoutProc Nothing (Just n)
 
