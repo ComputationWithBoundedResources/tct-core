@@ -36,12 +36,11 @@ module Tct.Combinators
   -- * Processor Combinators
 
   -- ** Trivial Combinators
-  , abort
-  , named
+  , FailProcessor, abort
+  , NamedProcessor, named
 
   -- ** Time
-  , timeoutIn
-  , timeoutUntil
+  , TimeoutProcessor, timeoutIn, timeoutUntil
 
   -- * Processor List
   , processors
@@ -188,8 +187,12 @@ when s sthen = try $ force s >>> sthen
 -- Processor Combinators ------------------------------------------------------
 
 -- * Fail Processor -----------------------------------------------------------
+-- | A processor that always fails.
+-- Does not necessarily abort the evaluation.
 data FailProcessor prob = FailProc deriving Show
+
 data FailProof = FailProof deriving Show
+
 instance PP.Pretty FailProof where
   pretty _ = PP.paragraph "We apply FailProccessor."
 instance ProofData prob => Processor (FailProcessor prob) where
@@ -211,6 +214,7 @@ abort = FailProc
 
 
 -- * Named Procesor -----------------------------------------------------------
+-- | Gives a dedicated name to a processor. Useful for pretty-printing and parser generation.
 data NamedProcessor p 
   = NamedProc String p deriving Show
 
@@ -249,12 +253,13 @@ instance Processor p => ParsableProcessor (NamedProcessor p) where
 namedProcessor :: NamedProcessor (FailProcessor prob)
 namedProcessor = NamedProc "Failing" FailProc
 
--- | @'named' name p@ is like @p@. But provides parser using @name@.
+-- | @'named' name p@ is like @p@. But provides a parser using @name@.
 named :: String -> p -> NamedProcessor p
 named = NamedProc
 
 
 -- * Timeout Processor --------------------------------------------------------
+-- | Wraps the application of a processor in a timeout.
 data TimeoutProcessor p
   = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p }
   deriving Show
