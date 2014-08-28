@@ -239,16 +239,6 @@ instance Processor p => Processor (NamedProcessor p) where
       Fail po                 -> Fail $ NamedProof n po
 
 instance Processor p => ParsableProcessor (NamedProcessor p) where
-  args _ ps = argsParser pargs desc
-    where
-      pargs = NamedProc
-        <$> argument Just (eopt
-            `withMetavar` "name"
-            `withHelpDoc` PP.paragraph "The name of the processor.")
-        <*> argument (parseSomeProcessorMaybe ps) (eopt
-            `withMetavar` "proc"
-            `withHelpDoc` PP.string "The applied subprocessor.")
-      desc = PP.string "NameProcessor"
 
 namedProcessor :: NamedProcessor (FailProcessor prob)
 namedProcessor = NamedProc "Failing" FailProc
