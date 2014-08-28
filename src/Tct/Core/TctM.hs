@@ -4,7 +4,6 @@ module Tct.Core.TctM
   -- * Tct Monad
   TctM (..)
   , TctROState (..) 
-
   , TctStatus (..)
   , askStatus
 
@@ -80,7 +79,6 @@ wait = liftIO . Async.wait
 --concurrently :: TctM a -> TctM (Async.Concurrently a)
 --concurrently m = Async.Concurrently `liftM` toIO m
 
-
 -- | Variant of 'Async.waitBoth'.
 -- @'waitBothTimed' i m1 m2@ runs @'timeout' n m1@ and @'timeout' n m2@ in parallel
 -- and returns both results.
@@ -92,16 +90,18 @@ waitBothTimed n m1 m2 = do
     liftIO $ Async.withAsync io2 $ \a2 -> 
     liftIO $ Async.waitBoth a1 a2
 
--- | "'raceWith' p1 p2 m1 m2" runs @m1@ and @m2@ in parallel.
--- (i) Returns the first result that fulfils @p1@.
--- (ii) Returns the first result that fulfils @p2@, if not (i).
--- (iii) Returns the latter result, if not (ii).
+-- | @'raceWith' p1 p2 m1 m2@ runs @m1@ and @m2@ in parallel.
+--
+-- * Returns the first result that fulfills @p1@.
+-- * If none fullfills @p1@, it returns the first result that fulfills @p2@.
+-- * If none fullfills neiter @p1@ nor @p2@, it returns the latter result.
 raceWith :: (a -> Bool) -> (a -> Bool) -> TctM a -> TctM a -> TctM a
 raceWith p1 p2 m1 m2 = do
   io1 <- toIO m1
   io2 <- toIO m2
   liftIO $ raceWithIO p1 p2 io1 io2
 
+-- TODO refactor
 raceWithIO :: (a -> Bool) -> (a -> Bool)-> IO a -> IO a -> IO a
 raceWithIO p1 p2 m1 m2 = 
   Async.withAsync m1 $ \a1 ->
@@ -110,11 +110,11 @@ raceWithIO p1 p2 m1 m2 =
     case e of
       Left  r1 
         | p1 r1     -> Async.cancel a2 >> return r1
-        | p2 r1     -> Async.wait a2 >>= \r2 -> return (if p1 r2 then r2 else r1)
+        | p2 r1     -> Async.wait a2 >>= \r2 -> return (if not (p2 r2) then r1 else r2)
         | otherwise -> Async.wait a2
       Right r2
         | p1 r2     -> Async.cancel a1 >> return r2
-        | p2 r2     -> Async.wait a1 >>= \r1 -> return (if p1 r2 then r1 else r2)
+        | p2 r2     -> Async.wait a1 >>= \r1 -> return (if not (p2 r2) then r2 else r1)
         | otherwise -> Async.wait a1
 
 -- | @'timeout' i m@ wraps the Tct action into a timeout, and locally sets 'stopTime'.

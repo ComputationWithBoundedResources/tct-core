@@ -1,5 +1,5 @@
--- | This module re-exports 
---   <http://hackage.haskell.org/package/mtl Control.Monad.Error>
+-- | This module re-exports "Control.Monad.Error"
+--   (<http://hackage.haskell.org/package/mtl>)
 --   and provides types for custom error handling.
 {-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Common.Error
@@ -53,10 +53,10 @@ liftMaybe :: e -> Maybe a  -> ErroneousIO e a
 liftMaybe e =  liftEither . note e
 
 -- | Transforms 'Either' to 'Maybe'.
-hush :: Either a b -> Maybe b
+hush :: Either e a -> Maybe a
 hush = either (const Nothing) Just
 
--- | Transforms 'Maybe' to 'Either'.
-note :: a -> Maybe b -> Either a b
+-- | Transforms 'Maybe' to 'Either'. 
+note :: e -> Maybe a -> Either e a
 note a = maybe (Left a) Right
 

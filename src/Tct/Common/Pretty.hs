@@ -1,6 +1,6 @@
--- | This module re-exports
--- <http://hackage.haskell.org/package/ansi-wl-pprint Text.PrettyPrint.ANSI.Leijen>
--- and provides suplementary pretty-printing functions.
+-- | This module re-exports "Text.PrettyPrint.ANSI.Leijen"
+-- (<http://hackage.haskell.org/package/ansi-wl-pprint>)
+-- and provides supplementary pretty-printing functions.
 module Tct.Common.Pretty
   (
     module Text.PrettyPrint.ANSI.Leijen

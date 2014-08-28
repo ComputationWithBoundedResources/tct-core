@@ -1,6 +1,5 @@
 -- | This module provides the 'Processor' type.
--- 'Processor' instances define a transformation of a problem to a (possible empy) set of subproblems and how the
--- results from the subproblems are combined.
+-- 'Processor' instances define transformations from problems to a (possible empty) set of subproblems.
 module Tct.Core.Processor
   (
   -- * Processor
@@ -13,6 +12,7 @@ module Tct.Core.Processor
   , SomeProcessor (..)
 
   -- * Parsable Procesor
+  , ArgumentParser
   , ParsableProcessor (..)
   , unitParser
   , argsParser
@@ -41,7 +41,7 @@ import           Tct.Core.TctM
 
 -- Processor -----------------------------------------------------------------
 
--- | Provides the interface for proof construction.
+-- | Provides the interface for the proof construction.
 -- All types which occur in the proof construction have to implement 'ProofData'.
 type ProofData d = (PP.Pretty d, Show d)
 --type ProofData d = (Xml.Xml d, PP.Pretty d, Show d)
@@ -51,20 +51,20 @@ type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
 -- | The result of applying a @'Processor' p@ to a problem.
 data Result p
-  = Fail 
+  = Fail
     { proofData :: ProofObject p }
   | Success
     { subProblems   :: Forking p (Problem p)
     , proofData     :: ProofObject p
     , certificateFn :: CertificateFn p }
 
--- | Defines the transformation on problems.
+-- | The interface to 'Processor' instances.
 class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p)) => Processor p where
-  -- | Defines the type of the proof. Has to be an instance of 'ProofData'.
+  -- | The type of the proof. Has to be an instance of 'ProofData'.
   type ProofObject p :: *
-  -- | Defines the type of the considered problem. Has to be an instance of 'ProofData'.
+  -- | The type of the considered problem. Has to be an instance of 'ProofData'.
   type Problem p     :: *
-  -- | Defines the type of the container for the subproblems.
+  -- | The type of the subproblems collection.
   -- Has to be an instance of 'Fork'. Default type is 'Id'.
   type Forking p     :: * -> *
   type Forking p     = Id
@@ -89,12 +89,12 @@ instance Show (SomeProcessor prob) where
 
 
 -- Parsable Processor --------------------------------------------------------
+-- | Type synonym for an argument parser.
 type ArgumentParser p = O.ParserInfo (SomeProcessor (Problem p))
-type Description      = PP.Doc
 
--- | Instances of 'ParsableProcessor' provide string parser.
+-- | Instances of 'ParsableProcessor' provide a string parser.
 class Processor p => ParsableProcessor p where
-  -- | Defines the argument parser for the instance.
+  -- | The argument parser for the instance.
   -- The default implementation takes no arguments.
   args           :: p -> [SomeProcessor (Problem p)] -> ArgumentParser p
   -- | Defines the actual parser for the processor.
@@ -113,11 +113,11 @@ class Processor p => ParsableProcessor p where
       else Left $ TctParseError "optParser"
 
 -- | Default processor (argument) parser without arguments.
-unitParser :: ParsableProcessor a => a -> Description -> ArgumentParser a
+unitParser :: ParsableProcessor a => a -> PP.Doc -> ArgumentParser a
 unitParser p desc = SomeProc `fmap` O.info (O.pure p) (O.progDescDoc (Just desc))
 
 -- | Define custom processor (argument) parser.
-argsParser :: ParsableProcessor a => O.Parser a -> Description -> ArgumentParser a
+argsParser :: ParsableProcessor a => O.Parser a -> PP.Doc -> ArgumentParser a
 argsParser parser desc = SomeProc `fmap` mkArgParser parser desc
 
 -- | Generates a descripton from the 'ParsableProcessor' instance of a list of processors.
@@ -141,7 +141,7 @@ parseSomeProcessor :: (ParsableProcessor (SomeProcessor prob), Problem (SomeProc
 parseSomeProcessor rs s =  def `fromMaybe` L.find isRight (map (\r -> parseProcessor r rs s) rs)
   where def = Left $ TctParseError $ "readAnyProc: ("  ++ s ++ ")"
 
--- | Like 'parseSomeProcessor' but returns 'Maybe'.
+-- | Like 'parseSomeProcessor' but returns 'Nothing' if the parsing failed.
 parseSomeProcessorMaybe ::
   (ParsableProcessor (SomeProcessor t), Problem (SomeProcessor t) ~ t) =>
   [SomeProcessor t] -> String -> Maybe (SomeProcessor t)

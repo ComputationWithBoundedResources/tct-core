@@ -1,13 +1,13 @@
 {- | This module re-exports the Tct.Core.* modules.
 
 
-We provide a short description of the core:
+We provide a short informal description of the core:
 
 Intuitively,
 
-  * 'ProofTree' corresponds to the global program state,
-  * a 'Processor' instance corresponds to an expression modifying the state,
-  * 'Strategy' controls the flow,
+  * 'ProofTree' corresponds to a global program state,
+  * 'Processor' instances correspond to expressions modifying the 'ProofTree',
+  * 'Strategy' controls the flow ,ie. in which order 'Processor' instances are applied,
   * problem @prob@ is the input, and
   * 'Certificate' is a property of the 'ProofTree'.
 
@@ -38,7 +38,6 @@ Otherwise, all leafs of the 'ProofTree' are 'Progress' nodes providing a 'Certif
 These are recursively combined (in a bottom-up way) using the certification function of 'Progress' nodes.
 
 -}
-
 module Tct.Core
   (
     module M
@@ -51,6 +50,4 @@ import Tct.Core.Processor   as M
 import Tct.Core.ProofTree   as M
 import Tct.Core.Strategy    as M
 import Tct.Core.TctM        as M 
-
-
 

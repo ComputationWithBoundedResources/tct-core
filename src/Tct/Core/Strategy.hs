@@ -1,7 +1,7 @@
 -- | This module provides the 'Strategy' type.
 module Tct.Core.Strategy
   (
-    Strategy (..)
+  Strategy (..)
   , Return (..)
   , evaluate
 
@@ -19,12 +19,12 @@ import           Data.Monoid         (mempty)
 import           Data.Traversable    as T
 import qualified Options.Applicative as O
 
+import           Tct.Common.Error    (TctError (..))
+import           Tct.Common.Parser   (tokenise)
+import qualified Tct.Common.Pretty   as PP
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
 import           Tct.Core.TctM
-import           Tct.Common.Error           (TctError (..))
-import           Tct.Common.Parser          (tokenise)
-import qualified Tct.Common.Pretty          as PP
 --import qualified Tct.Xml as Xml
 
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
@@ -45,10 +45,10 @@ data Strategy prob where
 instance Show (Strategy prob) where show _ = "ShowStrategy"
 
 -- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
--- See "Combinators" for a detailed description.
-data Return l 
-  = Continue { fromReturn :: l } 
-  | Abort    { fromReturn :: l } 
+-- See "Combinators" fndor a detailed description.
+data Return l
+  = Continue { fromReturn :: l }
+  | Abort    { fromReturn :: l }
   deriving (Show, Functor)
 
 isContinuing :: Return (ProofTree prob) -> Bool
@@ -98,12 +98,12 @@ evaluate (s1 `ThenPar` s2) prob = do
 
 evaluate (s1 `Alt` s2) prob = do
   r1 <- evaluate s1 prob
-  case r1 of  
-    Continue pt1 
+  case r1 of
+    Continue pt1
       | progress pt1 -> return (Continue pt1)
       | otherwise    -> do
           r2 <- evaluate s2 prob
-          case r2 of  
+          case r2 of
             Abort _      -> return (Continue pt1)
             Continue pt2 -> return (Continue pt2)
     Abort _ -> evaluate s2 prob
@@ -207,36 +207,29 @@ instance ProofData prob => Processor (Strategy prob) where
       else Fail (StrategyProof pt)
 
 
--- FIXME:
--- to make an instance for custom strategies arg has to be provided but is ignored anyway
--- awkward to provide unit instance
---
--- provide two strategies;
--- named strategy { name ... , strategie }
--- and custom { name , arg -> strategie , parser args }
--- when parsing do from custom -> namede (may not work out because of prob?)
+-- Customised Strategy -----------------------------------------------------------------------------------------------
 
 -- | @'strategy' name argumentParser strategy defaultArguments@ constructs a 'CostumStrategy'.
 strategy :: String -> O.ParserInfo args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
 strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
 
--- | 'CustomStrategy' implements 'Processor' and 'ParsableProcessor' and is used to generate a parser for strategies.
+-- | 'CustomStrategy' implements 'Processor' and 'ParsableProcessor',  and is used to generate a parser for strategies.
+-- The recommended way for strategies without arguments is 'Combinators.named'.
 -- For example:
 --
 -- @
 -- direct i = timeoutIn $ strat1 >>> strat2
 -- strat1 = strategy "direct" pargs direct (-1)
---   where 
+--   where
 --     cargs = option $ eopt
---       `withArgLong` "timeout" 
---       `withHelpDoc` PP.paragraph "abort after nSec seconds" 
+--       `withArgLong` "timeout"
+--       `withHelpDoc` PP.paragraph "abort after nSec seconds"
 --       `withMetavar` "nSec"
 --     pargs = mkArgParser cargs (PP.paragraph  "do strat1 and strat2 with timeout")
 -- @
 -- The string @"direct --timeout 10"@ is parsed successfully.
 --
 -- If a custom strategy is used within another strategy the default arguments 'args_' are used.
---
 data CustomStrategy args prob = CustomStrategy
   { name_     :: String
   , args_     :: args
@@ -268,7 +261,9 @@ instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
         _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
       else Left $ TctParseError $ name p ++ ss
 
--- make Processor (SomeProcessor prob) mainly for parsing;
+
+-- we use strategy evaluation to make SomeProcessor an instance of Processor
+-- as we can not extract the Forking type of (SomeProcessor p) a direct instance did not work out
 data SomeProofObject               where SomeProofObj :: (ProofData obj) => obj -> SomeProofObject
 instance PP.Pretty SomeProofObject where pretty (SomeProofObj obj) = PP.pretty obj
 instance Show SomeProofObject      where show (SomeProofObj obj)   = show obj

@@ -1,11 +1,14 @@
-{- | This modules 
-
-
-
+{- | This module provides the user interaction.
 
 -}
 module Tct
-where
+  ( 
+  TctMode (..)
+  , applyMode
+  , void
+  , version
+  )
+  where
 
 
 import qualified Config.Dyre                as Dyre (Params (..), defaultParams, wrapMain)
@@ -26,22 +29,33 @@ import qualified Tct.Common.Pretty                 as PP
 import           Tct.Combinators
 
 
--- TODO
+-- TODO: 
 -- get rid of redundancy in TctOptions, TctConfig
+-- currently only modeoptions can be constructed in conf file
+-- so realmain should hava type TctConfig prob opt -> IO ()
 
-
+-- | 'TctMode' provides all infromation necesary to construct a Tct customised for a problem type.
 data TctMode prob opt = TctMode
-  { modeParser          :: String -> Either TctError prob
-  , modeStrategies      :: [SomeProcessor prob]
-  , modeDefaultStrategy :: SomeProcessor prob
-  , modeOptions         :: O.Parser opt
-  , modeModifyer        :: prob -> opt -> prob }
+  { modeParser          :: String -> Either TctError prob -- ^ The parser for the problem.
+  , modeStrategies      :: [SomeProcessor prob]           -- ^ Problem specific Processor/Strategies.
+                                                          --   These are added to default 'processors'.
+  , modeDefaultStrategy :: SomeProcessor prob             -- ^ The default strategy to execute.
+  , modeOptions         :: O.Parser opt                   -- ^ Problem specific option parser. 
+                                                          --   These are added to the standard Tct options.
+  , modeModifyer        :: prob -> opt -> prob            -- ^ This function is applied to the initial problem, 
+                                                          --   using the options parsed from command line.
+  }
 
+-- | Construct customised Tct mode. Example usage.
+--
+-- > main = tctl $ applyMode void
+applyMode :: ProofData prob => TctMode prob opt -> IO ()
+applyMode = tctl . Right
 
 data Void = Void deriving (Show, Read)
-
 instance PP.Pretty Void where pretty = const $ PP.string "Void"
 
+-- | An example 'TctMode'.
 void :: TctMode Void Void
 void = TctMode
   { modeParser          = const $ Right Void
@@ -50,10 +64,12 @@ void = TctMode
   , modeOptions         = pure Void
   , modeModifyer        = const id }
 
+
 data TctOptions m = TctOptions
-  { satSolver_    :: Maybe FilePath
-  , smtSolver_    :: Maybe FilePath
-  , modeOptions_  :: m
+  { 
+  -- satSolver_    :: Maybe FilePath
+  -- , smtSolver_    :: Maybe FilePath
+    modeOptions_  :: m
   , strategyName_ :: Maybe String
   , problemFile_  :: FilePath
   }
@@ -65,9 +81,9 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
     listed = O.infoOption (PP.display $ mkDescription ps) $ mconcat [O.long "list", O.help "Display list of strategies."]
     versioned = O.infoOption version  $ mconcat [O.long "version", O.short 'v', O.help "Display Version.",  O.hidden]
     tctp = TctOptions
-      <$> O.optional (O.strOption (mconcat [O.long "satPath", O.help "Set path to minisat."]))
-      <*> O.optional (O.strOption (mconcat [O.long "smtPath", O.help "Set path to minismt."]))
-      <*> mparser
+      -- <$> O.optional (O.strOption (mconcat [O.long "satPath", O.help "Set path to minisat."]))
+      -- <*> O.optional (O.strOption (mconcat [O.long "smtPath", O.help "Set path to minismt."]))
+      <$> mparser
       <*> O.optional (O.strOption (mconcat [O.long "strategy", O.short 's', O.help "The strategy to apply."]))
       <*> O.argument O.str (O.metavar "File")
     desc = mconcat
@@ -77,6 +93,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
       ]
         
 
+-- | Current version.
 version :: String
 version = "3.0.0"
 
@@ -156,10 +173,6 @@ realMain dcfg = do
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
-
-
-applyMode :: TctMode prob opt ->TctModeConfig prob opt
-applyMode = Right
 
 type TctModeConfig prob opt = Either TctError (TctMode prob opt)
 

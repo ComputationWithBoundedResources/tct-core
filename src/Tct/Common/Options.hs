@@ -1,53 +1,51 @@
--- | This module provides a wrapper for 
--- <http://hackage.haskell.org/package/optparse-applicative OptParse.Applicative> 
--- to construct custom argument parsers.
+{- | This module provides a wrapper for "OptParse.Applicative"
+(<http://hackage.haskell.org/package/optparse-applicative>)
+to construct custom argument parsers.
+The parser for 'Tct.Combinators.TimeoutProcessor' is defined as follows:
+
+== Example
+>
+>TimeoutProc
+>  <$> optional (option $ eopt
+>      `withArgLong` "untilT"
+>      `withMetavar` "iSec"
+>      `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
+>  <*> optional (option $ eopt
+>      `withArgLong` "inT"
+>      `withMetavar` "iSec"
+>      `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
+>  <*> argument  (parseSomeProcessorMaybe ps) (eopt
+>      `withMetavar` "proc"
+>      `withHelpDoc` PP.string "The applied subprocessor.")
+>
+
+Example strings that are successfully parsed:
+    "processor",
+    "--inT 60 processor",
+    "--untilT 320 --inT 60 processor".
+
+Option @'Parser' a@ can be lifted to @'Parser' ('Maybe' a)@ using
+'Control.Applicative.optional'.
+
+  * Option @'Parser' ('Maybe' a)@ is optional during parsing.
+  * If an option @'Parser' a@ is constructed using 'withDefault' the option is optional during parsing.
+  * If an option @'Parser' ('Maybe' a)@ is constructed using @'withDefault' val@ then the option returns @'Just' val@ if
+    no other value is provided.
+-}
 module Tct.Common.Options
   (
-    -- * Example
-    {-|
-    The parser for 'Tct.Processor.Combinators.TimeoutProcessor' is defined as follows:
-
-    >
-    >TimeoutProc
-    >  <$> optional (option $ eopt
-    >      `withArgLong` "untilT"
-    >      `withMetavar` "iSec"
-    >      `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
-    >  <*> optional (option $ eopt
-    >      `withArgLong` "inT"
-    >      `withMetavar` "iSec"
-    >      `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
-    >  <*> argument  (parseSomeProcessorMaybe ps) (eopt
-    >      `withMetavar` "proc"
-    >      `withHelpDoc` PP.string "The applied subprocessor.")
-    >
-
-    Following strings are successfully parsed::
-        "processor",
-        "--inT 60 processor",
-        "--untilT 320 --inT 60 processor".
-    
-    Option @Parser a@ can be lifted to @Parser (Maybe a)@ using
-    'Control.Applicative.optional'.  Option @Parser (Maybe a)@ is optional during
-    parsing. If an option @Parser a@ is constructed using 'withDefault' the option
-    is optional during parsing. If an option @Parser (Maybe a)@ is constructed
-    using @'withDefault' val@ then the option returns @'Just' val@ if no other
-    value is provided.
-    -}
-
-    -- * Functions
-    -- ** Builder
-    eopt
+  -- * Builder
+  eopt
   , withArgLong
   , withDefault
   , withHelpDoc
   , withMetavar
-    -- ** Option Type
+  -- * Option Types
   , option
   , switch
   , flag
   , argument
-    -- ** Finisher
+    -- * Finisher
   , mkArgParser
   ) where
 
@@ -56,10 +54,10 @@ import           Data.Monoid                          ((<>))
 import qualified Options.Applicative                  as O
 import qualified Options.Applicative.Builder.Internal as O
 
-import           Tct.Common.Pretty                           (Doc)
+import           Tct.Common.Pretty                    (Doc)
 
 
--- | Identity Option. Is used to construct the option.
+-- | Identity Option.
 eopt :: Show a => O.Mod f a
 eopt = O.idm <> O.showDefault
 

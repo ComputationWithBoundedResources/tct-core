@@ -1,12 +1,13 @@
 -- | This module provides the 'ProofTree' type.
+-- 'ProofTree' stores the open problems and the proofs of applying 'Processor' instances to problems.
 module Tct.Core.ProofTree
   (
   -- * ProofTree
   ProofNode (..)
   , ProofTree (..)
   -- * Certification
-  , certificate
   , collectCertificate
+  , certificate
   -- * Lifting
   , resultToTree
   -- * Properites
@@ -26,18 +27,19 @@ import Tct.Core.Certificate (Certificate, unbounded)
 import Tct.Core.Processor
 
 
--- | A 'ProofNode' stores the necessary information to construct a proof from the application of a 'Processor'.
+-- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
   { problem   :: Problem p
   , processor :: p
   , proof     :: ProofObject p
   }
 
--- | The 'ProofTree' is the obtained from applying a 'Strategy' to a problem.
---
--- During evaluation 'Open' nodes store the open (sub-)problems,
--- 'NoProgress' nodes result from failing 'Processor' application, and
--- 'Progress' nodes result from successfull 'Processor' application.
+-- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
+-- During evaluation
+-- 
+-- * 'Open' nodes store the open (sub-)problems,
+-- * 'NoProgress' nodes result from failing 'Processor' applications, and
+-- * 'Progress' nodes result from successfull 'Processor' application.
 data ProofTree l where
   Open       :: l -> ProofTree l
   NoProgress :: Processor p => ProofNode p -> ProofTree l -> ProofTree l
@@ -51,17 +53,20 @@ resultToTree :: Processor p => Problem p -> p -> Result p -> ProofTree (Problem 
 resultToTree prob p (Fail po)                    = NoProgress (ProofNode prob p po) (Open prob)
 resultToTree prob p (Success subprobs po certfn) = Progress (ProofNode prob p po) certfn (Open `fmap` subprobs)
 
--- | Computes the 'Certificate' of a 'ProofTree'.
--- 'Open' nodes have the 'Certificate' 'unboundend.
--- prop> certificate pt = collectCertificate (const unbounded `fmap` pt)
-certificate :: ProofTree l -> Certificate
-certificate pt = collectCertificate $ const unbounded `fmap` pt
 
 -- | Computes the 'Certificate' of 'ProofTree'.
 collectCertificate :: ProofTree Certificate -> Certificate
 collectCertificate (Open c)                      = c
 collectCertificate (NoProgress _ subtree)        = certificate subtree
 collectCertificate (Progress _ certfn' subtrees) = certfn' (certificate `fmap` subtrees)
+
+-- | Computes the 'Certificate' of a 'ProofTree'.
+-- 'Open' nodes have the 'Certificate' 'unboundend'.
+--
+-- prop> certificate pt = collectCertificate (const unbounded `fmap` pt)
+certificate :: ProofTree l -> Certificate
+certificate pt = collectCertificate $ const unbounded `fmap` pt
+
 
 -- | Checks if the 'ProofTree' contains a 'Progress' node.
 progress :: ProofTree l -> Bool
@@ -78,6 +83,7 @@ isOpen :: ProofTree l -> Bool
 isOpen = null . open
 
 -- | Checks if there are no 'Open' nodes in the 'ProofTree'.
+--
 -- prop> isCloses = not . isOpen
 isClosed :: ProofTree l -> Bool
 isClosed = not . isOpen
