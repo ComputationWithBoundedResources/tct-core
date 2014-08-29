@@ -14,7 +14,6 @@ module Tct.Core.Strategy
 import           Control.Monad       (liftM)
 import           Control.Monad.Error (catchError)
 import           Data.Foldable       as F
-import           Data.Maybe          (fromMaybe)
 import           Data.Monoid         (mempty)
 import           Data.Traversable    as T
 import qualified Options.Applicative as O
@@ -112,23 +111,14 @@ evaluate (s1 `OrFaster` s2) prob =
   raceWith isProgressing isContinuing (evaluate s1 prob) (evaluate s2 prob)
 
 evaluate (OrBetter cmp s1 s2) prob = do
-  toM <- remainingTime `fmap` askStatus prob
-  let to = (-1) `fromMaybe` toM
-  (r1M, r2M) <- waitBothTimed to (evaluate s1 prob) (evaluate s2 prob)
-  return $ case (r1M, r2M) of
-    (Just r1, Just r2)
-      | isProgressing r1 && isProgressing r2 -> maxBy cmp (fromReturn r1) (fromReturn r2)
-      | isProgressing r1 -> r1
-      | isProgressing r2 -> r2
-      | isContinuing r1  -> r1
-      | otherwise        -> r2
-    (Just r1, Nothing ) -> r1
-    (Nothing , Just r2) -> r2
-    _ -> def
-  where
-    def = Abort (Open prob)
-    maxBy cm pt1 pt2 =
-      Continue $ if cm pt2 pt1 == GT then pt2 else pt1
+  (r1, r2) <- concurrently (evaluate s1 prob) (evaluate s2 prob)
+  return $ case (r1,r2) of
+    (Continue pt1, Continue pt2)
+      | progress pt1 && progress pt2 -> Continue $ maxBy cmp pt1 pt2
+      | progress pt1                 -> r1
+      | otherwise                    -> r2
+    _                                -> r2
+  where maxBy cm pt1 pt2 = if cm pt2 pt1 == GT then pt2 else pt1
 
 liftNoProgress :: Processor p => ProofNode p -> Return (ProofTree l) -> Return (ProofTree l)
 liftNoProgress n (Continue pt) = Continue (NoProgress n pt)

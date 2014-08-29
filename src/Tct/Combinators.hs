@@ -49,8 +49,7 @@ module Tct.Combinators
 where
 
 import           Control.Applicative (optional, (<$>), (<*>))
-import           Prelude
-
+import           Data.Maybe          (fromMaybe)
 import           Tct.Common.Options
 import qualified Tct.Common.Pretty   as PP
 import           Tct.Core            as C
@@ -109,10 +108,10 @@ infixr 6 <>, <||>
 (<||>) :: Strategy prob -> Strategy prob -> Strategy prob
 (<||>) = OrFaster
 
--- | Alternative version of 'OrBetter'.
+-- | Timed version of 'OrBetter'.
 --
--- @('<?>') cmp s1 s2@ applies @'timeout' n s1@ and @'timeout' n s2@ in parallel and waits until both strategies have
--- finished. Here @n@ depens on 'remainingTime'. We consider the following cases:
+-- @('<?>') cmp s1 s2@ applies @'timeoutIn' n s1@ and @'timeoutIn' n s2@ in parallel and waits until both strategies have
+-- finished. Here @n@ depends on 'remainingTime'. We consider the following cases:
 --
 --  * Both strategies end before the timeout
 --
@@ -126,8 +125,9 @@ infixr 6 <>, <||>
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
-(<?>) = OrBetter
+(<?>) :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
+(<?>) cmp s1 s2 = OrBetter cmp (some $ to s1) (some $ to s2)
+  where  to = TimeoutProc Nothing Nothing
 
 -- | @'try' s@ is continuing even if @s@ is not.
 --
@@ -169,7 +169,7 @@ fastest :: NList (Strategy prob) -> Strategy prob
 fastest (s:|ss) = foldr1 (<||>) (s:ss)
 
 -- | List version of ('<?>').
-best :: (ProofTree prob -> ProofTree prob -> Ordering) -> NList (Strategy prob) -> Strategy prob
+best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> NList (Strategy prob) -> Strategy prob
 best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
 
 
@@ -215,10 +215,10 @@ abort = FailProc
 
 -- * Named Procesor -----------------------------------------------------------
 -- | Gives a dedicated name to a processor. Useful for pretty-printing and parser generation.
-data NamedProcessor p 
+data NamedProcessor p
   = NamedProc String p deriving Show
 
-data NamedProof p 
+data NamedProof p
   = NamedProof String (ProofObject p)
 
 instance Processor p => Show (NamedProof p) where
@@ -274,19 +274,21 @@ instance Processor p => Processor (TimeoutProcessor p) where
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
     let
-      t = case (inT proc, untilT proc) of
+      to = case (inT proc, untilT proc) of
         (Nothing, Just u ) -> max 0 (u - running)
         (Just i , Nothing) -> max 0 i
         (Just i , Just u ) -> max 0 (min i (max 0 (u - running)))
-        _                  -> 0
-    mr <- timeout t (solve (procT proc) prob)
+        _                  -> (-1)
+    remains <- (fromMaybe to . remainingTime) `fmap` askStatus prob
+    mr <- timeout (min to remains) (solve (procT proc) prob)
     return $ case mr of
-      Nothing       -> Fail (Timeout t)
+      Nothing       -> Fail (Timeout to)
       Just (Fail p) -> Fail (NoTimeout p)
       Just r@(Success {}) -> Success
         { subProblems   = subProblems r
         , proofData     = NoTimeout (proofData r)
         , certificateFn = certificateFn r }
+
 
 instance Processor p => ParsableProcessor (TimeoutProcessor p) where
   args _ ps = argsParser pargs desc
@@ -309,13 +311,14 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
 timeoutProcessor :: TimeoutProcessor (FailProcessor prob)
 timeoutProcessor = TimeoutProc Nothing Nothing failProcessor
 
--- | @timoutIn i p@ aborts the application of @p@ after @i@ seconds.
+-- | @timoutIn i p@ aborts the application of @p@ safter @min i 'remainingTime'@ seconds;
 -- If @i@ is negative the processor may run forever.
 timeoutIn :: Int -> p -> TimeoutProcessor p
 timeoutIn n = TimeoutProc (Just n) Nothing
 
--- | @timeoutUntil i p@ aborts the application of @p@ until i seconds wrt. to the starting time.
--- If @i@ is negative the processor may run forever.
+-- | @timeoutUntil i p@ aborts the application of @p@ until i seconds wrt. to
+-- the starting time, or if 'remainingTime' is expired.  If @i@ is negative the
+-- processor may run forever.
 timeoutUntil :: Int -> p -> TimeoutProcessor p
 timeoutUntil n = TimeoutProc Nothing (Just n)
 

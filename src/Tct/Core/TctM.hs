@@ -3,7 +3,7 @@ module Tct.Core.TctM
   (
   -- * Tct Monad
   TctM (..)
-  , TctROState (..) 
+  , TctROState (..)
   , TctStatus (..)
   , askStatus
 
@@ -12,17 +12,17 @@ module Tct.Core.TctM
   , wait
   , timeout
   , raceWith
-  , waitBothTimed
+  , concurrently
   ) where
 
 
-import           Control.Applicative (Applicative)
-import           Control.Concurrent (threadDelay)
+import           Control.Applicative      (Applicative, (<$>), (<*>))
+import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
-import           Control.Monad (liftM)
-import           Control.Monad.Error (MonadError)
-import           Control.Monad.Reader (liftIO, MonadIO, ask, local, runReaderT, MonadReader, ReaderT)
-import qualified System.Time as Time
+import           Control.Monad            (liftM)
+import           Control.Monad.Error      (MonadError)
+import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT, ask, liftIO, local, runReaderT)
+import qualified System.Time              as Time
 
 
 -- | Provides Tct runtime options.
@@ -38,7 +38,7 @@ newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
 
 -- | Defines (dynamic) runtime status.
 data TctStatus prob = TctStatus
-  { currentProblem :: prob 
+  { currentProblem :: prob
   , runningTime    :: Int
   , remainingTime  :: Maybe Int }
 
@@ -50,7 +50,7 @@ askStatus :: prob -> TctM (TctStatus prob)
 askStatus prob = do
   st <- askState
   now <- liftIO Time.getClockTime
-  return TctStatus 
+  return TctStatus
     { currentProblem = prob
     , runningTime    = Time.tdSec (Time.diffClockTimes now (startTime st))
     , remainingTime  = (Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
@@ -70,24 +70,12 @@ wait = liftIO . Async.wait
 --waitEither :: Async.Async a -> Async.Async b -> TctM (Either a b)
 --waitEither a1 a2 = liftIO $ Async.waitEither a1 a2
 
---waitBoth :: Async.Async a -> Async.Async b -> TctM (a,b)
---waitBoth a1 a2 = liftIO $ Async.waitBoth a1 a2
-
---cancel :: Async.Async a -> TctM ()
---cancel = liftIO . Async.cancel
-
---concurrently :: TctM a -> TctM (Async.Concurrently a)
---concurrently m = Async.Concurrently `liftM` toIO m
-
--- | Variant of 'Async.waitBoth'.
--- @'waitBothTimed' i m1 m2@ runs @'timeout' n m1@ and @'timeout' n m2@ in parallel
--- and returns both results.
-waitBothTimed :: Int -> TctM a -> TctM b -> TctM (Maybe a, Maybe b)
-waitBothTimed n m1 m2 = do
-  io1 <- toIO $ timeout n m1 
-  io2 <- toIO $ timeout n m2
-  liftIO $ Async.withAsync io1 $ \a1 ->  
-    liftIO $ Async.withAsync io2 $ \a2 -> 
+-- | Lifts 'Async.concurrently'.
+concurrently :: TctM a -> TctM b -> TctM (a,b)
+concurrently m1 m2 = do
+  (io1,io2) <- (,) <$> toIO m1 <*> toIO m2
+  liftIO $ Async.withAsync io1 $ \a1 ->
+    liftIO $ Async.withAsync io2 $ \a2 ->
     liftIO $ Async.waitBoth a1 a2
 
 -- | @'raceWith' p1 p2 m1 m2@ runs @m1@ and @m2@ in parallel.
@@ -97,18 +85,17 @@ waitBothTimed n m1 m2 = do
 -- * If none fullfills neiter @p1@ nor @p2@, it returns the latter result.
 raceWith :: (a -> Bool) -> (a -> Bool) -> TctM a -> TctM a -> TctM a
 raceWith p1 p2 m1 m2 = do
-  io1 <- toIO m1
-  io2 <- toIO m2
+  (io1,io2) <- (,) <$> toIO m1 <*> toIO m2
   liftIO $ raceWithIO p1 p2 io1 io2
 
 -- TODO refactor
 raceWithIO :: (a -> Bool) -> (a -> Bool)-> IO a -> IO a -> IO a
-raceWithIO p1 p2 m1 m2 = 
+raceWithIO p1 p2 m1 m2 =
   Async.withAsync m1 $ \a1 ->
   Async.withAsync m2 $ \a2 -> do
     e <- Async.waitEither a1 a2
     case e of
-      Left  r1 
+      Left  r1
         | p1 r1     -> Async.cancel a2 >> return r1
         | p2 r1     -> Async.wait a2 >>= \r2 -> return (if not (p2 r2) then r1 else r2)
         | otherwise -> Async.wait a2
@@ -124,7 +111,7 @@ timeout :: Int -> TctM a -> TctM (Maybe a)
 timeout n m
   | n < 0 = Just `liftM` m
   | n == 0 = return Nothing
-  | otherwise = do 
+  | otherwise = do
     e <- toIO m' >>= liftIO . Async.race (threadDelay n)
     return $ either (const Nothing) Just e
     where
