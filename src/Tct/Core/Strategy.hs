@@ -11,7 +11,6 @@ module Tct.Core.Strategy
   ) where
 
 
-import           Control.Monad       (liftM)
 import           Control.Monad.Error (catchError)
 import           Data.Foldable       as F
 import           Data.Monoid         (mempty)
@@ -191,8 +190,9 @@ instance ProofData prob => Processor (Strategy prob) where
   type Problem (Strategy prob)     = prob
   name = const "Strategy Evaluation"
   solve s prob = do
-    pt <- fromReturn `liftM` evaluate s prob
-    return $ if progress pt
+    r <- evaluate s prob
+    let pt = fromReturn r
+    return $ if isProgressing r
       then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
 
@@ -234,8 +234,9 @@ instance ProofData prob => Processor (CustomStrategy arg prob) where
   type Problem (CustomStrategy arg prob)     = prob
   name                                       = name_
   solve st prob = do
-    pt <- fromReturn `liftM` evaluate (strategy_ st (args_ st)) prob
-    return $ if progress pt
+    r <- evaluate (strategy_ st (args_ st)) prob
+    let pt = fromReturn r
+    return $ if isProgressing r
       then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
 
@@ -264,8 +265,9 @@ instance ProofData prob => Processor (SomeParsableProcessor prob) where
   type Forking (SomeParsableProcessor prob) = ProofTree
   name (SomeParsableProc p) = name p
   solve (SomeParsableProc p) prob = do
-    pt <- fromReturn `liftM` evaluate (Proc p) prob
-    return $ if progress pt
+    r <- evaluate (Proc p) prob
+    let pt = fromReturn r
+    return $ if isProgressing r
       then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
 

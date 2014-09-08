@@ -160,8 +160,8 @@ realMain dcfg = do
         } = opts
     file  <- tryIO $ readFile theProblemFile
     prob  <- liftEither $ theProblemParser file >>= \prob -> return (theModifyer prob theOptions)
-    strat <- maybe (return theDefaultStrategy) (liftEither . liftM Proc . parseSomeParsableProcessor (strategies cfg)) theStrategyName
-    pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate strat prob)
+    st    <- maybe (return theDefaultStrategy) (liftEither . liftM Proc . parseSomeParsableProcessor (strategies cfg)) theStrategyName
+    pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate st prob)
     liftIO $ do
       print $ strategies cfg
       putStrLn "Problem:"

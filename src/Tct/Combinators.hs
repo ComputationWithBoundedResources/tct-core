@@ -58,8 +58,7 @@ import qualified Tct.Common.Pretty   as PP
 import           Tct.Core            as C
 
 
--- | List of default processor combinators.
--- 'SomeProcessor' are parsable and provide a description.
+-- | List of default parsable processors and processor combinators.
 parsableProcessors :: ProofData prob => [SomeParsableProcessor prob]
 parsableProcessors =
   [ SomeParsableProc failProcessor
@@ -367,14 +366,14 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
 timeoutProcessor :: TimeoutProcessor (FailProcessor prob)
 timeoutProcessor = TimeoutProc Nothing Nothing failProcessor
 
--- | @timoutIn i p@ aborts the application of @p@ safter @min i 'remainingTime'@ seconds;
+-- | @'timoutIn' i p@ aborts the application of @p@ after @min i 'remainingTime'@ seconds;
 -- If @i@ is negative the processor may run forever.
 timeoutIn :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
 timeoutIn n = pstrat . TimeoutProc (Just n) Nothing
 
--- | @timeoutUntil i p@ aborts the application of @p@ until i seconds wrt. to
--- the starting time, or if 'remainingTime' is expired.  If @i@ is negative the
--- processor may run forever.
+-- | @'timeoutUntil' i p@ aborts the application of @p@ until i seconds wrt. 
+-- to the starting time, or if 'remainingTime' is expired.
+-- If @i@ is negative the processor may run forever.
 timeoutUntil :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
 timeoutUntil n = pstrat . TimeoutProc Nothing (Just n)
 
