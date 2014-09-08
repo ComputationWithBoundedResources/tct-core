@@ -186,18 +186,14 @@ trying _ (WithStatus f) = WithStatus (try . f)
 trying b s              = Trying b s
 
 -- | @'try' s@ is continuing even if @s@ is not.
---
--- prop> try (force s) = try s
 try :: Strategic s1 => s1 -> Strategy (Problem s1)
 try = trying True . toStrategy
 
 -- | @'force' s@ fails if @s@ is not progressing.
---
--- prop> force (try s) = force s
 force :: Strategic s1 => s1 -> Strategy (Problem s1)
 force = trying False . toStrategy
 
--- | Applied strategy depens on run time status.
+-- | Applied strategy depends on run time status.
 withState :: (TctStatus prob -> Strategy prob) -> Strategy prob
 withState = WithStatus
 
@@ -248,10 +244,11 @@ data FailProof = FailProof deriving Show
 
 instance PP.Pretty FailProof where
   pretty _ = PP.paragraph "We apply FailProccessor."
+
 instance ProofData prob => Processor (FailProcessor prob) where
   type ProofObject (FailProcessor prob) = FailProof
-  type Problem (FailProcessor prob) = prob
-  name _ = "FailProcessor"
+  type Problem (FailProcessor prob)     = prob
+  name _    = "FailProcessor"
   solve _ _ = return $ Fail FailProof
 
 instance ProofData prob => ParsableProcessor (FailProcessor prob) where
@@ -260,8 +257,8 @@ instance ProofData prob => ParsableProcessor (FailProcessor prob) where
 failProcessor :: FailProcessor prob
 failProcessor = FailProc
 
--- | @abort@ always return 'Fail' and therfore 'Abort'.
--- Does not necessarily abort the whole evaluation.
+-- | @'abort'@ always returns 'Fail' and therfore 'Abort'.
+-- Does not abort the whole evaluation in combination with 'try'.
 abort :: FailProcessor prob
 abort = FailProc
 
@@ -292,15 +289,15 @@ instance Processor p => Processor (TimeoutProcessor p) where
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
     let
-      ton n = case n of
+      toNat n = case n of
         Just i | i >= 0 -> Just i
         _               -> Nothing
-      to = case (ton $ inT proc, ton $ untilT proc) of
+      to = case (toNat $ inT proc, toNat $ untilT proc) of
         (Nothing, Just u ) -> max 0 (u - running)
-        (Just i , Nothing) -> max 0 i
-        (Just i , Just u ) -> max 0 (min i (max 0 (u - running)))
+        (Just i , Nothing) -> i
+        (Just i , Just u ) -> min i (max 0 (u - running))
         _                  -> -1
-    remains <- (fromMaybe to . remainingTime) `fmap` askStatus prob
+    remains <- (fromMaybe to . toNat . remainingTime) `fmap` askStatus prob
     mr <- timeout (min to remains) (solve (procT proc) prob)
     return $ case mr of
       Nothing       -> Fail (Timeout to)
