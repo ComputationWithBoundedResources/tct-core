@@ -292,7 +292,10 @@ instance Processor p => Processor (TimeoutProcessor p) where
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
     let
-      to = case (inT proc, untilT proc) of
+      ton n = case n of
+        Just i | i >= 0 -> Just i
+        _               -> Nothing
+      to = case (ton $ inT proc, ton $ untilT proc) of
         (Nothing, Just u ) -> max 0 (u - running)
         (Just i , Nothing) -> max 0 i
         (Just i , Just u ) -> max 0 (min i (max 0 (u - running)))
@@ -307,16 +310,18 @@ instance Processor p => Processor (TimeoutProcessor p) where
         , proofData     = NoTimeout (proofData r)
         , certificateFn = certificateFn r }
 
+toSeconds :: Int -> Int
+toSeconds n = 1000000*n
 
 instance Processor p => ParsableProcessor (TimeoutProcessor p) where
   args _ ps = argsParser pargs desc
     where
       pargs = TimeoutProc
-        <$> optional (option $ eopt
+        <$> optional (fmap toSeconds $ option $ eopt
             `withArgLong` "untilT"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
-        <*> optional (option $ eopt
+        <*> optional (fmap toSeconds $ option $ eopt
             `withArgLong` "inT"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
@@ -332,11 +337,11 @@ timeoutProcessor = TimeoutProc Nothing Nothing failProcessor
 -- | @'timoutIn' i p@ aborts the application of @p@ after @min i 'remainingTime'@ seconds;
 -- If @i@ is negative the processor may run forever.
 timeoutIn :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
-timeoutIn n = pstrat . TimeoutProc (Just n) Nothing
+timeoutIn n = pstrat . TimeoutProc (Just $ toSeconds n) Nothing
 
 -- | @'timeoutUntil' i p@ aborts the application of @p@ until i seconds wrt. 
 -- to the starting time, or if 'remainingTime' is expired.
 -- If @i@ is negative the processor may run forever.
 timeoutUntil :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
-timeoutUntil n = pstrat . TimeoutProc Nothing (Just n)
+timeoutUntil n = pstrat . TimeoutProc Nothing (Just $ toSeconds n)
 

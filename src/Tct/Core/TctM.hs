@@ -39,8 +39,9 @@ newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
 -- | Defines (dynamic) runtime status.
 data TctStatus prob = TctStatus
   { currentProblem :: prob
-  , runningTime    :: Int
-  , remainingTime  :: Maybe Int }
+  , runningTime    :: Int       -- ^ Runing time in seconds.
+  , remainingTime  :: Maybe Int -- ^ Remaining time in seconds.
+  }
 
 askState :: TctM TctROState
 askState = ask
