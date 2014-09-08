@@ -8,17 +8,15 @@ module Tct.Core.Processor
   , Result (..)
   , Processor (..)
 
-  -- * Existential Type
-  , SomeProcessor (..)
-
   -- * Parsable Procesor
-  , ArgumentParser
   , ParsableProcessor (..)
+  , SomeParsableProcessor (..)
+  , ArgumentParser
   , unitParser
   , argsParser
   , mkDescription
-  , parseSomeProcessor
-  , parseSomeProcessorMaybe
+  , parseSomeParsableProcessor
+  , parseSomeParsableProcessorMaybe
   ) where
 
 
@@ -81,27 +79,27 @@ class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p
 -- Existential Type ----------------------------------------------------------
 
 -- | Existential type of 'Processor'.
-data SomeProcessor :: * -> * where
-  SomeProc :: (Processor p, ParsableProcessor p) => p -> SomeProcessor (Problem p)
+data SomeParsableProcessor :: * -> * where
+  SomeParsableProc :: ParsableProcessor p => p -> SomeParsableProcessor (Problem p)
 
-instance Show (SomeProcessor prob) where
-  show (SomeProc p) = show p
+instance Show (SomeParsableProcessor prob) where
+  show (SomeParsableProc p) = show p
 
 
 -- Parsable Processor --------------------------------------------------------
 -- | Type synonym for an argument parser.
-type ArgumentParser p = O.ParserInfo (SomeProcessor (Problem p))
+type ArgumentParser p = O.ParserInfo (SomeParsableProcessor (Problem p))
 
 -- | Instances of 'ParsableProcessor' provide a string parser.
 class Processor p => ParsableProcessor p where
   -- | The argument parser for the instance.
   -- The default implementation takes no arguments.
-  args           :: p -> [SomeProcessor (Problem p)] -> ArgumentParser p
+  args           :: p -> [SomeParsableProcessor (Problem p)] -> ArgumentParser p
   -- | Defines the actual parser for the processor.
   -- The default implemenation uses a combination of 'name' and 'args' to generate a parser.
   -- The default iplementation returns the processor itself if 'args' is not specified.
   -- See "Options" for an example implementation of 'args'.
-  parseProcessor :: p -> [SomeProcessor (Problem p)] -> String -> Either TctError (SomeProcessor (Problem p))
+  parseProcessor :: p -> [SomeParsableProcessor (Problem p)] -> String -> Either TctError (SomeParsableProcessor (Problem p))
   args p _              = unitParser p (PP.paragraph $ description p)
   parseProcessor p ps ss = do
     (t,ts) <- tokenise ss
@@ -114,18 +112,18 @@ class Processor p => ParsableProcessor p where
 
 -- | Default processor (argument) parser without arguments.
 unitParser :: ParsableProcessor a => a -> PP.Doc -> ArgumentParser a
-unitParser p desc = SomeProc `fmap` O.info (O.pure p) (O.progDescDoc (Just desc))
+unitParser p desc = SomeParsableProc `fmap` O.info (O.pure p) (O.progDescDoc (Just desc))
 
 -- | Define custom processor (argument) parser.
 argsParser :: ParsableProcessor a => O.Parser a -> PP.Doc -> ArgumentParser a
-argsParser parser desc = SomeProc `fmap` mkArgParser parser desc
+argsParser parser desc = SomeParsableProc `fmap` mkArgParser parser desc
 
 -- | Generates a descripton from the 'ParsableProcessor' instance of a list of processors.
-mkDescription :: [SomeProcessor prob] -> PP.Doc
+mkDescription :: [SomeParsableProcessor prob] -> PP.Doc
 mkDescription ps = PP.vcat $ map (mkDescription' ps) ps where
 
-mkDescription' :: [SomeProcessor prob] -> SomeProcessor prob  -> PP.Doc
-mkDescription' ps (SomeProc p) =
+mkDescription' :: [SomeParsableProcessor prob] -> SomeParsableProcessor prob  -> PP.Doc
+mkDescription' ps (SomeParsableProc p) =
   PP.string "--" PP.<+> PP.string (name p) PP.<+> PP.string (replicate (74 - length (name p)) '-')
   PP.<$$>
   PP.indent 2 (PP.empty
@@ -136,14 +134,14 @@ mkDescription' ps (SomeProc p) =
     parser = args p ps
 
 -- | Provides a simple parser for processors.
-parseSomeProcessor :: (ParsableProcessor (SomeProcessor prob), Problem (SomeProcessor prob) ~ prob)
-  => [SomeProcessor prob] -> String -> Either TctError (SomeProcessor prob)
-parseSomeProcessor rs s =  def `fromMaybe` L.find isRight (map (\r -> parseProcessor r rs s) rs)
+parseSomeParsableProcessor :: (ParsableProcessor (SomeParsableProcessor prob), Problem (SomeParsableProcessor prob) ~ prob)
+  => [SomeParsableProcessor prob] -> String -> Either TctError (SomeParsableProcessor prob)
+parseSomeParsableProcessor rs s =  def `fromMaybe` L.find isRight (map (\r -> parseProcessor r rs s) rs)
   where def = Left $ TctParseError $ "readAnyProc: ("  ++ s ++ ")"
 
--- | Like 'parseSomeProcessor' but returns 'Nothing' if the parsing failed.
-parseSomeProcessorMaybe ::
-  (ParsableProcessor (SomeProcessor t), Problem (SomeProcessor t) ~ t) =>
-  [SomeProcessor t] -> String -> Maybe (SomeProcessor t)
-parseSomeProcessorMaybe rs s = hush $ parseSomeProcessor rs s
+-- | Like 'parseSomeParsableProcessor' but returns 'Nothing' if the parsing failed.
+parseSomeParsableProcessorMaybe ::
+  (ParsableProcessor (SomeParsableProcessor t), Problem (SomeParsableProcessor t) ~ t) =>
+  [SomeParsableProcessor t] -> String -> Maybe (SomeParsableProcessor t)
+parseSomeParsableProcessorMaybe rs s = hush $ parseSomeParsableProcessor rs s
 

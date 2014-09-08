@@ -32,7 +32,7 @@ import           Tct.Core.TctM
 --
 -- > timoutIn 20 (s1 >>> s2)
 data Strategy prob where
-  Proc       :: SomeProcessor prob -> Strategy prob
+  Proc       :: (Processor p, Problem p ~ prob) => p -> Strategy prob
   Trying     :: Bool -> Strategy prob -> Strategy prob
   Then       :: Strategy prob -> Strategy prob -> Strategy prob
   ThenPar    :: Strategy prob -> Strategy prob -> Strategy prob
@@ -61,11 +61,11 @@ isProgressing _             = False
 -- | @'evaluate' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
 evaluate :: Strategy prob -> prob -> TctM (Return (ProofTree prob))
-evaluate (Proc (SomeProc p)) prob = (f `fmap` solve p prob) `catchError` errNode
+evaluate (Proc p) prob = (f `fmap` solve p prob) `catchError` errNode
   where
     f res@(Fail {})    = Abort (resultToTree prob p res)
     f res@(Success {}) = Continue (resultToTree prob p res)
-    errNode err = evaluate (Proc (SomeProc $ ErroneousProc err p)) prob
+    errNode err = evaluate (Proc (ErroneousProc err p)) prob
 
 evaluate (Trying True s) prob = f `fmap` evaluate s prob
   where
@@ -241,12 +241,12 @@ instance ProofData prob => Processor (CustomStrategy arg prob) where
 
 -- TODO: refactor with Processor
 instance ProofData prob => ParsableProcessor (CustomStrategy arg prob) where
-  args p _ = SomeProc `fmap` const p `fmap` pargs_ p
+  args p _ = SomeParsableProc `fmap` const p `fmap` pargs_ p
   parseProcessor p _ ss = do
     (t,ts) <- tokenise ss
     if name p == t
       then case O.execParserPure (O.prefs mempty) (pargs_ p) ts of
-        O.Success a   -> Right $ SomeProc $ p {args_ = a}
+        O.Success a   -> Right $ SomeParsableProc $ p {args_ = a}
         O.Failure err -> Left $ TctParseError $ "optParser error (" ++ show err ++ "," ++ show ss ++ ")"
         _             -> Left $ TctParseError $ "optParser completion error (" ++ show ss ++ ")"
       else Left $ TctParseError $ name p ++ ss
@@ -258,17 +258,17 @@ data SomeProofObject               where SomeProofObj :: (ProofData obj) => obj 
 instance PP.Pretty SomeProofObject where pretty (SomeProofObj obj) = PP.pretty obj
 instance Show SomeProofObject      where show (SomeProofObj obj)   = show obj
 
-instance ProofData prob => Processor (SomeProcessor prob) where
-  type ProofObject (SomeProcessor prob) = StrategyProof prob
-  type Problem (SomeProcessor prob) = prob
-  type Forking (SomeProcessor prob) = ProofTree
-  name (SomeProc p) = name p
-  solve p prob = do
+instance ProofData prob => Processor (SomeParsableProcessor prob) where
+  type ProofObject (SomeParsableProcessor prob) = StrategyProof prob
+  type Problem (SomeParsableProcessor prob) = prob
+  type Forking (SomeParsableProcessor prob) = ProofTree
+  name (SomeParsableProc p) = name p
+  solve (SomeParsableProc p) prob = do
     pt <- fromReturn `liftM` evaluate (Proc p) prob
     return $ if progress pt
       then Success pt (StrategyProof pt) collectCertificate
       else Fail (StrategyProof pt)
 
-instance ProofData prob => ParsableProcessor (SomeProcessor prob) where
-  parseProcessor (SomeProc p) = parseProcessor p
+instance ProofData prob => ParsableProcessor (SomeParsableProcessor prob) where
+  parseProcessor (SomeParsableProc p) = parseProcessor p
 

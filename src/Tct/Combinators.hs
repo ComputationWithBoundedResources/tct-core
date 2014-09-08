@@ -13,10 +13,13 @@ module Tct.Combinators
   --  * is continuing if the evaluation returns @'Continue' pt@,
   --  * is progressing if additionally @'progress' pt = 'True'@,
   --  * is failing if it is not continuing.
-  some
+  strat
+  , pstrat
   , NList (..)
+  , ProcessorStrategy (..)
+  , Strategic
   -- ** Sequential
-  , (>>>), (>||>)
+  , (>>>), (>||>), (>=>)
   , chain
   -- ** Alternative
   , (<>), (<||>), (<?>)
@@ -43,7 +46,7 @@ module Tct.Combinators
   , TimeoutProcessor, timeoutIn, timeoutUntil
 
   -- * Processor List
-  , processors
+  , parsableProcessors
   )
 
 where
@@ -57,21 +60,66 @@ import           Tct.Core            as C
 
 -- | List of default processor combinators.
 -- 'SomeProcessor' are parsable and provide a description.
-processors :: ProofData prob => [SomeProcessor prob]
-processors =
-  [ SomeProc failProcessor
-  , SomeProc namedProcessor
-  , SomeProc timeoutProcessor
+parsableProcessors :: ProofData prob => [SomeParsableProcessor prob]
+parsableProcessors =
+  [ SomeParsableProc failProcessor
+  , SomeParsableProc namedProcessor
+  , SomeParsableProc timeoutProcessor
   ]
+
+-- | Newtype wrapper for processors.
+-- If @p@ is a 'Processor' then @'ProcessorStrategy' p@ behaves like @p@.
+-- Additionally, @'ProcessorStrategy' p@ is an instance of 'Strategic'.
+newtype ProcessorStrategy a = ProcessorStrategy {fromProcessorStrategy :: a}
+
+instance Show a => Show (ProcessorStrategy a) where
+  show = show . fromProcessorStrategy
+
+instance PP.Pretty a => PP.Pretty (ProcessorStrategy a) where
+  pretty = PP.pretty . fromProcessorStrategy
+
+instance Processor p => Processor (ProcessorStrategy p) where
+  type ProofObject (ProcessorStrategy p) = ProofObject p
+  type Forking (ProcessorStrategy p)     = Forking p
+  type Problem (ProcessorStrategy p)     = Problem p
+  name        = name . fromProcessorStrategy
+  solve p prob = do
+    r1 <- solve (fromProcessorStrategy p) prob
+    return $ case r1 of
+      Success probs po certfn -> Success probs po certfn
+      Fail po                 -> Fail po
+
+instance ParsableProcessor p => ParsableProcessor (ProcessorStrategy p) where
+  args p           = args (fromProcessorStrategy p)
+  parseProcessor p = parseProcessor (fromProcessorStrategy p)
+
+-- | Generalises 'Strategy' and 'ProcessorStrategy'.
+-- Below defined strategy combinators take instances of 'Strategic' as arguments. Hence they work with 'Strategy' and
+-- 'ProcessorStrategy'.
+class Strategic a where
+  toStrategy :: a -> Strategy (Problem a)
+
+instance Strategic (Strategy prob) where
+  toStrategy a = a
+
+instance Processor p => Strategic (ProcessorStrategy p) where
+  toStrategy = Proc
 
 
 -- Strategy Combinators ------------------------------------------------------------------------------------------------
 
 -- | Lifts a processor to a 'Strategy'.
-some :: (Processor p, ParsableProcessor p)  => p ->  Strategy (Problem p)
-some = Proc . SomeProc
+strat :: Processor p  => p ->  Strategy (Problem p)
+strat = Proc
 
-infixr 5 >>>, >||>
+-- | Lifts a processor to a 'ProcessorStrategy'
+pstrat :: Processor p => p -> ProcessorStrategy p
+pstrat = ProcessorStrategy
+
+liftS2 :: (Strategic s1, Strategic s2) => (Strategy (Problem s1) -> Strategy (Problem s2) -> t) -> s1 -> s2 -> t
+liftS2 f s1 s2 = toStrategy s1 `f` toStrategy s2
+
+infixr 5 >>>, >||> , >=>
 infixr 6 <>, <||>
 
 -- | Infix version of 'Then'.
@@ -79,14 +127,19 @@ infixr 6 <>, <||>
 -- Fails if @s1@ or @s2@ fails.
 --
 -- prop> s1 >>> (s2 >>> s3) = (s1 >>> s2) >>> s3 = s1 >>> s2 >>> s3
-(>>>) :: Strategy prob -> Strategy prob -> Strategy prob
-(>>>)  = Then
+(>>>) :: (Strategic s1, Strategic s2, Problem s1 ~ Problem s2) => s1 -> s2 -> Strategy (Problem s2)
+(>>>)  = liftS2 Then
 
 -- | Infix version of 'ThenPar'.
--- Like ('>>>') but applies s2 on all problems in parallel.
-(>||>) :: Strategy prob -> Strategy prob -> Strategy prob
-(>||>) = ThenPar
+-- Like ('>>>') but applies @s2@ on all problems in parallel.
+(>||>) :: (Strategic s1, Strategic s2, Problem s1 ~ Problem s2) => s1 -> s2 -> Strategy (Problem s2)
+(>||>) = liftS2 ThenPar
 
+-- | Like ('>>>') but first strategy is optional.
+--
+-- prop> s1 >=> s2 = try s1 >>> s2
+(>=>) :: (Strategic s1, Strategic s2, Problem s1 ~ Problem s2) => s1 -> s2 -> Strategy (Problem s2)
+(>=>) s1 s2  = try s1 >>> s2
 
 -- | Infix version of 'Alt'.
 -- @s1 '<>' s2@
@@ -97,16 +150,16 @@ infixr 6 <>, <||>
 -- * Fails if @s1@ and @s2@ fails.
 --
 -- prop> s1 <> (s2 <> s3) = (s1 <> s2) <> s3 = s1 <> s2 <> s3
-(<>):: Strategy prob -> Strategy prob -> Strategy prob
-(<>)  = Alt
+(<>) :: (Strategic s1, Strategic s2, Problem s1 ~ Problem s2) => s1 -> s2 -> Strategy (Problem s2)
+(<>) = liftS2 Alt
 
 -- | Infix version of 'OrFaster'.
 -- Behaves like ('<>') but applies the strategies in parallel.
 -- Suppose that @s2@ ends before @s1@ then:
 --
 -- prop> s1 <||> s2  = s2 <> s1
-(<||>) :: Strategy prob -> Strategy prob -> Strategy prob
-(<||>) = OrFaster
+(<||>) :: (Strategic s1, Strategic s2, Problem s1 ~ Problem s2) => s1 -> s2 -> Strategy (Problem s2)
+(<||>) = liftS2 OrFaster
 
 -- | Timed version of 'OrBetter'.
 --
@@ -125,33 +178,36 @@ infixr 6 <>, <||>
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
-(<?>) cmp s1 s2 = OrBetter cmp (some $ to s1) (some $ to s2)
+(<?>) :: (Strategic s1, Strategic s2, Problem s1 ~ prob, Problem s2 ~ prob, ProofData prob) => (ProofTree prob -> ProofTree prob -> Ordering) -> s1 -> s2 -> Strategy prob
+(<?>) cmp s1 s2 = OrBetter cmp (strat . to $ toStrategy s1) (strat . to $ toStrategy s2)
   where  to = TimeoutProc Nothing Nothing
+
+
+trying :: Bool -> Strategy prob -> Strategy prob
+trying b s@(Trying _ _) = Trying b s
+trying _ (WithStatus f) = WithStatus (try . f)
+trying b s              = Trying b s
 
 -- | @'try' s@ is continuing even if @s@ is not.
 --
 -- prop> try (force s) = try s
-try :: Strategy prob -> Strategy prob
-try s@(Trying _ _) = Trying True s
-try (WithStatus f) = WithStatus (try . f)
-try s              = Trying True s
+try :: Strategic s1 => s1 -> Strategy (Problem s1)
+try = trying False . toStrategy
 
 -- | @'force' s@ fails if @s@ is not progressing.
 --
 -- prop> force (try s) = force s
-force :: Strategy prob -> Strategy prob
-force s@(Trying _ _) = Trying False s
-force (WithStatus f) = WithStatus (force . f)
-force s              = Trying False s
+force :: Strategic s1 => s1 -> Strategy (Problem s1)
+force = trying True . toStrategy
 
--- | prop> withState = 'WithStatus'
+-- | Applied strategy depens on run time status.
 withState :: (TctStatus prob -> Strategy prob) -> Strategy prob
 withState = WithStatus
 
 -- | Specialised version of 'withState'.
 withProblem :: (prob -> Strategy prob) -> Strategy prob
 withProblem g = WithStatus (g . currentProblem)
+
 
 -- | Defines a non-empty list.
 data NList a = a :| [a] deriving (Eq, Ord, Show)
@@ -173,7 +229,7 @@ best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> NLis
 best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
 
 
--- | @exhaustively s@ repeatedly applies @s@ until @s@ fails.
+-- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
 exhaustively :: Strategy prob -> Strategy prob
 exhaustively s =  s >>> try (exhaustively s)
@@ -278,7 +334,7 @@ instance Processor p => Processor (TimeoutProcessor p) where
         (Nothing, Just u ) -> max 0 (u - running)
         (Just i , Nothing) -> max 0 i
         (Just i , Just u ) -> max 0 (min i (max 0 (u - running)))
-        _                  -> (-1)
+        _                  -> -1
     remains <- (fromMaybe to . remainingTime) `fmap` askStatus prob
     mr <- timeout (min to remains) (solve (procT proc) prob)
     return $ case mr of
@@ -302,7 +358,7 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
             `withArgLong` "inT"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
-        <*> argument  (parseSomeProcessorMaybe ps) (eopt
+        <*> argument  (parseSomeParsableProcessorMaybe ps) (eopt
             `withMetavar` "proc"
             `withHelpDoc` PP.string "The applied subprocessor.")
       desc = PP.string "the timeoutprocessor"
@@ -313,12 +369,12 @@ timeoutProcessor = TimeoutProc Nothing Nothing failProcessor
 
 -- | @timoutIn i p@ aborts the application of @p@ safter @min i 'remainingTime'@ seconds;
 -- If @i@ is negative the processor may run forever.
-timeoutIn :: Int -> p -> TimeoutProcessor p
-timeoutIn n = TimeoutProc (Just n) Nothing
+timeoutIn :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
+timeoutIn n = pstrat . TimeoutProc (Just n) Nothing
 
 -- | @timeoutUntil i p@ aborts the application of @p@ until i seconds wrt. to
 -- the starting time, or if 'remainingTime' is expired.  If @i@ is negative the
 -- processor may run forever.
-timeoutUntil :: Int -> p -> TimeoutProcessor p
-timeoutUntil n = TimeoutProc Nothing (Just n)
+timeoutUntil :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
+timeoutUntil n = pstrat . TimeoutProc Nothing (Just n)
 

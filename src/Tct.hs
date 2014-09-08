@@ -37,9 +37,9 @@ import           Tct.Combinators
 -- | 'TctMode' provides all infromation necesary to construct a Tct customised for a problem type.
 data TctMode prob opt = TctMode
   { modeParser          :: String -> Either TctError prob -- ^ The parser for the problem.
-  , modeStrategies      :: [SomeProcessor prob]           -- ^ Problem specific Processor/Strategies.
+  , modeStrategies      :: [SomeParsableProcessor prob]   -- ^ Problem specific parsable Processor/Strategies.
                                                           --   These are added to default 'processors'.
-  , modeDefaultStrategy :: SomeProcessor prob             -- ^ The default strategy to execute.
+  , modeDefaultStrategy :: Strategy prob                  -- ^ The default strategy to execute.
   , modeOptions         :: O.Parser opt                   -- ^ Problem specific option parser. 
                                                           --   These are added to the standard Tct options.
   , modeModifyer        :: prob -> opt -> prob            -- ^ This function is applied to the initial problem, 
@@ -60,7 +60,7 @@ void :: TctMode Void Void
 void = TctMode
   { modeParser          = const $ Right Void
   , modeStrategies      = []
-  , modeDefaultStrategy = SomeProc abort
+  , modeDefaultStrategy = Proc abort
   , modeOptions         = pure Void
   , modeModifyer        = const id }
 
@@ -75,7 +75,7 @@ data TctOptions m = TctOptions
   }
 
 
-mkParser :: [SomeProcessor proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
+mkParser :: [SomeParsableProcessor proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
 mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
   where
     listed = O.infoOption (PP.display $ mkDescription ps) $ mconcat [O.long "list", O.help "Display list of strategies."]
@@ -112,13 +112,13 @@ owl = unlines
 data TctConfig prob = TctConfig
   { satSolver       :: FilePath
   , smtSolver       :: FilePath
-  , strategies      :: [SomeProcessor prob]
-  , defaultStrategy :: SomeProcessor prob
+  , strategies      :: [SomeParsableProcessor prob]
+  , defaultStrategy :: Strategy prob
   }
 
 
-defaultStrategies :: ProofData prob => [SomeProcessor prob]
-defaultStrategies = processors
+defaultStrategies :: ProofData prob => [SomeParsableProcessor prob]
+defaultStrategies = parsableProcessors
 
 defaultTctConfig :: ProofData prob => TctMode prob opt -> TctConfig prob
 defaultTctConfig mode = TctConfig
@@ -160,8 +160,8 @@ realMain dcfg = do
         } = opts
     file  <- tryIO $ readFile theProblemFile
     prob  <- liftEither $ theProblemParser file >>= \prob -> return (theModifyer prob theOptions)
-    strat <- maybe (return theDefaultStrategy) (liftEither . parseSomeProcessor (strategies cfg)) theStrategyName
-    pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate (Proc strat) prob)
+    strat <- maybe (return theDefaultStrategy) (liftEither . liftM Proc . parseSomeParsableProcessor (strategies cfg)) theStrategyName
+    pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate strat prob)
     liftIO $ do
       print $ strategies cfg
       putStrLn "Problem:"
