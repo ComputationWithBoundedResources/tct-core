@@ -40,7 +40,6 @@ module Tct.Combinators
 
   -- ** Trivial Combinators
   , FailProcessor, abort
-  , NamedProcessor, named
 
   -- ** Time
   , TimeoutProcessor, timeoutIn, timeoutUntil
@@ -62,7 +61,6 @@ import           Tct.Core            as C
 parsableProcessors :: ProofData prob => [SomeParsableProcessor prob]
 parsableProcessors =
   [ SomeParsableProc failProcessor
-  , SomeParsableProc namedProcessor
   , SomeParsableProc timeoutProcessor
   ]
 
@@ -191,13 +189,13 @@ trying b s              = Trying b s
 --
 -- prop> try (force s) = try s
 try :: Strategic s1 => s1 -> Strategy (Problem s1)
-try = trying False . toStrategy
+try = trying True . toStrategy
 
 -- | @'force' s@ fails if @s@ is not progressing.
 --
 -- prop> force (try s) = force s
 force :: Strategic s1 => s1 -> Strategy (Problem s1)
-force = trying True . toStrategy
+force = trying False . toStrategy
 
 -- | Applied strategy depens on run time status.
 withState :: (TctStatus prob -> Strategy prob) -> Strategy prob
@@ -266,41 +264,6 @@ failProcessor = FailProc
 -- Does not necessarily abort the whole evaluation.
 abort :: FailProcessor prob
 abort = FailProc
-
-
--- * Named Procesor -----------------------------------------------------------
--- | Gives a dedicated name to a processor. Useful for pretty-printing and parser generation.
-data NamedProcessor p
-  = NamedProc String p deriving Show
-
-data NamedProof p
-  = NamedProof String (ProofObject p)
-
-instance Processor p => Show (NamedProof p) where
-  show (NamedProof n po) = n ++ "(" ++ show po ++ ")"
-
-instance Processor p => PP.Pretty (NamedProof p) where
-  pretty (NamedProof n po) = PP.paragraph ("We apply " ++ n ++ ":") PP.<$$> PP.pretty po
-
-instance Processor p => Processor (NamedProcessor p) where
-  type ProofObject (NamedProcessor p) = NamedProof p
-  type Forking (NamedProcessor p)     = Forking p
-  type Problem (NamedProcessor p)     = Problem p
-  name (NamedProc n _) = n
-  solve (NamedProc n p) prob = do
-    r1 <- solve p prob
-    return $ case r1 of
-      Success probs po certfn -> Success probs (NamedProof n po) certfn
-      Fail po                 -> Fail $ NamedProof n po
-
-instance Processor p => ParsableProcessor (NamedProcessor p) where
-
-namedProcessor :: NamedProcessor (FailProcessor prob)
-namedProcessor = NamedProc "Failing" FailProc
-
--- | @'named' name p@ is like @p@. But provides a parser using @name@.
-named :: String -> p -> NamedProcessor p
-named = NamedProc
 
 
 -- * Timeout Processor --------------------------------------------------------

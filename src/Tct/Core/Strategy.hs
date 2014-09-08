@@ -8,6 +8,7 @@ module Tct.Core.Strategy
   -- * Customised Strategy
   , CustomStrategy (..)
   , strategy
+  , unitStrategy
   ) where
 
 
@@ -20,6 +21,7 @@ import qualified Options.Applicative as O
 import           Tct.Common.Error    (TctError (..))
 import           Tct.Common.Parser   (tokenise)
 import qualified Tct.Common.Pretty   as PP
+import           Tct.Common.Options
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
 import           Tct.Core.TctM
@@ -203,8 +205,12 @@ instance ProofData prob => Processor (Strategy prob) where
 strategy :: String -> O.ParserInfo args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
 strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
 
--- | 'CustomStrategy' implements 'Processor' and 'ParsableProcessor',  and is used to generate a parser for strategies.
--- The recommended way for strategies without arguments is 'Combinators.named'.
+-- | Like 'strategy' but takes no arguments.
+unitStrategy :: String -> String -> Strategy prob -> CustomStrategy () prob
+unitStrategy nme desc st = strategy nme pargs (const st) ()
+  where pargs = mkArgParser (option $ eopt `withDefault` ()) (PP.paragraph desc)
+
+-- | 'CustomStrategy' implements 'Processor' and 'ParsableProcessor', and is used to generate a parser for strategies.
 -- For example:
 --
 -- @
@@ -219,7 +225,7 @@ strategy nme pargs st stargs = CustomStrategy nme stargs pargs st
 -- @
 -- The string @"direct --timeout 10"@ is parsed successfully.
 --
--- If a custom strategy is used within another strategy the default arguments 'args_' are used.
+-- If a custom strategy is used within another strategy the specified default argument is used.
 data CustomStrategy args prob = CustomStrategy
   { name_     :: String
   , args_     :: args
