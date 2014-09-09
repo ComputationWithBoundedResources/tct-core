@@ -36,14 +36,15 @@ import           Tct.Combinators
 
 -- | 'TctMode' provides all infromation necesary to construct a Tct customised for a problem type.
 data TctMode prob opt = TctMode
-  { modeParser          :: String -> Either TctError prob -- ^ The parser for the problem.
-  , modeStrategies      :: [SomeParsableProcessor prob]   -- ^ Problem specific parsable Processor/Strategies.
-                                                          --   These are added to default 'processors'.
-  , modeDefaultStrategy :: Strategy prob                  -- ^ The default strategy to execute.
-  , modeOptions         :: O.Parser opt                   -- ^ Problem specific option parser. 
-                                                          --   These are added to the standard Tct options.
-  , modeModifyer        :: prob -> opt -> prob            -- ^ This function is applied to the initial problem, 
-                                                          --   using the options parsed from command line.
+  { modeParser          :: String -> Either TctError prob    -- ^ The parser for the problem.
+  , modeStrategies      :: [SomeParsableProcessor prob]      -- ^ Problem specific parsable Processor/Strategies.
+                                                             --   These are added to default 'processors'.
+  , modeDefaultStrategy :: Strategy prob                     -- ^ The default strategy to execute.
+  , modeOptions         :: O.Parser opt                      -- ^ Problem specific option parser.
+                                                             --   These are added to the standard Tct options.
+  , modeModifyer        :: prob -> opt -> prob               -- ^ This function is applied to the initial problem,
+                                                             --   using the options parsed from command line.
+  , modeAnswer          :: Return (ProofTree prob) -> Answer -- ^ Custom Answer.
   }
 
 -- | Construct customised Tct mode. Example usage.
@@ -58,11 +59,12 @@ instance PP.Pretty Void where pretty = const $ PP.string "Void"
 -- | An example 'TctMode'.
 void :: TctMode Void Void
 void = TctMode
-  { modeParser          = const $ Right Void
+  { modeParser          = const (Right Void)
   , modeStrategies      = []
   , modeDefaultStrategy = Proc abort
   , modeOptions         = pure Void
-  , modeModifyer        = const id }
+  , modeModifyer        = const id 
+  , modeAnswer          = const (answer Void)}
 
 
 data TctOptions m = TctOptions
@@ -149,6 +151,7 @@ realMain dcfg = do
         , modeDefaultStrategy   = theDefaultStrategy
         , modeOptions           = theOptionParser
         , modeModifyer          = theModifyer
+        , modeAnswer            = theAnswer
         } = mode
     opts <- liftIO $ O.execParser (mkParser (defaultStrategies ++ modeStrategies mode) theOptionParser)
     let
@@ -161,9 +164,11 @@ realMain dcfg = do
     file  <- tryIO $ readFile theProblemFile
     prob  <- liftEither $ theProblemParser file >>= \prob -> return (theModifyer prob theOptions)
     st    <- maybe (return theDefaultStrategy) (liftEither . liftM Proc . parseSomeParsableProcessor (strategies cfg)) theStrategyName
-    pt    <- liftIO $ fromReturn `liftM` run cfg (evaluate st prob)
+    r     <- liftIO $ run cfg (evaluate st prob)
+    let pt = fromReturn r
     liftIO $ do
-      print $ strategies cfg
+      putStrLn "Answer:"
+      putStrLn . PP.display $ PP.pretty $ theAnswer r
       putStrLn "Problem:"
       putStrLn . PP.display $ PP.pretty prob
       putStrLn "ProofTree:"

@@ -3,8 +3,11 @@ module Tct.Core.Strategy
   (
   Strategy (..)
   , Return (..)
+  , returning
   , evaluate
-
+  -- * Answer
+  , Answer
+  , answer
   -- * Customised Strategy
   , CustomStrategy (..)
   , strategy
@@ -50,6 +53,12 @@ data Return l
   = Continue { fromReturn :: l }
   | Abort    { fromReturn :: l }
   deriving (Show, Functor)
+
+-- | @'returning f g r' returns @f (fromReturn r)@ if @r@ is continuing, otherwise @g (fromReturn r)@.
+returning :: (l -> a) -> (l -> a) -> Return l-> a
+returning f g r = case r of
+  Continue l -> f l
+  Abort l    -> g l
 
 isContinuing :: Return (ProofTree prob) -> Bool
 isContinuing (Continue _) = True
@@ -139,7 +148,6 @@ evaluateTree s (Open p)                     = evaluate s p
 evaluateTree s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateTree s subtree
 evaluateTree s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateTree s `T.mapM` subtrees)
 
-
 -- TODO :
 -- test if threads leak in combination of timeout
 -- if so; try using withAsync, concurrently, or at least invoke them within timeout
@@ -155,6 +163,20 @@ evaluateTreePar s t = spawnTree t >>= collect
     collect (Progress n certfn subtrees) = liftProgress n certfn `fmap` (collect `T.mapM` subtrees)
 
 
+-- Answer --------------------------------------------------------------------
+-- | The Answer type.
+data Answer where
+  Answer :: ProofData a => a -> Answer
+
+instance Show Answer where
+  show (Answer a) = show a
+
+instance PP.Pretty Answer where
+  pretty (Answer a) = PP.pretty a
+
+-- | prop> anwer = Answer
+answer :: ProofData a => a -> Answer
+answer = Answer
 
 -- Error Processor -----------------------------------------------------------
 data ErroneousProof p = ErroneousProof IOError p deriving Show
