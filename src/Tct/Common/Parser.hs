@@ -4,6 +4,7 @@ module Tct.Common.Parser
   tokenise
   ) where
 
+
 import Data.Char (isSpace)
 
 import Tct.Common.Error (TctError (..))

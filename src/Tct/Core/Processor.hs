@@ -120,7 +120,7 @@ argsParser parser desc = SomeParsableProc `fmap` mkArgParser parser desc
 
 -- | Generates a descripton from the 'ParsableProcessor' instance of a list of processors.
 mkDescription :: [SomeParsableProcessor prob] -> PP.Doc
-mkDescription ps = PP.vcat $ map (mkDescription' ps) ps where
+mkDescription ps = PP.vcat $ map (mkDescription' ps) ps
 
 mkDescription' :: [SomeParsableProcessor prob] -> SomeParsableProcessor prob  -> PP.Doc
 mkDescription' ps (SomeParsableProc p) =

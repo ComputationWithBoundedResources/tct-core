@@ -15,19 +15,23 @@ module Tct.Common.Error
   , note
   ) where
 
+
 import Control.Exception   (IOException, try)
-import Control.Monad.Error (Error, ErrorT (..), liftIO, runErrorT)
+import Control.Monad.Error (Error (..), ErrorT (..), liftIO, runErrorT)
+
 
 -- | Custom error type.
 data TctError
   = TctDyreError String
   | TctParseError String
-  | TctIOError String
+  | TctIOError IOError
+  | TctUnknonwError String
   deriving Show
 
 instance Error TctError where
+  strMsg = TctUnknonwError
 
--- | Wraps 'IO' into an erroneous compuation for custom error handling.
+-- | Wraps 'IO' into an erroneous compuation with custom error handling.
 type ErroneousIO e = ErrorT e IO
 
 -- | Executes an erroneous computation.
@@ -40,9 +44,9 @@ runErroneousIO = runErrorT
 tryIO :: IO a -> ErroneousIO TctError a
 tryIO io = ErrorT . liftIO $ do
   e :: Either IOException a <- try io
-  return $ either (Left . TctIOError . show) Right e
+  return $ either (Left . TctIOError) Right e
 
--- | Lifts 'Either' to 'ErroneousIO'. 
+-- | Lifts 'Either' to 'ErroneousIO'.
 --   Indicates an error @e@ if the first argument is @'Left' e@.
 liftEither :: Either e a -> ErroneousIO e a
 liftEither = ErrorT . return
@@ -56,7 +60,7 @@ liftMaybe e =  liftEither . note e
 hush :: Either e a -> Maybe a
 hush = either (const Nothing) Just
 
--- | Transforms 'Maybe' to 'Either'. 
+-- | Transforms 'Maybe' to 'Either'.
 note :: e -> Maybe a -> Either e a
 note a = maybe (Left a) Right
 

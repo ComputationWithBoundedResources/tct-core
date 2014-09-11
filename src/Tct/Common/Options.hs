@@ -1,7 +1,7 @@
 {- | This module provides a wrapper for "OptParse.Applicative"
 (<http://hackage.haskell.org/package/optparse-applicative>)
 to construct custom argument parsers.
-The parser for 'Tct.Combinators.TimeoutProcessor' is defined as follows:
+For example, the parser for 'Tct.Combinators.TimeoutProcessor' is defined as follows:
 
 == Example
 >
@@ -28,7 +28,7 @@ Option @'Parser' a@ can be lifted to @'Parser' ('Maybe' a)@ using
 'Control.Applicative.optional'.
 
   * Option @'Parser' ('Maybe' a)@ is optional during parsing.
-  * If an option @'Parser' a@ is constructed using 'withDefault' the option is optional during parsing.
+  * If an option @'Parser' a@ is constructed using 'withDefault' the option is also optional.
   * If an option @'Parser' ('Maybe' a)@ is constructed using @'withDefault' val@ then the option returns @'Just' val@ if
     no other value is provided.
 -}

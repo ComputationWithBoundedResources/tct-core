@@ -45,7 +45,8 @@ data Strategy prob where
   OrBetter   :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
 
-instance Show (Strategy prob) where show _ = "ShowStrategy"
+instance Show (Strategy prob) where
+  show _ = "SomeStrategy"
 
 -- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
 -- See "Combinators" fndor a detailed description.
@@ -206,13 +207,15 @@ instance Processor p => ParsableProcessor (ErroneousProcessor p) where
 -- lift Strategies to Processor
 data StrategyProof prob = StrategyProof (ProofTree prob)
 instance Show (StrategyProof prob) where  show (StrategyProof _) = "StrategyProof"
-instance ProofData prob => PP.Pretty (StrategyProof prob) where  pretty (StrategyProof pt) = PP.pretty pt
+
+instance ProofData prob => PP.Pretty (StrategyProof prob) where
+  pretty (StrategyProof pt) =  PP.pretty pt
 
 instance ProofData prob => Processor (Strategy prob) where
   type ProofObject (Strategy prob) = StrategyProof prob
   type Forking (Strategy prob)     = ProofTree
   type Problem (Strategy prob)     = prob
-  name = const "Strategy Evaluation"
+  name = const "SomeStrategy"
   solve s prob = do
     r <- evaluate s prob
     let pt = fromReturn r

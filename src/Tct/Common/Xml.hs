@@ -1,6 +1,6 @@
 -- | This module provides functions for generating XML content.
 -- Currently not used.
-module Tct.Common.Xml 
+module Tct.Common.Xml
   (
   )where
 
@@ -26,9 +26,9 @@ module Tct.Common.Xml
 --int :: (Integral i) => i -> XmlContent
 --int i = Xml.xtext $ Txt.pack $ show $ toInteger i
 
---text :: String -> XmlContent 
---text = Xml.xtext  . Txt.pack 
-          
+--text :: String -> XmlContent
+--text = Xml.xtext  . Txt.pack
+
 --putXml :: Xml.Renderable t => Xml.Xml t -> IO ()
 --putXml = BS.putStr . Xml.xrender
 

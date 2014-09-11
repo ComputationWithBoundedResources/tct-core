@@ -2,7 +2,7 @@
 
 -}
 module Tct
-  ( 
+  (
   TctMode (..)
   , applyMode
   , void
@@ -25,11 +25,11 @@ import qualified System.Time                as Time
 
 import           Tct.Core
 import           Tct.Common.Error
-import qualified Tct.Common.Pretty                 as PP
+import qualified Tct.Common.Pretty          as PP
 import           Tct.Combinators
 
 
--- TODO: 
+-- TODO:
 -- get rid of redundancy in TctOptions, TctConfig
 -- currently only modeoptions can be constructed in conf file
 -- so realmain should hava type TctConfig prob opt -> IO ()
@@ -63,12 +63,12 @@ void = TctMode
   , modeStrategies      = []
   , modeDefaultStrategy = Proc abort
   , modeOptions         = pure Void
-  , modeModifyer        = const id 
+  , modeModifyer        = const id
   , modeAnswer          = const (answer Void)}
 
 
 data TctOptions m = TctOptions
-  { 
+  {
   -- satSolver_    :: Maybe FilePath
   -- , smtSolver_    :: Maybe FilePath
     modeOptions_  :: m
@@ -93,7 +93,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
       , O.progDescDoc . Just $ PP.string owl
       , O.footerDoc   . Just $ PP.string "version" PP.<+> PP.string version PP.<> PP.char ',' PP.<+> PP.string licence
       ]
-        
+
 
 -- | Current version.
 version :: String
@@ -101,12 +101,12 @@ version = "3.0.0"
 
 licence :: String
 licence = "some licence"
-    
+
 owl :: String
 owl = unlines
   [ " ,___, "
   , " [O.o]   - TcT is a transformer framework for automated complexity analysis."
-  , "/)___) " 
+  , "/)___) "
   , "--\"-\"-"
   ]
 
@@ -171,7 +171,7 @@ realMain dcfg = do
       putStrLn . PP.display $ PP.pretty $ theAnswer r
       putStrLn "Problem:"
       putStrLn . PP.display $ PP.pretty prob
-      putStrLn "ProofTree:"
+      putStrLn "ProofTree:\n"
       putStrLn . PP.display $ PP.pretty pt
       putStrLn "Certificate:"
       putStrLn . PP.display $ PP.pretty $ certificate pt

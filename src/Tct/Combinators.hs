@@ -267,7 +267,10 @@ abort = FailProc
 -- | Wraps the application of a processor in a timeout.
 data TimeoutProcessor p
   = TimeoutProc { untilT :: Maybe Int, inT :: Maybe Int, procT :: p }
-  deriving Show
+
+instance Show p => Show (TimeoutProcessor p) where
+  show (TimeoutProc mi mj p) = "timeout " ++ k mi ++ k mj ++ show p
+    where k = maybe "" (\m -> show m ++ " ")
 
 data TimeoutProof p
   = Timeout Int
@@ -290,7 +293,7 @@ instance Processor p => Processor (TimeoutProcessor p) where
     running <- runningTime `fmap` askStatus prob
     let
       toNat n = case n of
-        Just i | i >= 0 -> Just i
+        Just i | i >= 0 -> Just (toSeconds i)
         _               -> Nothing
       to = case (toNat $ inT proc, toNat $ untilT proc) of
         (Nothing, Just u ) -> max 0 (u - running)
@@ -314,11 +317,11 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
   args _ ps = argsParser pargs desc
     where
       pargs = TimeoutProc
-        <$> optional (fmap toSeconds $ option $ eopt
+        <$> optional (option $ eopt
             `withArgLong` "untilT"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
-        <*> optional (fmap toSeconds $ option $ eopt
+        <*> optional (option $ eopt
             `withArgLong` "inT"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
@@ -334,7 +337,7 @@ timeoutProcessor = TimeoutProc Nothing Nothing failProcessor
 -- | @'timoutIn' i p@ aborts the application of @p@ after @min i 'remainingTime'@ seconds;
 -- If @i@ is negative the processor may run forever.
 timeoutIn :: Processor p => Int -> p -> ProcessorStrategy (TimeoutProcessor p)
-timeoutIn n = pstrat . TimeoutProc (Just $ toSeconds n) Nothing
+timeoutIn n = pstrat . TimeoutProc (Just n) Nothing
 
 -- | @'timeoutUntil' i p@ aborts the application of @p@ until i seconds wrt. 
 -- to the starting time, or if 'remainingTime' is expired.

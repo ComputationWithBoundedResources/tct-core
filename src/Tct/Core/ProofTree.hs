@@ -31,12 +31,11 @@ import Tct.Core.Processor
 data ProofNode p = ProofNode
   { problem   :: Problem p
   , processor :: p
-  , proof     :: ProofObject p
-  }
+  , proof     :: ProofObject p }
 
 -- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
 -- During evaluation
--- 
+--
 -- * 'Open' nodes store the open (sub-)problems,
 -- * 'NoProgress' nodes result from failing 'Processor' applications, and
 -- * 'Progress' nodes result from successfull 'Processor' application.
@@ -57,8 +56,8 @@ resultToTree prob p (Success subprobs po certfn) = Progress (ProofNode prob p po
 -- | Computes the 'Certificate' of 'ProofTree'.
 collectCertificate :: ProofTree Certificate -> Certificate
 collectCertificate (Open c)                      = c
-collectCertificate (NoProgress _ subtree)        = certificate subtree
-collectCertificate (Progress _ certfn' subtrees) = certfn' (certificate `fmap` subtrees)
+collectCertificate (NoProgress _ subtree)        = collectCertificate subtree
+collectCertificate (Progress _ certfn' subtrees) = certfn' (collectCertificate `fmap` subtrees)
 
 -- | Computes the 'Certificate' of a 'ProofTree'.
 -- 'Open' nodes have the 'Certificate' 'unboundend'.
@@ -80,13 +79,13 @@ open = F.foldr (:) []
 
 -- | Checks if there exists 'Open' nodes in the 'ProofTree'.
 isOpen :: ProofTree l -> Bool
-isOpen = null . open
+isOpen = not . isClosed
 
 -- | Checks if there are no 'Open' nodes in the 'ProofTree'.
 --
--- prop> isCloses = not . isOpen
+-- prop> isClosed = not . isOpen
 isClosed :: ProofTree l -> Bool
-isClosed = not . isOpen
+isClosed = null . open
 
 
 instance Functor ProofTree where
@@ -110,23 +109,69 @@ instance Processor p => Pretty (ProofNode p) where
     <$$> text "Applied Processor:" <$$> indent 2 (text $ name p)
     <$$> text "Proof:" <$$> indent 2 (pretty po)
 
-filler :: Doc
-filler = text "-------------------------------------------------------------------------------"
-
 instance Pretty l => Pretty (ProofTree l) where
-  pretty (Open l) =
-    empty
-    <$$> filler
-    <$$> text "?" <+> pretty l
-  pretty (NoProgress pn pt) =
-    empty
-    <$$> filler
-    <$$> pretty pn
-    <$$> pretty pt
-    <$$> pretty (certificate pt)
-  pretty (Progress pn _ pts) =
-    empty
-    <$$> filler
-    <$$> pretty pn
-    <$$> indent 2 (vcat $ pretty `fmap` toList pts)
+  pretty = prettyProofTree
+
+prettyProofTree :: Pretty prob => ProofTree prob -> PP.Doc
+prettyProofTree pt =
+  paragraph "The considered (sub-)prooftree is" <+> status pt <+> paragraph "and has certificate"
+  <$$> pretty (certificate pt) <> dot
+  <$$> linebreak <> indent 2 (pp pt) where
+
+  pp (Open l) = block "* Open ***" body empty where
+    body = paragraph "Following problem is open:" <$$> indent 2 (pretty l)
+
+  pp (NoProgress (ProofNode prob p _) spt) =
+    block "*** NoProgress ***" body after where
+      body =
+        paragraph "We consider following open problem:"
+        <$$> indent 2 (pretty prob)
+        <$$> linebreak <> paragraph "We fail to apply:"
+        <$$> indent 2 (text $ name p)
+        -- <$$> paragraph "The reason is:"
+        -- <$$> indent 2 (pretty po)
+      after = linebreak
+        <$$> paragraph "We continue with the proof."
+        <$$> linebreak <> pp spt
+
+  pp t@(Progress (ProofNode prob p po) _ spts) =
+    block "*** Progress ***" body after where
+      body =
+        paragraph "We consider following open problem:"
+        <$$> indent 2 (pretty prob)
+        <$$> linebreak <> paragraph "We successfully apply"
+        <$$> indent 2 (text $ name p)
+        <$$> linebreak <> paragraph "yielding" <+> pprobs (map pretty $ open t)
+        <$$> linebreak <> paragraph "and obtaining certificate"
+        <$$> indent 2 (pretty $ certificate t)
+        <$$> linebreak <> linebreak <> paragraph "The proof is:"
+        <$$> linebreak <> indent 2 (pretty po) <> pprobs' (map pprob ps)
+      after = if null ps
+        then empty
+        else linebreak <> indent 4 (
+          linebreak <> paragraph "We continue with the proof."
+          <$$> linebreak <> vcat (punctuate linebreak [ pp spt | spt <- toList spts]))
+      ps = toList spts
+
+  status t = text $ if isClosed t then "closed" else "open"
+
+  block header body after = paragraph header <$$> filler (length header) <$$> indent 2 body <> after
+
+  pprobs [] = linebreak <> indent 2 (paragraph "no open problems.")
+  pprobs [p] =
+    paragraph "following open problem:"
+    <$$> indent 2 p
+  pprobs ps =
+    paragraph "following open problems:"
+    <$$> indent 2 (vcat (punctuate linebreak ps))
+
+  pprobs' [] = empty
+  pprobs' [p] = linebreak <$$> indent 2 (paragraph "Yielding following open problem:" <$$> indent 2 p)
+  pprobs' ps  = linebreak <$$> indent 2 (paragraph "Yielding following open problems:" <$$> indent 2 (vcat (punctuate linebreak ps)))
+
+  pprob (Open l)          = pretty l
+  pprob (NoProgress pn _) = pretty $ problem pn
+  pprob (Progress pn _ _) = pretty $ problem pn
+
+  filler i = text $ replicate i '-'
 

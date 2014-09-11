@@ -3,8 +3,7 @@
 -- and provides supplementary pretty-printing functions.
 module Tct.Common.Pretty
   (
-    module Text.PrettyPrint.ANSI.Leijen
-
+  module Text.PrettyPrint.ANSI.Leijen
   , Align (..)
   , table
   , paragraph
@@ -19,7 +18,7 @@ import Text.PrettyPrint.ANSI.Leijen
 -- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
--- | Provides a tabular pretty printing.
+-- | Provides tabular pretty-printing.
 table :: [(Align, [Doc])] -> Doc
 table cols = vcat [ pprow row | row <- rows]
   where
@@ -48,7 +47,7 @@ table cols = vcat [ pprow row | row <- rows]
 
 -- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc
-paragraph s = vcat [ fillSep [text w | w <- words l] | l <- lines s]
+paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
 
 -- | Default 'Doc' rendering.
 display :: Doc -> String
