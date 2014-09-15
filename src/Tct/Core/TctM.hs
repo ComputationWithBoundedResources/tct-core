@@ -27,9 +27,7 @@ import qualified System.Time              as Time
 
 -- | Provides Tct runtime options.
 data TctROState = TctROState
-  { satSolverExe :: FilePath
-  , smtSolverExe :: FilePath
-  , startTime    :: Time.ClockTime
+  { startTime    :: Time.ClockTime
   , stopTime     :: Maybe Time.ClockTime }
 
 -- | The Tct monad.
