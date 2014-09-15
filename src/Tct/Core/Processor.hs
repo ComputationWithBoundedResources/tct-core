@@ -31,6 +31,7 @@ import           Tct.Common.Error         (TctError (..), hush)
 import           Tct.Common.Options
 import           Tct.Common.Parser        (tokenise)
 import qualified Tct.Common.Pretty        as PP
+import qualified Tct.Common.Xml           as Xml
 import qualified Tct.Core.Certificate     as C
 import           Tct.Core.Forks           (Fork, Id (..))
 import           Tct.Core.TctM
@@ -41,8 +42,7 @@ import           Tct.Core.TctM
 
 -- | Provides the interface for the proof construction.
 -- All types which occur in the proof construction have to implement 'ProofData'.
-type ProofData d = (PP.Pretty d, Show d)
---type ProofData d = (Xml.Xml d, PP.Pretty d, Show d)
+type ProofData d = (Xml.Xml d, PP.Pretty d, Show d)
 
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of @'C.Certificate's@.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate

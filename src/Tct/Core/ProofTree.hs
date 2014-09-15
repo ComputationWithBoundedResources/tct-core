@@ -22,7 +22,8 @@ import Control.Applicative  as A ((<$>))
 import Data.Foldable        as F (Foldable, foldMap, foldr, toList)
 import Data.Traversable     as T (Traversable, traverse)
 
-import Tct.Common.Pretty    as PP
+import Tct.Common.Pretty as PP
+import qualified Tct.Common.Xml    as Xml
 import Tct.Core.Certificate (Certificate, unbounded)
 import Tct.Core.Processor
 
@@ -108,6 +109,20 @@ instance Processor p => Pretty (ProofNode p) where
     text "Considered Problem:" <$$> indent 2 (pretty prob)
     <$$> text "Applied Processor:" <$$> indent 2 (text $ name p)
     <$$> text "Proof:" <$$> indent 2 (pretty po)
+
+instance Processor p => Xml.Xml (ProofNode p) where
+  toXml (ProofNode prob p po) = 
+    Xml.elt "proofNode" 
+      [ Xml.elt "problem" [Xml.toXml prob]
+      , Xml.elt "processor" [Xml.text $ name p]
+      , Xml.elt "proofObject" [Xml.toXml po]]
+
+
+instance Xml.Xml l => Xml.Xml (ProofTree l) where
+  toXml pt = Xml.elt "proofTree" $ flip (:) [] $ case pt of
+    (Open l)             -> Xml.elt "open" [Xml.toXml l]
+    (NoProgress pn spt)  -> Xml.elt "noProgress" [Xml.toXml pn, Xml.toXml spt]
+    (Progress pn _ spts) -> Xml.elt "progress" (Xml.toXml pn :map Xml.toXml (toList spts))
 
 instance Pretty l => Pretty (ProofTree l) where
   pretty = prettyProofTree

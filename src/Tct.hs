@@ -26,6 +26,7 @@ import qualified System.Time                as Time
 import           Tct.Core
 import           Tct.Common.Error
 import qualified Tct.Common.Pretty          as PP
+import qualified Tct.Common.Xml             as Xml
 import           Tct.Combinators
 
 
@@ -55,6 +56,9 @@ applyMode = tctl . Right
 
 data Void = Void deriving (Show, Read)
 instance PP.Pretty Void where pretty = const $ PP.string "Void"
+
+instance Xml.Xml Void where 
+  toXml _ = Xml.elt "void" []
 
 -- | An example 'TctMode'.
 void :: TctMode Void Void
@@ -167,14 +171,15 @@ realMain dcfg = do
     r     <- liftIO $ run cfg (evaluate st prob)
     let pt = fromReturn r
     liftIO $ do
-      putStrLn "Answer:"
-      putStrLn . PP.display $ PP.pretty $ theAnswer r
-      putStrLn "Problem:"
-      putStrLn . PP.display $ PP.pretty prob
-      putStrLn "ProofTree:\n"
-      putStrLn . PP.display $ PP.pretty pt
-      putStrLn "Certificate:"
-      putStrLn . PP.display $ PP.pretty $ certificate pt
+      Xml.putXml $ Xml.toXml pt
+      --putStrLn "Answer:"
+      --putStrLn . PP.display $ PP.pretty $ theAnswer r
+      --putStrLn "Problem:"
+      --putStrLn . PP.display $ PP.pretty prob
+      --putStrLn "ProofTree:\n"
+      --putStrLn . PP.display $ PP.pretty pt
+      --putStrLn "Certificate:"
+      --putStrLn . PP.display $ PP.pretty $ certificate pt
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess

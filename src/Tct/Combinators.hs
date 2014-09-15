@@ -54,6 +54,7 @@ import           Control.Applicative (optional, (<$>), (<*>))
 import           Data.Maybe          (fromMaybe)
 import           Tct.Common.Options
 import qualified Tct.Common.Pretty   as PP
+import qualified Tct.Common.Xml   as Xml
 import           Tct.Core            as C
 
 
@@ -74,6 +75,9 @@ instance Show a => Show (ProcessorStrategy a) where
 
 instance PP.Pretty a => PP.Pretty (ProcessorStrategy a) where
   pretty = PP.pretty . fromProcessorStrategy
+
+instance Xml.Xml a => Xml.Xml (ProcessorStrategy a) where
+  toXml = Xml.toXml . fromProcessorStrategy
 
 instance Processor p => Processor (ProcessorStrategy p) where
   type ProofObject (ProcessorStrategy p) = ProofObject p
@@ -245,6 +249,9 @@ data FailProof = FailProof deriving Show
 instance PP.Pretty FailProof where
   pretty _ = PP.paragraph "We apply FailProccessor."
 
+instance Xml.Xml FailProof where
+  toXml _ = Xml.elt "fail" []
+
 instance ProofData prob => Processor (FailProcessor prob) where
   type ProofObject (FailProcessor prob) = FailProof
   type Problem (FailProcessor prob)     = prob
@@ -283,6 +290,10 @@ instance Processor p => Show (TimeoutProof p) where
 instance Processor p => PP.Pretty (TimeoutProof p) where
   pretty (Timeout i)    = PP.paragraph ("Computation aborted after a timeout of " ++ show i ++ " seconds")
   pretty (NoTimeout po) = PP.pretty po
+
+instance Processor p => Xml.Xml (TimeoutProof p) where
+  toXml (Timeout i)     = Xml.elt "timeout" [Xml.int i]
+  toXml (NoTimeout obj) = Xml.toXml obj 
 
 instance Processor p => Processor (TimeoutProcessor p) where
   type ProofObject (TimeoutProcessor p) = TimeoutProof p

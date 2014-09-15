@@ -24,6 +24,7 @@ import qualified Options.Applicative as O
 import           Tct.Common.Error    (TctError (..))
 import           Tct.Common.Parser   (tokenise)
 import qualified Tct.Common.Pretty   as PP
+import qualified Tct.Common.Xml      as Xml
 import           Tct.Common.Options
 import           Tct.Core.Processor
 import           Tct.Core.ProofTree
@@ -182,10 +183,11 @@ answer = Answer
 -- Error Processor -----------------------------------------------------------
 data ErroneousProof p = ErroneousProof IOError p deriving Show
 
---instance Processor p => Xml.Xml (ErroneousProof p) where
-  --toXml (ErroneousProof err p) =
-    --Xml.elt "error" [] [ Xml.elt "processor" [] [Xml.text (name p)]
-                       --, Xml.elt "message" [] [Xml.text (show err)] ]
+instance Processor p => Xml.Xml (ErroneousProof p) where
+  toXml (ErroneousProof err p) =
+    Xml.elt "error" 
+      [ Xml.elt "processor" [Xml.text (name p)]
+      , Xml.elt "message" [Xml.text (show err)] ]
 
 instance Processor p => PP.Pretty (ErroneousProof p) where
   pretty (ErroneousProof err p) =
@@ -208,8 +210,11 @@ instance Processor p => ParsableProcessor (ErroneousProcessor p) where
 data StrategyProof prob = StrategyProof (ProofTree prob)
 instance Show (StrategyProof prob) where  show (StrategyProof _) = "StrategyProof"
 
-instance ProofData prob => PP.Pretty (StrategyProof prob) where
+instance PP.Pretty prob => PP.Pretty (StrategyProof prob) where
   pretty (StrategyProof pt) =  PP.pretty pt
+
+instance Xml.Xml prob => Xml.Xml (StrategyProof prob) where
+  toXml (StrategyProof pt) = Xml.toXml pt
 
 instance ProofData prob => Processor (Strategy prob) where
   type ProofObject (Strategy prob) = StrategyProof prob
