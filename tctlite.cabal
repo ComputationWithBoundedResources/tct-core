@@ -50,8 +50,9 @@ Library
     Tct.Common.Error
     Tct.Common.Options
     Tct.Common.Parser
+    Tct.Common.Polynomial
     Tct.Common.Pretty
-    Tct.Common.SemiRing
+    Tct.Common.Ring
     Tct.Common.Xml
     Tct.Core
     Tct.Core.Certificate

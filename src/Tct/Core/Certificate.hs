@@ -31,7 +31,7 @@ module Tct.Core.Certificate
 
 
 import Tct.Common.Pretty
-import Tct.Common.SemiRing
+import Tct.Common.Ring
 
 
 data Complexity
