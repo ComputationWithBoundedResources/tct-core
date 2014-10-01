@@ -231,6 +231,8 @@ instance ProofData prob => Processor (Strategy prob) where
 
 -- Customised Strategy -----------------------------------------------------------------------------------------------
 
+-- TODO: remove default argument in custom strategy? 
+
 -- | @'strategy' name argumentParser strategy defaultArguments@ constructs a 'CostumStrategy'.
 strategy :: String -> O.ParserInfo args -> (args -> Strategy prob) -> args -> CustomStrategy args prob
 strategy nme pargs st stargs = CustomStrategy nme stargs pargs st

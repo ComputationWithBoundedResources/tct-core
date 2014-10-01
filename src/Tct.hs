@@ -7,6 +7,7 @@ module Tct
     version
   -- * TctMode
   , TctMode (..)
+  , apply
   , applyMode
   , void
   -- * TctConfig

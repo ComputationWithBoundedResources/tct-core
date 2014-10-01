@@ -8,6 +8,8 @@ module Tct.Core.Forks
   , judgement
   , Id (..)
   , Pair (..)
+  , Optional (..)
+  , Exclusive (..)
   ) where
 
 
@@ -38,4 +40,8 @@ newtype Pair a = Pair (a,a)
 instance Functor Pair     where f `fmap` (Pair (a,b)) = Pair (f a, f b)
 instance Foldable Pair    where foldr f e (Pair (a,b)) = a `f` (b `f` e)
 instance Traversable Pair where f `traverse` (Pair (a,b)) = Pair <$> liftA2 (,) (f a) (f b)
+
+data Optional a b = Optional (a b) | Null  deriving (Foldable, Functor, Traversable)
+
+data Exclusive a b c = Leftward (a c) | Rightward (b c) deriving (Foldable, Functor, Traversable)
 

@@ -20,28 +20,46 @@ Description:
 cabal-version: >= 1.8
 build-type: Simple
 
--- Executable tctw
---   hs-source-dirs: src-w
---   main-is: tctl.hs
---   build-depends:
---     containers           >= 0.5 && < 0.6,
---     optparse-applicative == 0.9.*,
---     mtl                  >= 2.1 && < 2.2,
---     base == 4.*,
--- 
---     smtlib == 0.*,
---     tct  == 3.*
---   ghc-options:
---     -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+Executable tctw
+  hs-source-dirs: src-w
+  main-is: tctl.hs
+  build-depends:
+    containers           >= 0.5 && < 0.6,
+    optparse-applicative == 0.9.*,
+    mtl                  >= 2.1 && < 2.2,
+    base == 4.*,
+
+    smtlib == 0.*,
+    tct  == 3.*
+  ghc-options:
+    -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+  extensions:
 
 Executable tctl
   hs-source-dirs: src-main
   main-is: Main.hs
   build-depends:
-    base == 4.*,
-    tct  == 3.*
+    containers     >= 0.5 && < 0.6,
+    mtl            >= 2.1 && < 2.2,
+    base           == 4.*,
+
+    smtlib         == 0.*,
+    term-rewriting == 0.*,
+    tct            == 3.*
   ghc-options:
     -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+  extensions: 
+    GeneralizedNewtypeDeriving,
+    TypeFamilies,
+    ConstraintKinds
+    -- GADTs, 
+    -- FlexibleContexts, 
+    -- MultiParamTypeClasses, 
+    -- TypeSynonymInstances,
+    -- DeriveDataTypeable,
+    -- DeriveFunctor, 
+    -- DeriveFoldable, 
+    -- DeriveTraversable
 
 Library
   exposed-modules:
@@ -50,7 +68,6 @@ Library
     Tct.Common.Error
     Tct.Common.Options
     Tct.Common.Parser
-    Tct.Common.Polynomial
     Tct.Common.Pretty
     Tct.Common.Ring
     Tct.Common.Xml

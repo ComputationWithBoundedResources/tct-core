@@ -24,13 +24,17 @@ module Tct.Common.Polynomial
   Monomial
   , Polynomial
   , degree
+  , isStronglyLinear
+  , coefficients
+  , substituteVars
   -- * View
-  , PowerView (..)
   , MonomialView (..)
   , PolynomialView (..)
-  , fromViewWith
-  , fromView
-  , (^^^), mono, poly
+  , mfromView
+  , pfromView
+  , pfromViewWith
+  , pfromViewWithM
+  , (^^^), monov, polyv
   , constant
   , variable
   , linear
@@ -43,6 +47,8 @@ module Tct.Common.Polynomial
   where
 
 
+import Data.List (foldl')
+import Control.Monad
 import qualified Data.Map.Strict   as M
 
 import qualified Tct.Common.Pretty as PP
@@ -51,7 +57,7 @@ import           Tct.Common.Ring
 
 -- | The abstract monomial type.
 newtype Monomial v = Mono (M.Map v Int)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 mmult :: Ord v => Monomial v -> Monomial v -> Monomial v
 mmult (Mono ps1) (Mono ps2) = Mono $ M.unionWith (+) ps1 ps2
@@ -70,7 +76,7 @@ instance Ord v => Multiplicative (Monomial v) where
 
 
 -- | The abstract polynom type.
-newtype Polynomial c v = Poly (M.Map (Monomial v) c)
+newtype Polynomial c v = Poly (M.Map (Monomial v) c) deriving Show
 
 pnormalise :: (Additive c, Eq c) => Polynomial c v -> Polynomial c v
 pnormalise (Poly ts) = Poly $ M.filter (zero /=) ts
@@ -116,84 +122,121 @@ instance (AdditiveGroup c, Eq c, Ord v) => AdditiveGroup (Polynomial c v) where
   neg = pnegate
 
 
+pbigMult :: (SemiRing c, Eq c, Ord v) => [Polynomial c v] -> Polynomial c v
+pbigMult = foldl' pmult pone
+
+pbigAdd :: (SemiRing c, Eq c, Ord v) => [Polynomial c v] -> Polynomial c v
+pbigAdd = foldl' padd pzero
+
+-- | @'substituteVars' p subs@ substitutes the variables in p according to @subs@.
+-- Variables occuring not in @subs@ are mapped to the unit ('one') polynomial.
+substituteVars :: (SemiRing c, Eq c, Ord v, Ord v') => Polynomial c v -> M.Map v (Polynomial c v') -> Polynomial c v'
+substituteVars (Poly ts) subs = pbigAdd $ foldl' handleTerms [] (M.toList ts)
+  where 
+    handleTerms polys (m,c) = (c `pscale` handleMono m) : polys
+    subs' = M.toList subs
+    handleMono (Mono ps) = pbigMult $ foldl' k [] subs'
+      where
+        k polys (v,p) = case M.lookup v ps of
+          Just i  -> polys ++ replicate i p
+          Nothing -> polys
+
 -- | Returns the degree of the polynomial.
 --
 -- prop> degree zero = -1
 degree :: Ord v => Polynomial c v -> Int
 degree (Poly ms) = maximum (map mdegree $ M.keys ms)
 
+-- prop> all (==one) . coefficients
+isStronglyLinear :: (SemiRing c, Eq c) =>  Polynomial c v -> Bool
+isStronglyLinear = all (==one) . coefficients
+
+-- | Returns the coefficients of a polynomial
+coefficients :: Polynomial c v -> [c]
+coefficients (Poly ts) = M.elems ts
+
 
 --- * View -----------------------------------------------------------------------------------------------------------
 
+
 -- | Power type with variable @v@.
-data PowerView v           = PowV v Int
+data PowerView v         = PowV v Int deriving (Eq, Ord)
 -- | Monomial type with coefficient @c@ and variable @v@.
-data MonomialView c v      = MonoV c [PowerView v]
+data MonomialView v      = MonoV [PowerView v]
 -- | Polynomial type with coefficient @c@ and variable @v@.
-newtype PolynomialView c v = PolyV [MonomialView c v]
+newtype PolynomialView c v = PolyV [(c,Monomial v)]
 
 -- | prop> v^^^1 = PowV v i
 (^^^) :: v -> Int -> PowerView v
 v^^^i = PowV v i
 
 -- | prop> mono = MonoV
-mono :: Ord v => c -> [PowerView v] -> MonomialView c v
-mono = MonoV
+monov :: Ord v => [PowerView v] -> MonomialView v
+monov = MonoV
 
 -- | prop> poly = PolyV
-poly :: [MonomialView c v] -> PolynomialView c v
-poly = PolyV
+polyv :: [(c,Monomial v)] -> PolynomialView c v
+polyv = PolyV
 
--- | @'fromViewWith' f g p@ first maps @f@ and @g@ over @p@ and then constructs a normalised monomial st. all invariants
--- hold. Non-positive exponents are ignored. Multiple occurences of a variable in a monomial or multiple occurences of the
--- same monomial are suitably combined.
-fromViewWith :: (Additive c', Eq c', Ord v') => (c -> c') -> (v -> v') -> PolynomialView c v -> Polynomial c' v'
-fromViewWith f g (PolyV ts) = pfromView f g ts
+mfromView :: Ord v => MonomialView v -> Monomial v
+mfromView (MonoV ps) = Mono $ foldl' k M.empty ps
+  where k m (PowV v i) = if i >0 then M.insertWith (+) v i m else m
+
 
 -- | Like 'fromViewWith' with the identity function applied.
 --
 -- prop> fromView = fromViewWith id id
-fromView :: (Additive c, Eq c, Ord v) => PolynomialView c v -> Polynomial c v
-fromView = fromViewWith id id
+pfromView :: (Additive c, Eq c, Ord v) => PolynomialView c v -> Polynomial c v
+pfromView = pfromViewWith id
 
--- constructs a normalised monomial
-mfromView :: Ord v' => (v -> v') -> [PowerView v] -> Monomial v'
-mfromView g = Mono . foldr k M.empty
-  where k (PowV v i) m = if i>0 then M.insertWith (+) (g v) i m else m
+pfromViewWith :: (Additive c', Eq c', Ord v) => (c -> c') -> PolynomialView c v -> Polynomial c' v
+pfromViewWith f (PolyV ts) = Poly $ foldl' k M.empty ts where
+  k p (c, m) = let c' = f c in
+    if c' /= zero then M.insertWith add m c' p else p
 
--- constructs a normalised polynomial
-pfromView :: (Additive c', Eq c', Ord v') => (c -> c') -> (v -> v') -> [MonomialView c v] -> Polynomial c' v'
-pfromView f g = Poly . foldr k M.empty where
-  k (MonoV c ps) m = let c' = f c in
-    if c' /= zero then M.insertWith add (mfromView g ps) c' m else m
+pfromViewWithM :: (Monad m, Additive c', Eq c', Ord v) => (c -> m c') -> PolynomialView c v -> m (Polynomial c' v)
+pfromViewWithM f (PolyV ts) = Poly `liftM` foldM k M.empty ts where
+  k p (c,m) = do
+    c' <- f c
+    return $ if c' /= zero
+      then M.insertWith add m c' p
+      else p
+
 
 -- | Lifts a constant to a polynom.
-constant :: c -> PolynomialView c v
-constant c = PolyV [MonoV c []]
+constantv :: c -> PolynomialView c v
+constantv c = PolyV [(c,mone)]
 
 -- | Lifts a variable to a polynom (with exponent 1).
-variable :: Multiplicative c => v -> PolynomialView c v
-variable v = PolyV [MonoV one [PowV v 1]]
+variablev :: Multiplicative c => v -> PolynomialView c v
+variablev v = PolyV [(one, Mono $ M.singleton v 1)]
+
+constant :: (Additive c, Eq c, Ord v) => c -> Polynomial c v
+constant = pfromView . constantv
+
+variable :: (SemiRing c, Eq c, Ord v) => v -> Polynomial c v 
+variable = pfromView . variablev
+
 
 -- | @'linear' f [x,...,z] = cx*x + ... + cz*z + c@
 -- constructs a linear polynomial; the coefficients are determinded by applying @f@ to each monomial.
-linear :: Ord v => ([PowerView v] -> c) -> [v] -> PolynomialView c v
-linear f = poly . (mkMono [] :) . map (\v -> mkMono [v^^^1])
-  where mkMono ps = mono (f ps) ps
+linear :: Ord v => (Monomial v -> c) -> [v] -> PolynomialView c v
+linear f = polyv . (mkTerm [] :) . map (\v -> mkTerm [v^^^1])
+  where mkTerm ps = let m = mfromView (MonoV ps) in (f m,m)
 
 -- | @'quadratic' f [x,...,z] = cx2*x^2 + cx*x + ... + cz2*z^2 + cz*z + c@
 -- constructs a quadratic polynomial; the coefficients are determined by applying @f@ to each monomial.
-quadratic :: Ord v => ([PowerView v] -> c) -> [v] -> PolynomialView c v
-quadratic f = poly . (mkMono [] :) . map (\v -> mkMono [v^^^2,v^^^1])
-  where mkMono ps = mono (f ps) ps
+quadratic :: Ord v => (Monomial v -> c) -> [v] -> PolynomialView c v
+quadratic f = polyv . (mkTerm [] :) . map (\v -> mkTerm [v^^^2,v^^^1])
+  where mkTerm ps = let m = mfromView (MonoV ps) in (f m, m)
 
 -- | Creates a mixed polynom up to a specified degree; the coefficients are determined by applying @f@ to each monomial.
 --
--- > mixed (const 1) "xz" 2 = x^2 + x*z + x + z^2 + z + 1
-mixed :: Ord v => ([PowerView v] -> c) -> [v] -> Int -> PolynomialView c v
-mixed f vs d =  poly $ map mkMono pows
+-- > mixed 2 (const 1) "xz" = x^2 + x*z + x + z^2 + z + 1
+mixed :: Ord v => Int -> (Monomial v -> c) -> [v] -> PolynomialView c v
+mixed d f vs =  polyv $ map mkTerm pows
   where
-    mkMono ps = mono (f ps) ps
+    mkTerm ps = let m = mfromView (MonoV ps) in (f m, m)
     pows =
       map (filter (\(PowV _ i) -> i>0) . zipWith PowV vs) -- [] isElem of pows
       . filter (\ps -> sum ps <= d)

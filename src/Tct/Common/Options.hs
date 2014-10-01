@@ -34,9 +34,11 @@ Option @'Parser' a@ can be lifted to @'Parser' ('Maybe' a)@ using
 -}
 module Tct.Common.Options
   (
+  Options
   -- * Builder
-  eopt
+  , eopt
   , withArgLong
+  , withCropped
   , withDefault
   , withHelpDoc
   , withMetavar
@@ -56,6 +58,8 @@ import qualified Options.Applicative.Builder.Internal as O
 
 import           Tct.Common.Pretty                    (Doc)
 
+-- | Type synonym for 'Options.Applicative.Type.Parser'.
+type Options a = O.Parser a
 
 -- | Identity Option.
 eopt :: Show a => O.Mod f a
@@ -64,6 +68,10 @@ eopt = O.idm <> O.showDefault
 -- | Sets the id for the argument. The id is parsed as "--id".
 withArgLong :: O.HasName f => O.Mod f a -> String -> O.Mod f a
 opt `withArgLong` str = opt <> O.long str
+
+-- | The short version of 'withArgLong'.
+withCropped :: O.HasName f => O.Mod f a -> Char -> O.Mod f a
+opt `withCropped` c = opt <> O.short c
 
 -- | Sets a default value for an option.
 withDefault :: (O.HasValue f, Show a) => O.Mod f a -> a -> O.Mod f a

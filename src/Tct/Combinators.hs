@@ -46,9 +46,7 @@ module Tct.Combinators
 
   -- * Processor List
   , parsableProcessors
-  )
-
-where
+  ) where
 
 import           Control.Applicative (optional, (<$>), (<*>))
 import           Data.Maybe          (fromMaybe)
@@ -209,6 +207,8 @@ withProblem g = WithStatus (g . currentProblem)
 -- | Defines a non-empty list.
 data NList a = a :| [a] deriving (Eq, Ord, Show)
 
+-- TODO: use rankntypes, or existential to allow strategic lists
+
 -- | List version of ('>>>').
 chain :: NList (Strategy prob) -> Strategy prob
 chain (s:|ss) = foldr1 (>>>) (s:ss)
@@ -228,7 +228,7 @@ best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
-exhaustively :: Strategy prob -> Strategy prob
+exhaustively :: (Strategic s) => s -> Strategy (Problem s)
 exhaustively s =  s >>> try (exhaustively s)
 
 -- | @'when' s then@ applies @then@ if @s@ is progressing. Never fails.
@@ -266,8 +266,8 @@ failProcessor = FailProc
 
 -- | @'abort'@ always returns 'Fail' and therfore 'Abort'.
 -- Does not abort the whole evaluation in combination with 'try'.
-abort :: FailProcessor prob
-abort = FailProc
+abort :: ProofData prob => ProcessorStrategy (FailProcessor prob)
+abort = pstrat FailProc
 
 
 -- * Timeout Processor --------------------------------------------------------
@@ -329,11 +329,11 @@ instance Processor p => ParsableProcessor (TimeoutProcessor p) where
     where
       pargs = TimeoutProc
         <$> optional (option $ eopt
-            `withArgLong` "untilT"
+            `withArgLong` "until"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
         <*> optional (option $ eopt
-            `withArgLong` "inT"
+            `withArgLong` "in"
             `withMetavar` "iSec"
             `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
         <*> argument  (parseSomeParsableProcessorMaybe ps) (eopt
