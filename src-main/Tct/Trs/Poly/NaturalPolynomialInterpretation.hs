@@ -1,7 +1,9 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Trs.Poly.NaturalPolynomialInterpretation 
   (
-    stronglyLinear
+  polyInterSD
+  , stronglyLinear
   , linear
   , quadratic
   , mixed  
@@ -24,24 +26,32 @@ import qualified Tct.Common.Pretty                     as PP
 import           Tct.Common.Ring
 import qualified Tct.Common.Xml                        as Xml
 import           Tct.Core hiding (linear)
+import           Tct.Core.Declaration.Parse ()
+import qualified Tct.Common.Parser as P
 
 import qualified Tct.Common.Polynomial                 ()
 import qualified Tct.Common.Polynomial                 as P
 import           Tct.Trs.Orientation                   (OrientationProof (..))
 import qualified Tct.Trs.Poly.PolynomialInterpretation as PI
 import           Tct.Trs.Trs
-import           Tct.Combinators (ProcessorStrategy, pstrat)
 
 
 --- Instances --------------------------------------------------------------------------------------------------------
 
-stronglyLinear, linear, quadratic :: ProcessorStrategy PolyInterProcessor
-stronglyLinear = pstrat (PolyInterProc PI.StronglyLinear)
-linear         = pstrat (PolyInterProc PI.Linear)
-quadratic      = pstrat (PolyInterProc PI.Quadratic)
+polyInterProcessor :: PolyInterProcessor
+polyInterProcessor = PolyInterProc PI.StronglyLinear
 
-mixed :: Int -> ProcessorStrategy PolyInterProcessor
-mixed = pstrat . PolyInterProc . PI.Mixed
+polyInterSD :: StrategyDeclaration (TrsProblem Fun Var)
+polyInterSD = SD . liftP $ declaration polyInterProcessor
+
+
+stronglyLinear, linear, quadratic :: Strategy (TrsProblem Fun Var)
+stronglyLinear = Proc (PolyInterProc PI.StronglyLinear)
+linear         = Proc (PolyInterProc PI.Linear)
+quadratic      = Proc (PolyInterProc PI.Quadratic)
+
+mixed :: Int -> Strategy (TrsProblem Fun Var)
+mixed = undefined --pstrat . PolyInterProc . PI.Mixed
 
 -- TODO: to common.smt; do some re-exporting in it
 instance Additive SMT.Expr where
@@ -84,20 +94,33 @@ degree po = case kind_ po of
   where
     inters = PI.interpretations (inter_ po)
 
+shape_ :: Argument Required (PI.Shape)
+shape_ = arg { argName = "shape" }
+
+instance SParsable prob PI.Shape where
+  parseS = P.choice
+    [ P.symbol "stronglyLinerar" >> return PI.StronglyLinear
+    , P.symbol "linear"          >> return PI.Linear
+    , P.symbol "quadratic"       >> return PI.Quadratic
+    , P.symbol "mixed"           >> P.natural >>= return .PI.Mixed ]
+
 
 instance Processor PolyInterProcessor where
   type ProofObject PolyInterProcessor = PolyInterProof
   type Problem PolyInterProcessor     = TrsProblem Fun Var
   type Forking PolyInterProcessor     = Optional Id
-  name _                              = "poly"
+  type ProcessorArgs PolyInterProcessor = 
+    '[ Argument Required PI.Shape ]
   solve p prob
-    | null (strictRules prob) = return $ Success Null (PolyInterProof Empty) (const $ timeUBCert constant)
+    | null (strictRules prob) = return . resultToTree p prob $
+       (Success Null (PolyInterProof Empty) (const $ timeUBCert constant))
     | otherwise  = do
         res <- liftIO $ entscheide p prob
-        return $ case res of
+        return . resultToTree p prob $ case res of
           SMT.Sat (order, isStrict) ->
             Success (newProblem prob isStrict) (PolyInterProof $ Order order) (certification order)
           _                         -> Fail (PolyInterProof Incompatible)
+  declaration _ = declareProcessor "poly" (OneTuple shape_) PolyInterProc
 
 newtype StrictVar = StrictVar (R.Rule Fun Var) deriving (Eq, Ord)
 
@@ -109,12 +132,12 @@ type IsStrict = R.Rule Fun Var -> Bool
 newProblem :: TrsProblem Fun Var -> IsStrict -> Optional Id (TrsProblem Fun Var)
 newProblem prob isStrict
   | null wr   = Null
-  | otherwise = Optional . Id $ prob {strictRules = sr ++  strictRules prob, weakRules = wr }
+  | otherwise = Opt . Id $ prob {strictRules = sr ++  strictRules prob, weakRules = wr }
   where (sr, wr) = L.partition isStrict (weakRules prob)
 
 certification :: PolyOrder -> Optional Id Certificate -> Certificate
-certification order Null              = timeUBCert (degree order)
-certification order (Optional (Id c)) = updateTimeUBCert c (`add` degree order)
+certification order Null         = timeUBCert (degree order)
+certification order (Opt (Id c)) = updateTimeUBCert c (`add` degree order)
 
 entscheide :: PolyInterProcessor -> TrsProblem Fun Var -> IO (SMT.Sat (PolyOrder, IsStrict))
 entscheide p prob = do

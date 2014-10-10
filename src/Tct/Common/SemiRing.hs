@@ -1,11 +1,9 @@
 -- | This module provides the abstract 'SemiRing' and 'Ring' type.
-module Tct.Common.Ring
+module Tct.Common.SemiRing
   (
     Additive (..)
   , Multiplicative (..)
   , SemiRing
-  , AdditiveGroup (..)
-  , Ring
   ) where
 
 
@@ -43,24 +41,10 @@ class Multiplicative a where
 --     prop> zero `mult` a = a `mult` zero = zero
 type SemiRing a = (Additive a, Multiplicative a)
 
--- | Extends 'Additive' to a additive group with inverse elements.
-class Additive a => AdditiveGroup a where
-  neg :: a -> a
-
--- | 'Ring' instances should satisfy the 'SemiRing' laws:
--- Additionally:
---
--- * @'neg' a@ defines the inversible element of a
---
---    prop> a `add` neg a = zero
-type Ring a = (AdditiveGroup a, Multiplicative a)
-
-
 instance  Additive Int where
   zero = 0
   add  = (+)
-instance AdditiveGroup Int where
-  neg = negate
+
 instance Multiplicative Int where
   one = 1
   mult = (*)

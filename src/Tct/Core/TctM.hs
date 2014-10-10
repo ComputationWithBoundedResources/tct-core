@@ -16,30 +16,14 @@ module Tct.Core.TctM
   ) where
 
 
-import           Control.Applicative      (Applicative, (<$>), (<*>))
+import           Control.Applicative      ((<$>),(<*>))
 import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
-import           Control.Monad.Error      (MonadError)
-import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT, ask, liftIO, local, runReaderT)
+import           Control.Monad.Reader     (ask, liftIO, local, runReaderT)
 import qualified System.Time              as Time
 
-
--- | Provides Tct runtime options.
-data TctROState = TctROState
-  { startTime    :: Time.ClockTime
-  , stopTime     :: Maybe Time.ClockTime }
-
--- | The Tct monad.
-newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
-    deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
-
--- | Defines (dynamic) runtime status.
-data TctStatus prob = TctStatus
-  { currentProblem :: prob
-  , runningTime    :: Int       -- ^ Runing time in seconds.
-  , remainingTime  :: Maybe Int -- ^ Remaining time in seconds.
-  }
+import Tct.Core.Types
 
 askState :: TctM TctROState
 askState = ask

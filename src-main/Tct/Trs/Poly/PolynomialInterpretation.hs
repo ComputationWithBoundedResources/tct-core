@@ -2,6 +2,7 @@ module Tct.Trs.Poly.PolynomialInterpretation
 where
 
 import qualified Data.Map               as M (Map, fromList, (!))
+import Data.Data (Typeable)
 
 import qualified Data.Rewriting.Term    as R (Term)
 
@@ -20,7 +21,7 @@ data Shape
   | Linear
   | Quadratic
   | Mixed Int
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable)
 
 -- | The kind of the interpretation.
 data Kind

@@ -6,6 +6,12 @@ Author:
   Georg Moser <georg.moser@uibk.ac.at>,
   Michael Schaper <michael.schaper@uibk.ac.at>,
   Maria Schett <maria.schett@uibk.ac.at>
+Maintainer:
+  Martin Avanzini <martin.avanzini@uibk.ac.at>,
+  Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
+  Georg Moser <georg.moser@uibk.ac.at>,
+  Michael Schaper <michael.schaper@uibk.ac.at>,
+  Maria Schett <maria.schett@uibk.ac.at>
 Category: Program Analysis
 Stability: Experimental
 License: BSD3
@@ -20,20 +26,20 @@ Description:
 cabal-version: >= 1.8
 build-type: Simple
 
-Executable tctw
-  hs-source-dirs: src-w
-  main-is: tctl.hs
-  build-depends:
-    containers           >= 0.5 && < 0.6,
-    optparse-applicative == 0.9.*,
-    mtl                  >= 2.1 && < 2.2,
-    base == 4.*,
-
-    smtlib == 0.*,
-    tct  == 3.*
-  ghc-options:
-    -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
-  extensions:
+--Executable tctw
+--  hs-source-dirs: src-w
+--  main-is: tctl.hs
+--  build-depends:
+--    containers           >= 0.5 && < 0.6,
+--    optparse-applicative == 0.9.*,
+--    mtl                  >= 2.1 && < 2.2,
+--    base == 4.*,
+--
+--    smtlib == 0.*,
+--    tct  == 3.*
+--  ghc-options:
+--    -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+--  extensions:
 
 Executable tctl
   hs-source-dirs: src-main
@@ -47,14 +53,17 @@ Executable tctl
     term-rewriting == 0.*,
     tct            == 3.*
   ghc-options:
-    -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+    -j -threaded -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
   extensions: 
+    ConstraintKinds,
+    DataKinds,
+    DeriveDataTypeable,
+    FlexibleInstances,
     GeneralizedNewtypeDeriving,
-    TypeFamilies,
-    ConstraintKinds
+    MultiParamTypeClasses, 
+    TypeFamilies
     -- GADTs, 
     -- FlexibleContexts, 
-    -- MultiParamTypeClasses, 
     -- TypeSynonymInstances,
     -- DeriveDataTypeable,
     -- DeriveFunctor, 
@@ -65,19 +74,25 @@ Library
   exposed-modules:
     Tct
     Tct.Combinators
+    Tct.Common.Arguments
     Tct.Common.Error
     Tct.Common.Options
     Tct.Common.Parser
     Tct.Common.Pretty
-    Tct.Common.Ring
+    Tct.Common.SemiRing
     Tct.Common.Xml
     Tct.Core
     Tct.Core.Certificate
+    Tct.Core.Declaration
+    Tct.Core.Declaration.Parse
     Tct.Core.Forks
     Tct.Core.Processor
     Tct.Core.ProofTree
     Tct.Core.Strategy
     Tct.Core.TctM
+    Tct.Core.Types
+    Tct.Processors.Failing
+    Tct.Processors.Timeout
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,
     async                == 2.*,
@@ -96,16 +111,22 @@ Library
     
   hs-source-dirs: src
   ghc-options:
-    -j -threaded -Wall -O -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+    -j -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
   extensions: 
-    GeneralizedNewtypeDeriving,
-    TypeFamilies,
     ConstraintKinds, 
-    GADTs, 
-    FlexibleContexts, 
-    MultiParamTypeClasses, 
-    TypeSynonymInstances,
+    DataKinds,
     DeriveDataTypeable,
-    DeriveFunctor, 
     DeriveFoldable, 
-    DeriveTraversable
+    DeriveFunctor, 
+    DeriveTraversable,
+    EmptyDataDecls,
+    FlexibleContexts, 
+    FlexibleInstances, 
+    GADTs, 
+    GeneralizedNewtypeDeriving,
+    MultiParamTypeClasses, 
+    PolyKinds,
+    StandaloneDeriving,
+    TypeFamilies,
+    TypeOperators,
+    TypeSynonymInstances

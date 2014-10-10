@@ -2,6 +2,7 @@ module Tct.Trs.Trs where
 
 import qualified Data.Map.Strict as M (Map,fromList, keys)
 import Data.List ((\\))
+import Data.Data (Typeable)
 
 import qualified Data.Rewriting.Problem as R 
 import qualified Data.Rewriting.Rule as R (Rule (..))
@@ -21,7 +22,8 @@ data TrsProblem f v = TrsProblem
   , weakRules       :: [R.Rule f v]
   , signature       :: M.Map f Int
   , constructors    :: [f]
-  } deriving Show
+  } deriving (Show, Typeable)
+
 
 allRules :: TrsProblem f v -> [R.Rule f v]
 allRules prob = strictRules prob ++ weakRules prob

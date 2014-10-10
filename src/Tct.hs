@@ -18,10 +18,10 @@ module Tct
 
 import qualified Config.Dyre          as Dyre (Params (..), defaultParams, wrapMain)
 import           Control.Applicative  (pure, (<$>), (<*>))
-import           Control.Monad        (liftM)
 import           Control.Monad.Reader (runReaderT)
 import           Data.Maybe           (fromMaybe)
 import           Data.Monoid          (mconcat)
+import           Data.Typeable        (Typeable)
 import qualified Options.Applicative  as O
 import           System.Directory     (getHomeDirectory)
 import           System.Exit          (exitFailure, exitSuccess)
@@ -29,6 +29,7 @@ import           System.FilePath      ((</>))
 import           System.IO            (hPrint, stderr)
 import qualified System.Time          as Time
 
+import           Tct.Processors.Failing (failing)
 import           Tct.Combinators
 import           Tct.Common.Error
 import qualified Tct.Common.Pretty    as PP
@@ -54,7 +55,7 @@ owl = unlines
 -- | 'TctMode' provides all infromation necesary to construct a Tct customised for a problem type.
 data TctMode prob opt = TctMode
   { modeParser          :: String -> Either TctError prob    -- ^ The parser for the problem.
-  , modeStrategies      :: [SomeParsableProcessor prob]      -- ^ Problem specific parsable Processor/Strategies.
+  , modeStrategies      :: [StrategyDeclaration prob]        -- ^ Problem specific parsable Processor/Strategies.
                                                              --   These are added to default 'processors'.
   , modeDefaultStrategy :: Strategy prob                     -- ^ The default strategy to execute.
   , modeOptions         :: O.Parser opt                      -- ^ Problem specific option parser.
@@ -73,7 +74,7 @@ apply c m = tctl $ Right (c,m)
 -- | Construct a customised Tct with default configuration.
 --
 -- > applyMode m = apply defaultTctConfig m
-applyMode :: ProofData prob => TctMode prob opt -> IO ()
+applyMode :: (ProofData prob, Typeable prob) => TctMode prob opt -> IO ()
 applyMode = apply defaultTctConfig
 
 data Void = Void deriving (Show, Read)
@@ -87,7 +88,7 @@ void :: TctMode Void Void
 void = TctMode
   { modeParser          = const (Right Void)
   , modeStrategies      = []
-  , modeDefaultStrategy = Proc abort
+  , modeDefaultStrategy = failing
   , modeOptions         = pure Void
   , modeModifyer        = const id
   , modeAnswer          = const (answer Void)}
@@ -112,13 +113,13 @@ readOutputMode s
 -- Defines global properties. Is updated by command line arguments and 'TctMode'.
 data TctConfig prob = TctConfig
   { outputMode :: OutputMode
-  , strategies :: [SomeParsableProcessor prob] }
+  , strategies :: [StrategyDeclaration prob] }
 
 -- | The default Tct configuration.
-defaultTctConfig :: ProofData prob => TctConfig prob
+defaultTctConfig :: (ProofData prob, Typeable prob) => TctConfig prob
 defaultTctConfig = TctConfig
   { outputMode = OnlyAnswer
-  , strategies = parsableProcessors }
+  , strategies = declarations }
 
 -- | Tct command line options.
 data TctOptions m = TctOptions
@@ -130,7 +131,7 @@ data TctOptions m = TctOptions
 updateTctConfig :: TctConfig prob -> TctOptions m -> TctConfig prob
 updateTctConfig cfg opt = cfg { outputMode = outputMode cfg `fromMaybe` outputMode_ opt }
 
-mkParser :: [SomeParsableProcessor proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
+mkParser :: [StrategyDeclaration proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
 mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
   where
     listed = O.infoOption (PP.display $ mkDescription ps) $ mconcat
@@ -156,6 +157,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
     desc = mconcat
       [ O.headerDoc   . Just $ PP.string "TcT -- Tyrolean Complexity Tool"
       , O.progDescDoc . Just $ PP.string owl ]
+    mkDescription = undefined
 
 run :: TctConfig prob -> TctM a -> IO a
 run _ m = do
@@ -199,9 +201,10 @@ realMain dcfg = do
 
   where
     mkOptions optParser strats = liftIO $ O.execParser (mkParser strats optParser)
+    mkStrategy :: Strategy prob -> [StrategyDeclaration prob] -> Maybe String -> ErrorT TctError IO (Strategy prob)
     mkStrategy def strats = maybe
       (return def)
-      (liftEither . liftM Proc . parseSomeParsableProcessor strats)
+      (liftEither . parseStrategy strats)
     mkProblem file parser modifyer opts = do
       f <- tryIO $ readFile file
       liftEither $ do
@@ -213,10 +216,12 @@ realMain dcfg = do
       let pt = fromReturn r
       case a of
         WithProof -> putPretty pt
-        WithXml   -> Xml.putXml $ Xml.toXml pt
+        --WithXml   -> Xml.putXml $ Xml.toXml pt
         _         -> return ()
     putPretty :: PP.Pretty a => a -> IO ()
     putPretty = putStrLn . PP.display . PP.pretty
+    parseStrategy :: [StrategyDeclaration prob] -> String -> Either TctError (Strategy prob) 
+    parseStrategy = undefined
 
 
 type TctConfiguration prob opt = Either TctError (TctConfig prob, TctMode prob opt)
@@ -229,6 +234,5 @@ tctl = Dyre.wrapMain $ Dyre.defaultParams
   , Dyre.cacheDir    = Just tctldir
   , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
   , Dyre.ghcOpts     = ["-threaded", "-package tct-" ++ version] }
-  --, Dyre.ghcOpts     = ["-threaded"] }
   where tctldir = getHomeDirectory >>= \home -> return (home </> "tctl")
 

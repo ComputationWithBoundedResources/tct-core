@@ -45,6 +45,8 @@ module Tct.Core
 
 
 import Tct.Core.Certificate as M
+import Tct.Core.Declaration as M -- TODO: Declaration.Parse
+import Tct.Core.Types       as M -- TODO: refactor and remove;
 import Tct.Core.Forks       as M
 import Tct.Core.Processor   as M
 import Tct.Core.ProofTree   as M
