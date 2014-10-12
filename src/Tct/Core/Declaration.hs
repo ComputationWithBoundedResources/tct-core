@@ -34,8 +34,8 @@ module Tct.Core.Declaration
 
 import           Tct.Core.Types
 
-instance WithName (Declaration c) where withName (Decl n h f as) n' = Decl n' h f as
-instance WithHelp (Declaration c) where withHelp (Decl n h f as) h' = Decl n h' f as
+instance WithName (Declaration c) where withName (Decl _ h f as) n' = Decl n' h f as
+instance WithHelp (Declaration c) where withHelp (Decl n _ f as) h' = Decl n h' f as
 
 declName :: Declaration c -> String
 declName (Decl n _ _  _) = n
@@ -53,8 +53,8 @@ declArgs (Decl _ _ _ as) = as
 -- default fun
 type family DefaultFun c where
   DefaultFun ('[] :-> r) = r
-  DefaultFun ((Argument Optional a ': as) :-> r) = DefaultFun (as :-> r)
-  DefaultFun ((Argument Required a ': as) :-> r) = a -> DefaultFun (as :-> r)
+  DefaultFun (Argument Optional a ': as :-> r) = DefaultFun (as :-> r)
+  DefaultFun (Argument Required a ': as :-> r) = a -> DefaultFun (as :-> r)
 
 class DefF c where
   defaultFun :: Declaration c -> DefaultFun c
@@ -62,13 +62,13 @@ class DefF c where
 instance DefF ('[] :-> f) where
   defaultFun (Decl _ _ f _) = f
 
-instance (DefF (as :-> r)) => DefF ((Argument Optional a ': as) :-> r) where
+instance (DefF (as :-> r)) => DefF (Argument Optional a ': as :-> r) where
   defaultFun (Decl n h f (HCons a as)) = defaultFun (Decl n h (f (argDefault a)) as)
-  defaultFun (Decl _ _ _ _)            = error "Tct.Core.Declaration.defaultFun: something ubelievable happened"
+  defaultFun Decl{}                    = error "Tct.Core.Declaration.defaultFun: something ubelievable happened"
 
-instance DefF (as :-> r) => DefF ((Argument Required a ': as) :-> r) where
+instance DefF (as :-> r) => DefF (Argument Required a ': as :-> r) where
   defaultFun (Decl n h f (HCons _ as)) = \ a' -> defaultFun (Decl n h (f a') as)
-  defaultFun (Decl _ _ _ _)            = error "Tct.Core.Declaration.defaultFun: something ubelievable happened"
+  defaultFun Decl{}                    = error "Tct.Core.Declaration.defaultFun: something ubelievable happened"
 
 -- default declaration
 class DefD args args' where
@@ -79,10 +79,10 @@ instance DefD '[] '[] where
 
 instance (DefD as as') => DefD (Argument Optional a ': as) as' where
   defaultDecl (Decl n h f (HCons a as)) = defaultDecl (Decl n h (f (argDefault a)) as)
-  defaultDecl (Decl _ _ _ _)            = error "Tct.Core.Declaration.defaultDecl: something ubelievable happened"
+  defaultDecl Decl{}                    = error "Tct.Core.Declaration.defaultDecl: something ubelievable happened"
 
 instance (DefD as as') => DefD (Argument Required a ': as) (Argument Required a ': as') where
-  defaultDecl (Decl _ _ _ _)            = error "Tct.Core.Declaration.defaultDecl: something ubelievable happened"
+  defaultDecl Decl{} = error "Tct.Core.Declaration.defaultDecl: something ubelievable happened"
 
 
 -- processor lifting
@@ -100,12 +100,12 @@ class App1 args a args' where
   app1 :: Declaration (args :-> r) -> a -> Declaration (args' :-> r)
 
 instance App1 (Argument Optional a ': as) a as where
-  app1 (Decl n h f (HCons _ as)) a = (Decl n h (f a) as)
-  app1 (Decl _ _ _ _) _            = undefined
+  app1 (Decl n h f (HCons _ as)) a = Decl n h (f a) as
+  app1 Decl{} _                    = undefined
 
 instance App1 (Argument Required a ': as) a as where
-  app1 (Decl n h f (HCons _ as)) a = (Decl n h (f a) as)
-  app1 (Decl _ _ _ _) _            = undefined
+  app1 (Decl n h f (HCons _ as)) a = Decl n h (f a) as
+  app1 Decl{} _            = undefined
 
 
 
@@ -113,7 +113,7 @@ instance App1 (Argument Required a ': as) a as where
 -- arguments ----------------------------------------------------------------------
 instance Functor (Argument r) where
   f `fmap` ar@OptArg{} = OptArg { argName = argName ar, argHelp = argHelp ar, argDefault = f (argDefault ar) }
-  f `fmap` ar@ReqArg{} = ReqArg { argName = argName ar, argHelp = argHelp ar }
+  _ `fmap` ar@ReqArg{} = ReqArg { argName = argName ar, argHelp = argHelp ar }
 
 arg :: Argument Required a
 arg = ReqArg {argName = "arg", argHelp = []}
@@ -142,7 +142,7 @@ instance WithHelp (Argument r a) where withHelp ar n = ar { argHelp = n}
 
 -- StrategyDeclaration
 
-instance WithName (StrategyDeclaration prob) where withName (SD (Decl n h f as)) n' = SD $ Decl n' h f as
-instance WithHelp (StrategyDeclaration prob) where withHelp (SD (Decl n h f as)) h' = SD $ Decl n h' f as
+instance WithName (StrategyDeclaration prob) where withName (SD (Decl _ h f as)) n' = SD $ Decl n' h f as
+instance WithHelp (StrategyDeclaration prob) where withHelp (SD (Decl n _ f as)) h' = SD $ Decl n h' f as
 
 

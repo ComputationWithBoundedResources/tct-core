@@ -17,14 +17,14 @@ trsMode = TctMode
   { modeParser          = parser
   , modeStrategies      = []
 
-  , modeDefaultStrategy = bestPolys
+  , modeDefaultStrategy = timeoutIn 30 $ bestPolys
   , modeOptions         = options
   , modeModifyer        = modifyer
   , modeAnswer          = answering }
 
 
 bestPolys :: Strategy (TrsProblem Fun Var)
-bestPolys = es linear >=> es quadratic >=> es (mixed 2) >=> es (mixed 3)
+bestPolys = es linear >=> es quadratic >=> es (mixed 2)
   where es = exhaustively
 
 fastestPolys :: Strategy (TrsProblem Fun Var)

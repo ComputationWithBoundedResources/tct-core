@@ -15,7 +15,6 @@ module Tct
   )
   where
 
-
 import qualified Config.Dyre          as Dyre (Params (..), defaultParams, wrapMain)
 import           Control.Applicative  (pure, (<$>), (<*>))
 import           Control.Monad.Reader (runReaderT)

@@ -17,7 +17,7 @@ module Tct.Core.ProofTree
 
 
 import Control.Applicative  as A ((<$>))
-import Data.Foldable        as F (Foldable, foldr, foldMap)
+import Data.Foldable        as F (Foldable, foldr, foldMap, toList)
 import Data.Traversable     as T (Traversable, traverse)
 
 import Tct.Core.Certificate (Certificate, unbounded)
@@ -79,92 +79,26 @@ instance Traversable ProofTree where
 instance Show (ProofTree l) where
   show _ = undefined
 
-instance PP.Pretty (ProofTree l) where
-  pretty _ = undefined
 
-{-instance Processor p => Pretty (ProofNode p) where-}
-  {-pretty (ProofNode prob p po) =-}
-    {-text "Considered Problem:" <$$> indent 2 (pretty prob)-}
-    {-<$$> text "Applied Processor:" <$$> indent 2 (text $ name p)-}
-    {-<$$> text "Proof:" <$$> indent 2 (pretty po)-}
+-- Pretty Printing ---------------------------------------------------------------------------------------------------
 
-{-instance Processor p => Xml.Xml (ProofNode p) where-}
-  {-toXml (ProofNode prob p po) = -}
-    {-Xml.elt "proofNode" -}
-      {-[ Xml.elt "problem" [Xml.toXml prob]-}
-      {-, Xml.elt "processor" [Xml.text $ name p]-}
-      {-, Xml.elt "proofObject" [Xml.toXml po]]-}
+instance Processor p => PP.Pretty (ProofNode p) where
+  pretty (ProofNode p prob po) = PP.vcat
+    [ PP.text "Considered Problem:" PP.<$$> ind (PP.pretty prob)
+    , PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
+    , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
+    where ind = PP.indent 2
 
-
-{-instance Xml.Xml l => Xml.Xml (ProofTree l) where-}
-  {-toXml pt = Xml.elt "proofTree" $ flip (:) [] $ case pt of-}
-    {-(Open l)             -> Xml.elt "open" [Xml.toXml l]-}
-    {-(NoProgress pn spt)  -> Xml.elt "noProgress" [Xml.toXml pn, Xml.toXml spt]-}
-    {-(Progress pn _ spts) -> Xml.elt "progress" (Xml.toXml pn :map Xml.toXml (toList spts))-}
-
-{-instance Pretty l => Pretty (ProofTree l) where-}
-  {-pretty = prettyProofTree-}
-
-{-prettyProofTree :: Pretty prob => ProofTree prob -> PP.Doc-}
-{-prettyProofTree pt =-}
-  {-paragraph "The considered (sub-)prooftree is" <+> status pt <+> paragraph "and has certificate"-}
-  {-<$$> pretty (certificate pt) <> dot-}
-  {-<$$> linebreak <> indent 2 (pp pt) where-}
-
-  {-pp (Open l) = block "* Open ***" body empty where-}
-    {-body = paragraph "Following problem is open:" <$$> indent 2 (pretty l)-}
-
-  {-pp (NoProgress (ProofNode prob p _) spt) =-}
-    {-block "*** NoProgress ***" body after where-}
-      {-body =-}
-        {-paragraph "We consider following open problem:"-}
-        {-<$$> indent 2 (pretty prob)-}
-        {-<$$> linebreak <> paragraph "We fail to apply:"-}
-        {-<$$> indent 2 (text $ name p)-}
-        {--- <$$> paragraph "The reason is:"-}
-        {--- <$$> indent 2 (pretty po)-}
-      {-after = linebreak-}
-        {-<$$> paragraph "We continue with the proof."-}
-        {-<$$> linebreak <> pp spt-}
-
-  {-pp t@(Progress (ProofNode prob p po) _ spts) =-}
-    {-block "*** Progress ***" body after where-}
-      {-body =-}
-        {-paragraph "We consider following open problem:"-}
-        {-<$$> indent 2 (pretty prob)-}
-        {-<$$> linebreak <> paragraph "We successfully apply"-}
-        {-<$$> indent 2 (text $ name p)-}
-        {-<$$> linebreak <> paragraph "yielding" <+> pprobs (map pretty $ open t)-}
-        {-<$$> linebreak <> paragraph "and obtaining certificate"-}
-        {-<$$> indent 2 (pretty $ certificate t)-}
-        {-<$$> linebreak <> linebreak <> paragraph "The proof is:"-}
-        {-<$$> linebreak <> indent 2 (pretty po) <> pprobs' (map pprob ps)-}
-      {-after = if null ps-}
-        {-then empty-}
-        {-else linebreak <> indent 4 (-}
-          {-linebreak <> paragraph "We continue with the proof."-}
-          {-<$$> linebreak <> vcat (punctuate linebreak [ pp spt | spt <- toList spts]))-}
-      {-ps = toList spts-}
-
-  {-status t = text $ if isClosed t then "closed" else "open"-}
-
-  {-block header body after = paragraph header <$$> filler (length header) <$$> indent 2 body <> after-}
-
-  {-pprobs [] = linebreak <> indent 2 (paragraph "no open problems.")-}
-  {-pprobs [p] =-}
-    {-paragraph "following open problem:"-}
-    {-<$$> indent 2 p-}
-  {-pprobs ps =-}
-    {-paragraph "following open problems:"-}
-    {-<$$> indent 2 (vcat (punctuate linebreak ps))-}
-
-  {-pprobs' [] = empty-}
-  {-pprobs' [p] = linebreak <$$> indent 2 (paragraph "Yielding following open problem:" <$$> indent 2 p)-}
-  {-pprobs' ps  = linebreak <$$> indent 2 (paragraph "Yielding following open problems:" <$$> indent 2 (vcat (punctuate linebreak ps)))-}
-
-  {-pprob (Open l)          = pretty l-}
-  {-pprob (NoProgress pn _) = pretty $ problem pn-}
-  {-pprob (Progress pn _ _) = pretty $ problem pn-}
-
-  {-filler i = text $ replicate i '-'-}
+instance PP.Pretty l => PP.Pretty (ProofTree l) where
+  pretty (Open l) = PP.vcat
+    [ PP.text "*** Open ***"
+    , PP.indent 4 (PP.pretty l) ]
+  pretty (NoProgress pn pt) = PP.vcat
+    [ PP.text "*** NoProgress ***"
+    , PP.indent 4 (PP.pretty pn) 
+    , PP.indent 2 (PP.pretty pt) ]
+  pretty (Progress pn _ pts) = PP.vcat
+    [ PP.text "*** Progress ***"
+    , PP.indent 4 (PP.pretty pn) 
+    , PP.indent 2 (PP.vcat $ map PP.pretty (F.toList pts)) ]
 

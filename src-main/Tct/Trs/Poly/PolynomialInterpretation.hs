@@ -1,7 +1,19 @@
 module Tct.Trs.Poly.PolynomialInterpretation
-where
+  (
+  Shape (..)
+  , Kind (..)
+  , SomeIndeterminate
+  , SomePolynomial
+  , VarPolynomial
 
-import qualified Data.Map               as M (Map, fromList, (!))
+  , CoefficientVar(..)
+  , PolyInter (..)
+
+  , mkInterpretation
+  , interpret
+  ) where
+
+import qualified Data.Map               as M (Map, fromList, (!), elems)
 import Data.Data (Typeable)
 
 import qualified Data.Rewriting.Term    as R (Term)
@@ -35,8 +47,6 @@ newtype SomeIndeterminate = SomeIndeterminate Int deriving (Eq, Ord, Enum)
 indeterminates :: Int -> [SomeIndeterminate]
 indeterminates n = take n [SomeIndeterminate 0 .. ]
 
-instance Show SomeIndeterminate where
-  show (SomeIndeterminate i) = "x_" ++ show i
 
 type SomePolynomial c = P.Polynomial c SomeIndeterminate
 type VarPolynomial c = P.Polynomial c Var
@@ -48,7 +58,7 @@ data CoefficientVar = CoefficientVar
   , argpos   :: Monomial SomeIndeterminate
   } deriving (Eq, Ord)
 
-data PolyInter c = PolyInter 
+newtype PolyInter c = PolyInter 
   { interpretations :: M.Map Fun (SomePolynomial c) }
   deriving Show
 
@@ -74,6 +84,12 @@ mkInterpretation k (f,ar) = fromShape (shape k) (mkCoefficient k f) (indetermina
 
 --- Proofdata --------------------------------------------------------------------------------------------------------
 
+instance Show SomeIndeterminate where
+  show (SomeIndeterminate i) = "x_" ++ show i
+
+instance PP.Pretty SomeIndeterminate where
+  pretty (SomeIndeterminate i) = PP.text "x_" PP.<> PP.int i
+
 instance PP.Pretty Shape where
   pretty StronglyLinear = PP.text "stronglyLinear"
   pretty Linear         = PP.text "linear"
@@ -84,5 +100,7 @@ instance PP.Pretty Kind where
   pretty (Unrestricted shp)       = PP.text "unrestricted" PP.<> PP.parens (PP.pretty shp)
   pretty (ConstructorBased shp _) = PP.text "constructor-based" PP.<> PP.parens (PP.pretty shp)
 
+instance PP.Pretty (PolyInter Int) where
+  pretty pint = PP.vcat $ map PP.pretty (M.elems $ interpretations pint)
 
-  
+

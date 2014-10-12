@@ -24,9 +24,6 @@ import           Tct.Core.ProofTree
 import           Tct.Core.TctM
 --import qualified Tct.Xml as Xml
 
-import Data.Data (Typeable) 
-
-deriving instance Typeable Strategy
 
 instance Show (Strategy prob) where
   show _ = "someStrategy" -- TODO
@@ -148,17 +145,6 @@ strategy ::
 strategy n as f = Decl n [] f (toHList as)
 
 
--- Answer ------------------------------------------------------------------------------------------------------------
-
--- | The Answer type.
-data Answer where
-  Answer :: ProofData a => a -> Answer
-
-instance Show Answer where
-  show (Answer a) = show a
-
-instance PP.Pretty Answer where
-  pretty (Answer a) = PP.pretty a
 
 -- | prop> anwer = Answer
 answer :: ProofData a => a -> Answer

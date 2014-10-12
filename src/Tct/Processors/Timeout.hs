@@ -15,7 +15,6 @@ import Tct.Core
 import Tct.Core.Declaration.Parse ()
 import Tct.Processors.Failing
 import qualified Tct.Common.Pretty as PP
-import           Data.Data (Typeable)
 
 instance Show p => Show (TimeoutProcessor p) where
   show (TimeoutProc mi mj p) = "timeout " ++ k mi ++ k mj ++ show p
@@ -72,7 +71,7 @@ timeoutProcessor :: ProofData prob => TimeoutProcessor prob
 timeoutProcessor = TimeoutProc Nothing Nothing failing
 
 -- | The timeout strategy declaration.
-timeoutSD :: (Typeable prob, ProofData prob) => StrategyDeclaration prob
+timeoutSD :: ProofData prob => StrategyDeclaration prob
 timeoutSD = SD . liftP $ declaration timeoutProcessor
 
 -- | @'timoutIn' i p@ aborts the application of @p@ after @min i 'remainingTime'@ seconds;

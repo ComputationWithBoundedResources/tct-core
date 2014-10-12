@@ -91,19 +91,22 @@ instance PA prob '[] where
   mkOptParsers  _ = []
   mkArgParser _ _ = return HNil
 
-instance (Typeable a, SParsable prob a, PA prob as) => PA prob (Argument r a ': as) where
-  mkOptParsers (HCons ReqArg{} as) = mkOptParsers as
+instance (Typeable a, SParsable prob a, PA prob as) => PA prob (Argument Optional a ': as) where
   mkOptParsers (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParsers as
     where
       pa :: SParsable prob a => Argument Optional a -> SParser prob a
       pa _ = symbol (':' : argName a) >> parseS                                            
   mkArgParser (HCons a as) ls = do
-    v <- maybePa a
+    v  <- return (fromMaybe (argDefault a) (lookup (argName a) ls >>= fromDynamic))
     vs <- mkArgParser as ls
     return (HCons v  vs)
-   where
-     maybePa OptArg{} = return (fromMaybe (argDefault a) (lookup (argName a) ls >>= fromDynamic))
-     maybePa ReqArg{} = lexeme parseS
+
+instance (SParsable prob a, PA prob as) => PA prob (Argument Required a ': as) where
+  mkOptParsers (HCons ReqArg{} as) = mkOptParsers as
+  mkArgParser (HCons _ as) ls = do
+    v  <- lexeme parseS
+    vs <- mkArgParser as ls
+    return (HCons v  vs)
 
 
 instance SParsable prob D.Nat where parseS = natural
