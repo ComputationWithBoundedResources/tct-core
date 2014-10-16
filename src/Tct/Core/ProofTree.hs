@@ -16,13 +16,13 @@ module Tct.Core.ProofTree
   ) where
 
 
-import Control.Applicative  as A ((<$>))
-import Data.Foldable        as F (Foldable, foldr, foldMap, toList)
-import Data.Traversable     as T (Traversable, traverse)
+import           Control.Applicative  as A ((<$>))
+import           Data.Foldable        as F (Foldable, foldMap, foldr, toList)
+import           Data.Traversable     as T (Traversable, traverse)
 
-import Tct.Core.Certificate (Certificate, unbounded)
-import Tct.Core.Types
-import qualified Tct.Common.Pretty as PP
+import qualified Tct.Common.Pretty    as PP
+import           Tct.Core.Certificate (Certificate, unbounded)
+import           Tct.Core.Types
 
 
 -- | Computes the 'Certificate' of 'ProofTree'.
@@ -95,10 +95,10 @@ instance PP.Pretty l => PP.Pretty (ProofTree l) where
     , PP.indent 4 (PP.pretty l) ]
   pretty (NoProgress pn pt) = PP.vcat
     [ PP.text "*** NoProgress ***"
-    , PP.indent 4 (PP.pretty pn) 
+    , PP.indent 4 (PP.pretty pn)
     , PP.indent 2 (PP.pretty pt) ]
   pretty (Progress pn _ pts) = PP.vcat
     [ PP.text "*** Progress ***"
-    , PP.indent 4 (PP.pretty pn) 
+    , PP.indent 4 (PP.pretty pn)
     , PP.indent 2 (PP.vcat $ map PP.pretty (F.toList pts)) ]
 

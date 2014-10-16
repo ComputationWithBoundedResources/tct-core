@@ -6,9 +6,10 @@ module Tct.Core.Strategy
   , returning
   , evaluate
   -- * Declaration
+  , StrategyDeclaration (..)
   , strategy
   -- * Answer
-  , Answer
+  , Answer (..)
   , answer
   ) where
 
@@ -122,7 +123,6 @@ evaluateTree s (Open p)                     = evaluate s p
 evaluateTree s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateTree s subtree
 evaluateTree s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateTree s `T.mapM` subtrees)
 
--- TODO: test if leaks; then use concurrently
 evaluateTreePar :: Strategy prob -> ProofTree prob -> TctM (Return (ProofTree prob))
 evaluateTreePar s t = spawnTree t >>= collect
   where
@@ -137,14 +137,18 @@ evaluateTreePar s t = spawnTree t >>= collect
 
 -- Strategy Processor -----------------------------------------------------------------------------------------------
 
+-- |  Constructs a strategy declaration. For example: Assume that @st :: Int -> Maybe Int -> Strategy prob@.
+--
+-- > strategy "name" (nat, some nat) st
 strategy :: 
   ( ToHList as, HListOf as ~ args
   , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
   , Ret (ArgsType args) f ~ Strategy prob )
-  => String -> as -> f -> Declaration (args :-> Strategy prob)
+  => String -- ^ The name of the strategy.
+  -> as  -- ^ The arguments as tuples: (), (OneTuple a1), (a1,a2) ...
+  -> f  -- ^ The strategy.
+  -> Declaration (args :-> Strategy prob)
 strategy n as f = Decl n [] f (toHList as)
-
-
 
 -- | prop> anwer = Answer
 answer :: ProofData a => a -> Answer

@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Common.Error
   (
-    module Control.Monad.Error
+  module Control.Monad.Error
   , TctError (..)
   , ErroneousIO
   , runErroneousIO
@@ -22,14 +22,13 @@ import Control.Monad.Error (Error (..), ErrorT (..), liftIO, runErrorT)
 
 -- | Custom error type.
 data TctError
-  = TctDyreError String
+  = TctDyreError String     -- ^ Indicates an Error of Config.Dyre
   | TctParseError String
   | TctIOError IOError
   | TctUnknonwError String
   deriving Show
 
-instance Error TctError where
-  strMsg = TctUnknonwError
+instance Error TctError where strMsg = TctUnknonwError
 
 -- | Wraps 'IO' into an erroneous compuation with custom error handling.
 type ErroneousIO e = ErrorT e IO

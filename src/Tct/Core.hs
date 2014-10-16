@@ -40,16 +40,17 @@ These are recursively combined (in a bottom-up way) using the certification func
 -}
 module Tct.Core
   (
-    module M
+  module M
   ) where
 
 
-import Tct.Core.Certificate as M
-import Tct.Core.Declaration as M -- TODO: Declaration.Parse
-import Tct.Core.Types       as M -- TODO: refactor and remove;
-import Tct.Core.Forks       as M
-import Tct.Core.Processor   as M
-import Tct.Core.ProofTree   as M
-import Tct.Core.Strategy    as M
-import Tct.Core.TctM        as M
+import Tct.Core.Certificate       as M
+import Tct.Core.Declaration       as M
+import Tct.Core.Declaration.Parse as M
+import Tct.Core.Forks             as M
+import Tct.Core.Types             as M
+import Tct.Core.Processor         as M
+import Tct.Core.ProofTree         as M
+import Tct.Core.Strategy          as M
+import Tct.Core.TctM              as M
 

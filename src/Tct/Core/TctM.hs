@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home, hide #-}
 -- | This module provides the Tct monad.
 module Tct.Core.TctM
   (
@@ -10,20 +11,20 @@ module Tct.Core.TctM
   -- * Lifted IO functions
   , async
   , wait
-  , timeout
+  , timeit
   , raceWith
   , concurrently
   ) where
 
 
-import           Control.Applicative      ((<$>),(<*>))
+import           Control.Applicative      ((<$>), (<*>))
 import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
 import           Control.Monad.Reader     (ask, liftIO, local, runReaderT)
 import qualified System.Time              as Time
 
-import Tct.Core.Types
+import           Tct.Core.Types
 
 askState :: TctM TctROState
 askState = ask
@@ -87,15 +88,20 @@ raceWithIO p1 p2 m1 m2 =
         | p2 r2     -> Async.wait a1 >>= \r1 -> return (if not (p2 r2) then r2 else r1)
         | otherwise -> Async.wait a1
 
--- | @'timeout' i m@ wraps the Tct action into a timeout, and locally sets 'stopTime'.
--- If @i@ is negative @m@ may run forever.
--- Returns 'Nothing'  if @m@ does not end before the timeout.
-timeout :: Int -> TctM a -> TctM (Maybe a)
-timeout n m
-  | n < 0 = Just `liftM` m
+-- | @'timeit' seconds m@ wraps the Tct action in timeout, and locally sets 'stopTime'.
+-- When @seconds@
+--
+--  * is negative, no timeout is set;
+--  * is @0@, the computation aborts immediately, returning 'Nothing';
+--  * is positive the computation runs at most @i@ seconds.
+--
+-- Returns 'Nothing' if @m@ does not end before the timeout.
+timeit :: Int -> TctM a -> TctM (Maybe a)
+timeit n m
+  | n < 0  = Just `liftM` m
   | n == 0 = return Nothing
   | otherwise = do
-    e <- toIO m' >>= liftIO . Async.race (threadDelay n)
+    e <- toIO m' >>= liftIO . Async.race (threadDelay $ toSec n)
     return $ either (const Nothing) Just e
     where
       m' = do

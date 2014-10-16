@@ -29,20 +29,28 @@ processorName p = Decl.declName (declaration p)
 processorHelp :: Processor p => p -> [String]
 processorHelp p = Decl.declHelp (declaration p)
 
-declareProcessor ::
-  (ToHList a, HListOf a ~ ProcessorArgs p
-  , f ~ Uncurry (ArgsType (ProcessorArgs p) :-> p)
-  , p ~ Ret (ArgsType (ProcessorArgs p)) f)
-  => String -> a -> f -> Declaration ((ProcessorArgs p) :-> p)
-declareProcessor n as p = Decl n [] p (toHList as)
+{-declareProcessor ::-}
+  {-(ToHList a, HListOf a ~ ProcessorArgs p-}
+  {-, f ~ Uncurry (ArgsType (ProcessorArgs p) :-> p)-}
+  {-, p ~ Ret (ArgsType (ProcessorArgs p)) f)-}
+  {-=> String -> a -> f -> Declaration ((ProcessorArgs p) :-> Strategy (Problem p))-}
+{-declareProcessor n as p = Decl n [] p (toHList as)-}
+
+
+declareProcessor :: 
+  ( ToHList as, HListOf as ~ args
+  , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
+  , Ret (ArgsType args) f ~ Strategy prob )
+  => String -> [String] -> as -> f -> Declaration (args :-> Strategy prob)
+declareProcessor n h as f = Decl n h f (toHList as)
 
 -- | Lifts the result of a 'Processor' application (see 'solve') to 'ProofTree'. Informally we have:
 --
 -- prop> 'Fail'    -> 'NoProgress'
 -- prop> 'Success' -> 'Progress'
 resultToTree :: Processor p => p -> Problem p -> Result p -> Return (ProofTree (Problem p))
-resultToTree p prob (Fail po)                    = Abort $ NoProgress (ProofNode p prob po) (Open prob)
-resultToTree p prob (Success subprobs po certfn) = Continue $ Progress (ProofNode p prob po) certfn (Open `fmap` subprobs)
+resultToTree p prob (Fail po)                 = Abort $ NoProgress (ProofNode p prob po) (Open prob)
+resultToTree p prob (Success probs po certfn) = Continue $ Progress (ProofNode p prob po) certfn (Open `fmap` probs)
               
 -- Error Processor ---------------------------------------------------------------------------------------------------
 
@@ -64,5 +72,5 @@ instance Processor p => Processor (ErroneousProcessor p) where
   type ProofObject (ErroneousProcessor p) = ErroneousProof p
   type Problem (ErroneousProcessor p)     = Problem p
   solve e@(ErroneousProc err p) prob      = return $ resultToTree e prob (Fail (ErroneousProof err p))
-  declaration p                           = declareProcessor ("Erroneous processor" ++ processorName p) () p
+  declaration p@(ErroneousProc _ proc)    =  declareProcessor ("Erroneous processor: " ++ processorName proc) [] () $ Proc p
 

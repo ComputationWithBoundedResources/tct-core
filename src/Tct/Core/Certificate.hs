@@ -134,8 +134,6 @@ data Certificate = Certificate
   , timeLB  :: Complexity
   } deriving Show
 
-instance Pretty Certificate where pretty = text . show
-
 -- | Defines the identity 'Certificate'. Sets all components to 'Unknown'.
 unbounded :: Certificate
 unbounded = Certificate
@@ -145,7 +143,7 @@ unbounded = Certificate
   , timeLB  = Unknown }
 
 -- | Constructs a 'Certificate' from the given 'Complexity'.
--- Sets only the specified component; all others are 'Unknown'.
+-- Sets only the specified component; all others are set to 'Unknown'.
 spaceUBCert, spaceLBCert, timeUBCert, timeLBCert :: Complexity -> Certificate
 spaceUBCert c = unbounded { spaceUB = c }
 spaceLBCert c = unbounded { spaceLB = c }
@@ -154,9 +152,30 @@ timeLBCert c  = unbounded { timeLB  = c }
 
 -- | Updates a component in the 'Certificate'.
 updateSpaceUBCert, updateSpaceLBCert, updateTimeUBCert, updateTimeLBCert
- :: Certificate -> (Complexity -> Complexity) -> Certificate
+  :: Certificate -> (Complexity -> Complexity) -> Certificate
 updateSpaceUBCert cert f = cert { spaceUB = f $ spaceUB cert }
 updateSpaceLBCert cert f = cert { spaceLB = f $ spaceLB cert }
 updateTimeUBCert  cert f = cert { timeUB  = f $ timeUB  cert }
 updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
+
+
+-- Pretty Printing ---------------------------------------------------------------------------------------------------
+
+instance Pretty Certificate where
+  pretty (Certificate su sl tu tl) =
+    text "TIME (" <> pretty tu <> char ',' <> pretty tl <> char ')' <$$>
+    text "SPACE(" <> pretty sl <> char ',' <> pretty su <> char ')'
+
+instance Pretty Complexity where
+  pretty (Poly (Just 0)) = text "n"
+  pretty (Poly (Just k)) = text "n" <> char '^' <> int k
+  pretty (Poly Nothing)  = text "Poly"
+  pretty (Exp Nothing)   = text "Elem"
+  pretty (Exp (Just 1))  = text "Exp"
+  pretty (Exp (Just k))  = text "Exp-" <> int k
+  pretty Supexp          = text "Supexp"
+  pretty Primrec         = text "Primrec"
+  pretty Multrec         = text "Multrec"
+  pretty Rec             = text "Rec"
+  pretty Unknown         = char '?'
 

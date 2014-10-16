@@ -1,7 +1,7 @@
 -- | This module provides the abstract 'SemiRing' and 'Ring' type.
 module Tct.Common.SemiRing
   (
-    Additive (..)
+  Additive (..)
   , Multiplicative (..)
   , SemiRing
   ) where
@@ -46,7 +46,6 @@ instance  Additive Int where
   add  = (+)
 
 instance Multiplicative Int where
-  one = 1
+  one  = 1
   mult = (*)
-
 

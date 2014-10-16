@@ -1,18 +1,23 @@
+{-# OPTIONS_HADDOCK not-home #-}
+-- | This module defines the most important types.
 module Tct.Core.Types where
 
 
-import Text.ParserCombinators.Parsec (CharParser)
-import           Data.Dynamic (Dynamic)
-import           Control.Applicative (Applicative)
-import           Control.Monad.Error (MonadError)
-import           Control.Monad.Reader (MonadIO, MonadReader, ReaderT)
-import           Data.Foldable as F (Foldable)
-import           Data.Traversable as T (Traversable)
-import qualified System.Time as Time
+import           Control.Applicative           (Applicative)
+import           Control.Monad.Error           (MonadError)
+import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
+import           Data.Dynamic                  (Dynamic)
+import           Data.Foldable                 as F (Foldable)
+import           Data.Traversable              as T (Traversable)
+import qualified System.Time                   as Time
+import           Text.Parsec                   (alphaNum, letter, oneOf, (<|>))
+import qualified Text.Parsec.Language          as PL
+import qualified Text.Parsec.Token             as PT
+import           Text.ParserCombinators.Parsec (CharParser)
 
-import qualified Tct.Core.Certificate as C
-import           Tct.Core.Forks (Id(..))
-import qualified Tct.Common.Pretty as PP
+import qualified Tct.Common.Pretty             as PP
+import qualified Tct.Core.Certificate          as C
+import           Tct.Core.Forks                (Id (..))
 
 
 -- TcT Monad ---------------------------------------------------------------------------------------------------------
@@ -26,7 +31,7 @@ data TctROState = TctROState
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
     deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
--- | Defines (dynamic) runtime status.
+-- | Defines the (dynamic) runtime status of 'TctROState'.
 data TctStatus prob = TctStatus
   { currentProblem :: prob
   , runningTime    :: Int       -- ^ Runing time in seconds.
@@ -55,7 +60,7 @@ data ProofTree l where
 
 
 -- Processor  --------------------------------------------------------------------------------------------------------
- 
+
 -- | 'Fork' is an abstract type that provides the "Foldable", "Functor" and "Traversable" interface.
 type Fork t = (Foldable t, Functor t, Traversable t)
 
@@ -82,19 +87,16 @@ class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p
   type Forking p       =  Id
   type ProcessorArgs p :: [*]
   type ProcessorArgs p =  '[]
-  declaration          :: p -> Declaration (ProcessorArgs p :-> p)
+  declaration          :: p -> Declaration (ProcessorArgs p :-> Strategy (Problem p))
   solve                :: p -> Problem p -> TctM (Return (ProofTree (Problem p)))
 
 
 -- Strategy ----------------------------------------------------------------------------------------------------------
 
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
--- For a detailed description of the control flow constructs see "Combinators".
--- 'Strategy' is an instance of 'Processor', hence they can be used in processor combinators. For example,
---
--- > timoutIn 20 (s1 >>> s2)
+-- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy prob where
-  Proc       :: (Processor p, Problem p ~ prob, ProofData prob) => p -> Strategy prob
+  Proc       :: (Processor p, Problem p ~ prob) => p -> Strategy prob
   Trying     :: Bool -> Strategy prob -> Strategy prob
   Then       :: Strategy prob -> Strategy prob -> Strategy prob
   ThenPar    :: Strategy prob -> Strategy prob -> Strategy prob
@@ -121,6 +123,7 @@ instance PP.Pretty Answer where pretty (Answer a) = PP.pretty a
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------
 
+-- | A heterogenous list.
 data HList :: [*] -> * where
   HNil  :: HList '[]
   HCons :: a -> HList t -> HList (a ': t)
@@ -132,7 +135,7 @@ type family HListOf a :: [*] where
   HListOf (a1,a2,a3,a4)    = '[a1,a2,a3,a4]
   HListOf (a1,a2,a3,a4,a5) = '[a1,a2,a3,a4,a5]
   HListOf (OneTuple a)     = '[a]
-  
+
 class ToHList a                   where toHList :: a -> HList (HListOf a)
 instance ToHList ()               where toHList ()               = HNil
 instance ToHList (a1,a2)          where toHList (a1,a2)          = HCons a1 (HCons a2 HNil)
@@ -141,7 +144,8 @@ instance ToHList (a1,a2,a3,a4)    where toHList (a1,a2,a3,a4)    = HCons a1 (toH
 instance ToHList (a1,a2,a3,a4,a5) where toHList (a1,a2,a3,a4,a5) = HCons a1 (toHList (a2,a3,a4,a5))
 instance ToHList (OneTuple a)     where toHList (OneTuple a)     = HCons a HNil
 
-data OneTuple a = OneTuple a
+-- | Should be used in 'strategy' ('declareProcessor') if the Strategy (Processor) has a single argument.
+newtype OneTuple a = OneTuple a
 
 
 -- Currying / Uncurrying ---------------------------------------------------------------------------------------------
@@ -149,11 +153,13 @@ data OneTuple a = OneTuple a
 data as :-> b = HList as :-> b
 infix 4 :->
 
+-- | Uncurried version of a function.
 type family Uncurry a where
   Uncurry ('[] :-> r) = r
   Uncurry ((a ': as) :-> r) = a -> Uncurry (as :-> r)
 
 
+-- | Return type of function wrt to its argument list.
 type family Ret as f where
   Ret '[] b = b
   Ret (a ': as) (a -> b) = Ret as b
@@ -161,29 +167,48 @@ type family Ret as f where
 
 -- Declarations ------------------------------------------------------------------------------------------------------
 
+-- | Specifies if the Argument is optional or required.
+-- This mainly affects parsing of strategies and the the default function ('defaultFun') of declarations.
 data ArgFlag = Optional | Required
-  
-data Argument :: ArgFlag -> * -> * where
-  ReqArg :: r ~ Required => { argName :: String, argHelp :: [String] } -> Argument r a
-  OptArg :: r ~ Optional => { argName :: String, argHelp :: [String], argDefault :: a } -> Argument r a
 
+-- | Specifies an meta information of an argument.
+-- An argument contains meta information - name, domain and description - for displaying and parsing.
+-- An optional argument additionally requires a default value.
+data Argument :: ArgFlag -> * -> * where
+  ReqArg :: r ~ Required => 
+    { argName :: String, argDomain :: String, argHelp :: [String] } -> Argument r a
+  OptArg :: r ~ Optional => 
+    { argName :: String, argDomain :: String, argHelp :: [String], argDefault :: a } -> Argument r a
+
+-- | Associates the types to a list of arguments.
 type family ArgsType a where
   ArgsType (Argument r a ': as) = a ': ArgsType as
   ArgsType '[]                  = '[]
 
+-- | A 'Strategy' or a 'Processor' is wrapped into a declaration 
 data Declaration :: * -> * where
-  Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)) =>
-          String -> [String] -> f -> HList args -> Declaration (args :-> Ret (ArgsType args) f)
+  Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f))
+    => String                                       -- The name of the declaration.
+    -> [String]                                     -- A description of the declaration.
+    -> f                                            -- A uncurried version of the Strategy or Processor.
+    -> HList args                                   -- A list of arguments.
+    -> Declaration (args :-> Ret (ArgsType args) f)
 
-class WithName a where  withName :: a -> String -> a
-class WithHelp a where  withHelp :: a -> [String] -> a
-
-class PA prob ats where
+-- | Specifies the construction of a argument parser.
+class ParsableArgs prob ats where
   mkOptParsers :: HList ats -> [SParser prob (String,Dynamic)]
   mkArgParser  :: HList ats -> [(String, Dynamic)] -> SParser prob (HList (ArgsType ats))
 
+-- | Collects the meta information of a list of arguments.
+class ArgsInfo as where
+  argsInfo :: 
+    HList as ->                                -- A heterogenous list of arguments.
+    [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
+
+-- | Existential type for declarations specifying a Strategy.
 data StrategyDeclaration prob where
-  SD :: (PA prob args) => Declaration (args :-> Strategy prob) -> StrategyDeclaration prob
+  SD :: (ParsableArgs prob args, ArgsInfo args) => Declaration (args :-> Strategy prob) -> StrategyDeclaration prob
+
 
 -- Parsing -----------------------------------------------------------------------------------------------------------
 
@@ -192,4 +217,28 @@ type SParser prob = CharParser (SPState prob)
 
 class SParsable prob a where
   parseS :: SParser prob a
+
+-- | Specified Tokenparser.
+strategyTP :: PT.TokenParser st
+strategyTP = PT.makeTokenParser style
+  where
+    style = PL.emptyDef
+      { PT.commentStart   = "{-"
+      , PT.commentEnd     = "-}"
+      , PT.commentLine    = "--"
+      , PT.nestedComments = True
+      , PT.identStart     = letter
+      , PT.identLetter    = alphaNum <|> oneOf "_'"
+      , PT.reservedOpNames= ["try", "force"]
+      , PT.reservedNames  = [">>>", ">||", "<>", "<||>" ]
+      , PT.caseSensitive  = True }
+
+
+-- Modifyers ---------------------------------------------------------------------------------------------------------
+
+-- | Update of meta information.
+class WithName a where  withName :: a -> String -> a
+
+-- | Update of meta information.
+class WithHelp a where  withHelp :: a -> [String] -> a
 

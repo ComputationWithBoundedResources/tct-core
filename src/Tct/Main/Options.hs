@@ -32,7 +32,7 @@ Option @'Parser' a@ can be lifted to @'Parser' ('Maybe' a)@ using
   * If an option @'Parser' ('Maybe' a)@ is constructed using @'withDefault' val@ then the option returns @'Just' val@ if
     no other value is provided.
 -}
-module Tct.Common.Options
+module Tct.Main.Options
   (
   Options
   -- * Builder

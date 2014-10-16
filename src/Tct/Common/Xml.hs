@@ -14,9 +14,9 @@ module Tct.Common.Xml
   )where
 
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text as Txt
-import qualified Text.XML.Generator as Xml
-import Text.XML.Generator ((<#>))
+import qualified Data.Text            as Txt
+import           Text.XML.Generator   ((<#>))
+import qualified Text.XML.Generator   as Xml
 
 
 type XmlContent = Xml.Xml Xml.Elem

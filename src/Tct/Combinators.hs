@@ -39,13 +39,13 @@ module Tct.Combinators
 import Data.Data (Typeable)
 
 import Tct.Core
-import Tct.Processors.Timeout (timeoutRemaining, timeoutSD)
-import Tct.Processors.Failing (failingSD)
+import Tct.Processors.Timeout (timeoutRemaining, timeoutDeclaration)
+import Tct.Processors.Failing (failingDeclaration)
 
 declarations :: (ProofData prob, Typeable prob)  => [StrategyDeclaration prob]
 declarations = 
-  [ failingSD
-  , timeoutSD
+  [ SD failingDeclaration
+  , SD timeoutDeclaration
   ]
 
 
