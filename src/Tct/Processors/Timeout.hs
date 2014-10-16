@@ -63,7 +63,7 @@ instance ProofData prob => Processor (TimeoutProcessor prob) where
     running <- runningTime `fmap` askStatus prob
     let
       toNat n = case n of
-        Just i | i >= 0 -> Just (1000000*i)
+        Just i | i >= 0 -> Just i
         _               -> Nothing
       to = case (toNat $ inT proc, toNat $ untilT proc) of
         (Nothing, Just u ) -> max 0 (u - running)
