@@ -39,7 +39,7 @@ module Tct.Core.Combinators
 import Data.Data                  (Typeable)
 
 import Tct.Core.Data
-import Tct.Core.Processor.Failing (failingDeclaration)
+import Tct.Core.Processor.Trivial (failingDeclaration)
 import Tct.Core.Processor.Timeout (timeoutDeclaration, timeoutRemaining)
 
 declarations :: (ProofData prob, Typeable prob)  => [StrategyDeclaration prob]

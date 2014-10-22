@@ -27,6 +27,7 @@ module Tct.Core.Data.Declaration
   , Nat 
   , nat
   , bool
+  , string
   , strat
   ) where
 
@@ -108,9 +109,12 @@ nat = arg { argName = "nat", argDomain = "<nat>" }
 bool :: Argument Required Bool
 bool = arg { argName = "bool", argDomain = "<bool>" }
 
+string :: Argument Required String
+string = arg { argName = "string", argDomain = "<String>" }
+
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Argument Required (Strategy prob)
-strat = arg { argName = "strategy", argDomain = "<strategy>" }
+strat = arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
 
 instance WithName (Argument r a) where withName ar n = ar { argName = n}
 instance WithHelp (Argument r a) where withHelp ar n = ar { argHelp = n}

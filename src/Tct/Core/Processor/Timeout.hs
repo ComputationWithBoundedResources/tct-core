@@ -14,7 +14,7 @@ import           Data.Maybe                      (fromMaybe)
 
 import qualified Tct.Core.Common.Pretty          as PP
 import           Tct.Core.Data
-import           Tct.Core.Processor.Failing
+import           Tct.Core.Processor.Trivial
 
 
 instance Show p => Show (TimeoutProcessor p) where

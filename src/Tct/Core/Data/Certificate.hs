@@ -7,10 +7,6 @@ module Tct.Core.Data.Certificate
   , linear
 
   -- * Semiring/Composition
-  , zero
-  , add
-  , one
-  , mult
   -- , compose
   -- , iter
 
@@ -78,12 +74,12 @@ instance Additive Complexity where
   zero = Poly (Just 0)
 
 instance Multiplicative Complexity where
-  (Poly (Just n)) `mult` (Poly (Just m)) = Poly $ Just $ n + m
-  (Poly Nothing)  `mult` (Poly _)        = Poly Nothing
-  (Poly _)        `mult` (Poly Nothing)  = Poly Nothing
-  (Exp (Just n))  `mult` (Exp (Just m))  = Exp $ Just $ max n m
-  (Exp Nothing)   `mult` (Exp _)         = Exp Nothing
-  a               `mult` b               = max a b
+  (Poly (Just n)) `mul` (Poly (Just m)) = Poly $ Just $ n + m
+  (Poly Nothing)  `mul` (Poly _)        = Poly Nothing
+  (Poly _)        `mul` (Poly Nothing)  = Poly Nothing
+  (Exp (Just n))  `mul` (Exp (Just m))  = Exp $ Just $ max n m
+  (Exp Nothing)   `mul` (Exp _)         = Exp Nothing
+  a               `mul` b               = max a b
   one = Poly (Just 0)
 
 {-
@@ -133,6 +129,22 @@ data Certificate = Certificate
   , timeUB  :: Complexity
   , timeLB  :: Complexity
   } deriving Show
+
+instance Additive Certificate where
+  add c1 c2 = Certificate
+    { spaceUB = spaceUB c1 `add` spaceUB c2
+    , spaceLB = spaceLB c1 `add` spaceLB c2
+    , timeUB = timeUB c1 `add` timeUB c2
+    , timeLB = timeLB c1 `add` timeLB c2 }
+  zero = Certificate zero zero zero zero
+
+instance Multiplicative Certificate where
+  mul c1 c2 = Certificate
+    { spaceUB = spaceUB c1 `mul` spaceUB c2
+    , spaceLB = spaceLB c1 `mul` spaceLB c2
+    , timeUB = timeUB c1 `mul` timeUB c2
+    , timeLB = timeLB c1 `mul` timeLB c2 }
+  one = Certificate zero zero zero zero
 
 -- | Defines the identity 'Certificate'. Sets all components to 'Unknown'.
 unbounded :: Certificate
