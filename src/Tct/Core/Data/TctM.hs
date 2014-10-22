@@ -1,6 +1,6 @@
 {-# OPTIONS_HADDOCK not-home, hide #-}
 -- | This module provides the Tct monad.
-module Tct.Core.TctM
+module Tct.Core.Data.TctM
   (
   -- * Tct Monad
   TctM (..)
@@ -11,7 +11,7 @@ module Tct.Core.TctM
   -- * Lifted IO functions
   , async
   , wait
-  , timeit
+  , timed
   , raceWith
   , concurrently
   ) where
@@ -24,7 +24,8 @@ import           Control.Monad            (liftM)
 import           Control.Monad.Reader     (ask, liftIO, local, runReaderT)
 import qualified System.Time              as Time
 
-import           Tct.Core.Types
+import           Tct.Core.Data.Types
+
 
 askState :: TctM TctROState
 askState = ask
@@ -88,7 +89,7 @@ raceWithIO p1 p2 m1 m2 =
         | p2 r2     -> Async.wait a1 >>= \r1 -> return (if not (p2 r2) then r2 else r1)
         | otherwise -> Async.wait a1
 
--- | @'timeit' seconds m@ wraps the Tct action in timeout, and locally sets 'stopTime'.
+-- | @'timed' seconds m@ wraps the Tct action in timeout, and locally sets 'stopTime'.
 -- When @seconds@
 --
 --  * is negative, no timeout is set;
@@ -96,8 +97,8 @@ raceWithIO p1 p2 m1 m2 =
 --  * is positive the computation runs at most @i@ seconds.
 --
 -- Returns 'Nothing' if @m@ does not end before the timeout.
-timeit :: Int -> TctM a -> TctM (Maybe a)
-timeit n m
+timed :: Int -> TctM a -> TctM (Maybe a)
+timed n m
   | n < 0  = Just `liftM` m
   | n == 0 = return Nothing
   | otherwise = do

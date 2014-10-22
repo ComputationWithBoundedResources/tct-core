@@ -1,6 +1,6 @@
 -- | This module provides the 'Processor' type.
 -- 'Processor' instances define transformations from problems to a (possible empty) set of subproblems.
-module Tct.Core.Processor 
+module Tct.Core.Data.Processor 
   ( 
     Result (..)
   , Processor (..)
@@ -17,9 +17,11 @@ module Tct.Core.Processor
   , ErroneousProof (..)
   ) where
 
-import           Tct.Core.Types
-import qualified Tct.Common.Pretty as PP
-import qualified Tct.Core.Declaration as Decl
+
+import qualified Tct.Core.Common.Pretty    as PP
+import qualified Tct.Core.Data.Declaration as Decl
+import           Tct.Core.Data.Types
+
 
 -- Processor ---------------------------------------------------------------------------------------------------------
 

@@ -1,21 +1,22 @@
 -- | 
 
-module Tct.Core.Declaration.Parse 
+module Tct.Core.Data.Declaration.Parse 
   (
   SParsable
   , ParsableArgs
   , strategyFromString
   ) where
 
-import qualified Text.Parsec.Expr as PE
-import           Data.Dynamic (toDyn, fromDynamic)
-import           Data.Maybe (fromMaybe)
-import           Data.Data (Typeable)
-import           Control.Applicative ((<$>))
-import qualified Tct.Core.Declaration as D
-import qualified Tct.Core.Strategy as S
-import           Tct.Core.Types
-import Tct.Common.Parser
+
+import           Control.Applicative       ((<$>))
+import           Data.Data                 (Typeable)
+import           Data.Dynamic              (fromDynamic, toDyn)
+import           Data.Maybe                (fromMaybe)
+import           Tct.Core.Common.Parser
+import qualified Tct.Core.Data.Declaration as D
+import qualified Tct.Core.Data.Strategy    as S
+import           Tct.Core.Data.Types
+import qualified Text.Parsec.Expr          as PE
 
 
 curried :: f ~ Uncurry (args :-> Ret args f) => f -> HList args -> Ret args f

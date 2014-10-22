@@ -1,12 +1,13 @@
-module Tct.Main.Mode
-  ( 
+module Tct.Core.Main.Mode
+  (
   TctMode (..)
   ) where
 
 
-import Tct.Core
-import Tct.Common.Error
-import Tct.Main.Options
+import Tct.Core.Common.Error
+import Tct.Core.Data
+import Tct.Core.Main.Options
+
 
 -- | 'TctMode' provides all infromation necesary to construct a Tct instance customised for a problem type.
 data TctMode prob opt = TctMode

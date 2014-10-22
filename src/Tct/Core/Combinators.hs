@@ -1,5 +1,5 @@
 -- | This module provides common 'Strategy' and 'Processor' combinators.
-module Tct.Combinators
+module Tct.Core.Combinators
   (
   -- * Strategy Combinators
   -- | We define left-associative infix versions of 'Strategy' constructors.
@@ -36,14 +36,14 @@ module Tct.Combinators
   ) where
 
 
-import Data.Data (Typeable)
+import Data.Data                  (Typeable)
 
-import Tct.Core
-import Tct.Processors.Timeout (timeoutRemaining, timeoutDeclaration)
-import Tct.Processors.Failing (failingDeclaration)
+import Tct.Core.Data
+import Tct.Core.Processor.Failing (failingDeclaration)
+import Tct.Core.Processor.Timeout (timeoutDeclaration, timeoutRemaining)
 
 declarations :: (ProofData prob, Typeable prob)  => [StrategyDeclaration prob]
-declarations = 
+declarations =
   [ SD failingDeclaration
   , SD timeoutDeclaration
   ]
@@ -110,7 +110,7 @@ infixl 6 <>, <||>
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) 
+(<?>) :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering)
          -> Strategy prob -> Strategy prob -> Strategy prob
 (<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
   where  to = timeoutRemaining

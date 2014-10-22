@@ -1,5 +1,5 @@
 -- | This module provides functions for generating XML content.
-module Tct.Common.Xml
+module Tct.Core.Common.Xml
   (
   Xml (..)
   , XmlContent

@@ -28,28 +28,28 @@ Build-type: Simple
 
 Library
   exposed-modules:
-    Tct
-    Tct.Combinators
-    Tct.Common.Error
-    Tct.Common.Parser
-    Tct.Common.Pretty
-    Tct.Common.SemiRing
-    Tct.Common.Xml
     Tct.Core
-    Tct.Core.Certificate
-    Tct.Core.Declaration
-    Tct.Core.Declaration.Parse
-    Tct.Core.Forks
-    Tct.Core.Processor
-    Tct.Core.ProofTree
-    Tct.Core.Strategy
-    Tct.Core.TctM
-    Tct.Core.Types
-    Tct.Main
-    Tct.Main.Mode
-    Tct.Main.Options
-    Tct.Processors.Failing
-    Tct.Processors.Timeout
+    Tct.Core.Combinators
+    Tct.Core.Common.Error
+    Tct.Core.Common.Parser
+    Tct.Core.Common.Pretty
+    Tct.Core.Common.SemiRing
+    Tct.Core.Common.Xml
+    Tct.Core.Data
+    Tct.Core.Data.Certificate
+    Tct.Core.Data.Declaration
+    Tct.Core.Data.Declaration.Parse
+    Tct.Core.Data.Forks
+    Tct.Core.Data.Processor
+    Tct.Core.Data.ProofTree
+    Tct.Core.Data.Strategy
+    Tct.Core.Data.TctM
+    Tct.Core.Data.Types
+    Tct.Core.Main
+    Tct.Core.Main.Mode
+    Tct.Core.Main.Options
+    Tct.Core.Processor.Failing
+    Tct.Core.Processor.Timeout
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,
     async                == 2.*,

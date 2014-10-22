@@ -2,7 +2,7 @@
 --   (<http://hackage.haskell.org/package/mtl>)
 --   and provides types for custom error handling.
 {-# LANGUAGE ScopedTypeVariables #-}
-module Tct.Common.Error
+module Tct.Core.Common.Error
   (
   module Control.Monad.Error
   , TctError (..)

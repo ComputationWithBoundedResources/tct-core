@@ -1,5 +1,5 @@
 -- | This module provides the 'Complexity' and 'Certificate' type.
-module Tct.Core.Certificate
+module Tct.Core.Data.Certificate
   (
   -- * Complexity Functions
   Complexity (..)
@@ -30,8 +30,8 @@ module Tct.Core.Certificate
   ) where
 
 
-import Tct.Common.Pretty
-import Tct.Common.SemiRing
+import Tct.Core.Common.Pretty
+import Tct.Core.Common.SemiRing
 
 
 data Complexity

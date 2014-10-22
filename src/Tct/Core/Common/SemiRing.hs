@@ -1,5 +1,5 @@
 -- | This module provides the abstract 'SemiRing' and 'Ring' type.
-module Tct.Common.SemiRing
+module Tct.Core.Common.SemiRing
   (
   Additive (..)
   , Multiplicative (..)

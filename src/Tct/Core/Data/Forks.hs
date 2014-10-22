@@ -1,6 +1,6 @@
 -- | This module provides the 'Fork' type and several fork instances.
 -- A fork instance defines the branching of a node in the 'Tct.Core.ProofTree'.
-module Tct.Core.Forks
+module Tct.Core.Data.Forks
   (
   -- * Fork Instances
     Judgement (..)

@@ -1,6 +1,6 @@
 -- | This module re-export "Text.Parsec" (<http://hackage.haskell.org/package/parsec>)
 --   and provides common parser tokens.
-module Tct.Common.Parser
+module Tct.Core.Common.Parser
   (
   module Text.Parsec
   -- * Basic Parsers
@@ -25,7 +25,7 @@ import           Text.Parsec
 import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
 
-import           Tct.Core.Types                (strategyTP)
+import           Tct.Core.Data.Types           (strategyTP)
 
 
 lexeme :: CharParser s a -> CharParser s a

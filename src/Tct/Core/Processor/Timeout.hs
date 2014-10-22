@@ -1,4 +1,4 @@
-module Tct.Processors.Timeout 
+module Tct.Core.Processor.Timeout 
   ( 
   -- * Declaration
   timeoutDeclaration
@@ -9,12 +9,12 @@ module Tct.Processors.Timeout
   , timeoutRemaining
   ) where
 
-import Data.Maybe (fromMaybe)
 
-import qualified Tct.Common.Pretty as PP
-import Tct.Core
-import Tct.Core.Declaration.Parse ()
-import Tct.Processors.Failing
+import           Data.Maybe                      (fromMaybe)
+
+import qualified Tct.Core.Common.Pretty          as PP
+import           Tct.Core.Data
+import           Tct.Core.Processor.Failing
 
 
 instance Show p => Show (TimeoutProcessor p) where
@@ -71,7 +71,7 @@ instance ProofData prob => Processor (TimeoutProcessor prob) where
         (Just i , Just u ) -> min i (max 0 (u - running))
         _                  -> -1
     remains <- (fromMaybe to . toNat . remainingTime) `fmap` askStatus prob
-    mr <- timeit (min to remains) (evaluate (stratT proc) prob)
+    mr <- timed (min to remains) (evaluate (stratT proc) prob)
     return $ case mr of
       Nothing -> resultToTree proc prob (Fail (Timeout to))
       Just r  -> r

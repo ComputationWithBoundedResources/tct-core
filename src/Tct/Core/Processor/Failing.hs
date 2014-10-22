@@ -1,6 +1,6 @@
 -- | This module implements the 'FailProcessor'.
 -- This processor always fails.
-module Tct.Processors.Failing
+module Tct.Core.Processor.Failing
   ( 
   -- * StrategyDeclaration
   failingDeclaration
@@ -9,9 +9,9 @@ module Tct.Processors.Failing
   ) where
 
 
-import qualified Tct.Common.Pretty as PP
-import Tct.Core
-import Tct.Core.Declaration.Parse as P ()
+import qualified Tct.Core.Common.Pretty          as PP
+import           Tct.Core.Data
+import           Tct.Core.Data.Declaration.Parse as P ()
 
 
 data FailProof = FailProof deriving Show

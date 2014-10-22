@@ -1,5 +1,5 @@
 -- | This module provides the 'Strategy' type.
-module Tct.Core.Strategy
+module Tct.Core.Data.Strategy
   (
   Strategy (..)
   , Return (..)
@@ -14,15 +14,15 @@ module Tct.Core.Strategy
   ) where
 
 
-import           Control.Monad.Error (catchError)
-import           Data.Foldable       as F
-import           Data.Traversable    as T
+import           Control.Monad.Error     (catchError)
+import           Data.Foldable           as F
+import           Data.Traversable        as T
 
-import qualified Tct.Common.Pretty   as PP
-import           Tct.Core.Types
-import           Tct.Core.Processor 
-import           Tct.Core.ProofTree 
-import           Tct.Core.TctM
+import qualified Tct.Core.Common.Pretty  as PP
+import           Tct.Core.Data.Processor
+import           Tct.Core.Data.ProofTree
+import           Tct.Core.Data.TctM
+import           Tct.Core.Data.Types
 --import qualified Tct.Xml as Xml
 
 

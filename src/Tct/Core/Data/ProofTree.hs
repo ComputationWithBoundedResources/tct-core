@@ -1,6 +1,6 @@
 -- | This module provides the 'ProofTree' type.
 -- 'ProofTree' stores the open problems and the proofs of applying 'Processor' instances to problems.
-module Tct.Core.ProofTree
+module Tct.Core.Data.ProofTree
   (
   -- * ProofTree
   ProofNode (..)
@@ -16,13 +16,13 @@ module Tct.Core.ProofTree
   ) where
 
 
-import           Control.Applicative  as A ((<$>))
-import           Data.Foldable        as F (Foldable, foldMap, foldr, toList)
-import           Data.Traversable     as T (Traversable, traverse)
+import           Control.Applicative       as A ((<$>))
+import           Data.Foldable             as F (Foldable, foldMap, foldr, toList)
+import           Data.Traversable          as T (Traversable, traverse)
 
-import qualified Tct.Common.Pretty    as PP
-import           Tct.Core.Certificate (Certificate, unbounded)
-import           Tct.Core.Types
+import qualified Tct.Core.Common.Pretty    as PP
+import           Tct.Core.Data.Certificate (Certificate, unbounded)
+import           Tct.Core.Data.Types
 
 
 -- | Computes the 'Certificate' of 'ProofTree'.

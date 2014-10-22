@@ -1,6 +1,6 @@
 {-# OPTIONS_HADDOCK not-home #-}
 -- | This module defines the most important types.
-module Tct.Core.Types where
+module Tct.Core.Data.Types where
 
 
 import           Control.Applicative           (Applicative)
@@ -15,9 +15,9 @@ import qualified Text.Parsec.Language          as PL
 import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
 
-import qualified Tct.Common.Pretty             as PP
-import qualified Tct.Core.Certificate          as C
-import           Tct.Core.Forks                (Id (..))
+import qualified Tct.Core.Common.Pretty        as PP
+import qualified Tct.Core.Data.Certificate     as C
+import           Tct.Core.Data.Forks           (Id (..))
 
 
 -- TcT Monad ---------------------------------------------------------------------------------------------------------

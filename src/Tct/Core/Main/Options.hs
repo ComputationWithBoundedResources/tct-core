@@ -32,7 +32,7 @@ Option @'Parser' a@ can be lifted to @'Parser' ('Maybe' a)@ using
   * If an option @'Parser' ('Maybe' a)@ is constructed using @'withDefault' val@ then the option returns @'Just' val@ if
     no other value is provided.
 -}
-module Tct.Main.Options
+module Tct.Core.Main.Options
   (
   Options
   -- * Builder
@@ -56,7 +56,7 @@ import           Data.Monoid                          ((<>))
 import qualified Options.Applicative                  as O
 import qualified Options.Applicative.Builder.Internal as O
 
-import           Tct.Common.Pretty                    (Doc)
+import           Tct.Core.Common.Pretty               (Doc)
 
 -- | Type synonym for 'Options.Applicative.Type.Parser'.
 type Options a = O.Parser a

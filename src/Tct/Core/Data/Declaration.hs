@@ -2,7 +2,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 -- | 
 
-module Tct.Core.Declaration
+module Tct.Core.Data.Declaration
   ( 
   declName
   , declHelp
@@ -31,8 +31,9 @@ module Tct.Core.Declaration
   ) where
 
 
-import           Tct.Core.Types
-import qualified Tct.Common.Pretty as PP
+import           Tct.Core.Data.Types
+import qualified Tct.Core.Common.Pretty as PP
+
 
 instance WithName (Declaration c) where withName (Decl _ h f as) n' = Decl n' h f as
 instance WithHelp (Declaration c) where withHelp (Decl n _ f as) h' = Decl n h' f as
