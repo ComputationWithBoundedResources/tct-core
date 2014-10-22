@@ -45,43 +45,48 @@ instance ProofData prob => Processor (TimeoutProcessor prob) where
     '[ Argument 'Optional (Maybe Nat)
      , Argument 'Required (Maybe Nat)
      , Argument 'Required (Strategy prob) ]
+
   declaration _ = declareProcessor 
     "timeout" 
-    [ "timeout m n s runs ..."  ]
+    [ "Wrappes the computation in a timeout."  ]
     ( (some nat `optional` Nothing)
       `withName` "until"
-      `withHelp` ["Aborts the computation "]
+      `withHelp` ["Aborts the computation after until <nat> seconds, wrt. the starting time. "]
     , some nat
       `withName` "in"
-      `withHelp` ["The timeout in seconds."]
-    , strat 
-      `withName` "strategy"
-      `withHelp` ["The strategy to apply with timeout."]) 
+      `withHelp` ["Aborts the comutation in <nat> seconds."]
+    , strat )
     $ \n m s -> Proc (TimeoutProc n m s)
 
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
     let
-      toNat n = case n of
-        Just i | i >= 0 -> Just i
-        _               -> Nothing
-      to = case (toNat $ inT proc, toNat $ untilT proc) of
+      to = case (toNat (inT proc), toNat (untilT proc)) of
         (Nothing, Just u ) -> max 0 (u - running)
         (Just i , Nothing) -> i
         (Just i , Just u ) -> min i (max 0 (u - running))
         _                  -> -1
     remains <- (fromMaybe to . toNat . remainingTime) `fmap` askStatus prob
-    mr <- timed (min to remains) (evaluate (stratT proc) prob)
+    mr <- timed (min to (cutoff remains delta)) (evaluate (stratT proc) prob)
     return $ case mr of
       Nothing -> resultToTree proc prob (Fail (Timeout to))
       Just r  -> r
-
+    where
+      toNat n = case n of
+        Just i | i >= 0 -> Just i
+        _               -> Nothing
+      cutoff a b = min 0 (a -b)
+      delta = 1 :: Int 
 
 -- Standard timeout processor
 timeoutProcessor :: ProofData prob => TimeoutProcessor prob
 timeoutProcessor = TimeoutProc Nothing Nothing failing
 
 -- | TimoutProcessor declaration.
+-- 
+--   * Each application of the timeout processor, sets 'remainingTime' for the sub-computation.
+--   * A timeout is maximal 'remainingTime'.
+--   * Nothing is treated as no timeout.
 timeoutDeclaration :: ProofData prob => Declaration(
   '[ Argument 'Optional (Maybe Nat)
    , Argument 'Required (Maybe Nat)
@@ -92,22 +97,26 @@ timeoutDeclaration = declaration $ timeoutProcessor
 
 -- Strategies --------------------------------------------------------------------------------------------------------
 
--- | prop> timeout m n s = timeoutUntil m (timoutIn n s) = timeoutIn n (timeoutUntil m s)
+-- | prop> timeout m n st = timeoutUntil m (timoutIn n st) = timeoutIn n (timeoutUntil m st)
 timeout :: ProofData prob => Int -> Int -> Strategy prob -> Strategy prob
 timeout n m = Proc . TimeoutProc (Just n) (Just m)
 
--- | @'timoutIn' i p@ aborts the application of @p@ after @min i 'remainingTime'@ seconds;
--- If @i@ is negative the processor may run forever.
+-- | @'timoutIn' i st@ aborts the application of @st@ after @min i 'remainingTime'@ seconds;
+--
+-- prop> i < 0 => timeoutIn i = timeout Nothing Nothing
 timeoutIn :: ProofData prob => Int -> Strategy prob -> Strategy prob
 timeoutIn n = Proc . TimeoutProc Nothing (Just n)
 
--- | @'timeoutUntil' i p@ aborts the application of @p@ until i seconds wrt.
+-- | @'timeoutUntil' i st@ aborts the application of @st@ after i seconds wrt.
 -- to the starting time, or if 'remainingTime' is expired.
--- If @i@ is negative the processor may run forever.
+--
+-- prop> i < 0 => timeoutUntil i = timeout Nothing Nothing
 timeoutUntil :: ProofData prob => Int -> Strategy prob -> Strategy prob
 timeoutUntil n = Proc . TimeoutProc (Just n) Nothing
 
 -- | @'timeoutRemaining' i p@ sets the timeout to the 'remainingtime'.
+--
+-- prop> timeoutRemaining = timeout Nothing Nothing
 timeoutRemaining :: ProofData prob => Strategy prob -> Strategy prob
 timeoutRemaining = Proc . TimeoutProc Nothing Nothing
 
