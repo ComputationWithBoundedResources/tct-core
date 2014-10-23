@@ -1,8 +1,9 @@
 module Tct.Core.Processor.Timeout 
   ( 
-  -- * Declaration
+  -- * Timeout
+  -- ** Declaration
   timeoutDeclaration
-  -- * Strategies
+  -- ** Strategies
   , timeout
   , timeoutIn
   , timeoutUntil

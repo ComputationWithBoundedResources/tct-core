@@ -36,13 +36,11 @@ module Tct.Core.Combinators
   ) where
 
 
-import Data.Data                  (Typeable)
-
 import Tct.Core.Data
 import Tct.Core.Processor.Trivial (failingDeclaration)
 import Tct.Core.Processor.Timeout (timeoutDeclaration, timeoutRemaining)
 
-declarations :: (ProofData prob, Typeable prob)  => [StrategyDeclaration prob]
+declarations :: ProofData prob  => [StrategyDeclaration prob]
 declarations =
   [ SD failingDeclaration
   , SD timeoutDeclaration

@@ -18,7 +18,6 @@ import           Control.Applicative        ((<$>), (<*>))
 import           Control.Monad.Reader       (runReaderT)
 import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid                (mconcat)
-import           Data.Typeable              (Typeable)
 import qualified Options.Applicative        as O
 import           System.Directory           (getHomeDirectory)
 import           System.Exit                (exitFailure, exitSuccess)
@@ -75,7 +74,7 @@ readOutputMode s
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
 
 -- | The default Tct configuration. A good starting point for custom configurations.
-defaultTctConfig :: (ProofData prob, Typeable prob) => TctConfig prob
+defaultTctConfig :: ProofData prob => TctConfig prob
 defaultTctConfig = TctConfig
   { outputMode = OnlyAnswer
   , strategies = declarations }
@@ -104,7 +103,7 @@ apply c m = tctl $ Right (c,m)
 -- | Construct a customised Tct with default configuration.
 --
 -- > applyMode m = apply defaultTctConfig m
-applyMode :: (ProofData prob, Typeable prob) => TctMode prob opt -> IO ()
+applyMode :: ProofData prob => TctMode prob opt -> IO ()
 applyMode = apply defaultTctConfig
 
 
