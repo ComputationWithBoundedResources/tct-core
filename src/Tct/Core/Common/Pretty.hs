@@ -6,6 +6,7 @@ module Tct.Core.Common.Pretty
   module Text.PrettyPrint.ANSI.Leijen
   , Align (..)
   , table
+  , itemise
   , paragraph
   , display
   ) where
@@ -45,6 +46,10 @@ table cols = vcat [ pprow row | row <- rows]
             r    = diff - l
         ws n = replicate n ' '
 
+-- | Provides a itemise environment. @itemise d ds@ enumerates @ds@ with bullet @d@.
+itemise :: Doc -> [Doc] -> Doc
+itemise d ds = indent 2 $ vcat (map (d <+>) ds)
+
 -- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc
 paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
@@ -52,4 +57,3 @@ paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
 -- | Default 'Doc' rendering.
 display :: Doc -> String
 display d = displayS (renderPretty 0.9 1000 d) ""
-
