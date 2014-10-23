@@ -44,6 +44,7 @@ module Tct.Core.Main.Options
   , withMetavar
   -- * Option Types
   , option
+  , unit
   , switch
   , flag
   , argument
@@ -88,6 +89,10 @@ opt `withMetavar` str = opt <> O.metavar str
 -- | Constructs and Option given the empty option together with its modifiers.
 option :: Read a => O.Mod O.OptionFields a -> O.Parser a
 option = O.option
+
+-- | Constructs a hidden unit option. This option is ignored during parsing.
+unit :: O.Parser ()
+unit = O.option $ O.idm `withDefault` () <> O.internal <> O.hidden
 
 -- | A Flag option..
 flag :: a -> a -> O.Mod O.FlagFields a -> O.Parser a
