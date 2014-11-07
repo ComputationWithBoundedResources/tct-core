@@ -20,6 +20,7 @@ module Tct.Core
   , apply
   , applyMode
   -- * Strategy Declaration
+  , ProofData
   , Strategy
   -- ** Argument
   , Argument

@@ -15,6 +15,7 @@ import           Data.Maybe                      (fromMaybe)
 
 import qualified Tct.Core.Common.Pretty          as PP
 import           Tct.Core.Data
+import           Tct.Core.Common.Error (liftIO)
 import           Tct.Core.Processor.Trivial
 
 
@@ -68,7 +69,8 @@ instance ProofData prob => Processor (TimeoutProcessor prob) where
         (Just i , Just u ) -> min i (max 0 (u - running))
         _                  -> -1
     remains <- (fromMaybe to . toNat . remainingTime) `fmap` askStatus prob
-    mr <- timed (min to (cutoff remains delta)) (evaluate (stratT proc) prob)
+    let actual = min to (cutoff remains delta)
+    mr <- timed  actual (evaluate (stratT proc) prob)
     return $ case mr of
       Nothing -> resultToTree proc prob (Fail (Timeout to))
       Just r  -> r
@@ -76,7 +78,7 @@ instance ProofData prob => Processor (TimeoutProcessor prob) where
       toNat n = case n of
         Just i | i >= 0 -> Just i
         _               -> Nothing
-      cutoff a b = min 0 (a -b)
+      cutoff a b = max 0 (a -b)
       delta = 1 :: Int 
 
 -- Standard timeout processor
