@@ -15,7 +15,6 @@ import           Data.Maybe                      (fromMaybe)
 
 import qualified Tct.Core.Common.Pretty          as PP
 import           Tct.Core.Data
-import           Tct.Core.Common.Error (liftIO)
 import           Tct.Core.Processor.Trivial
 
 

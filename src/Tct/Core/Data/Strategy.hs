@@ -9,7 +9,7 @@ module Tct.Core.Data.Strategy
   , StrategyDeclaration (..)
   , strategy
   -- * Answer
-  , Answer (..)
+  , SomeAnswer (..)
   , answer
   ) where
 
@@ -151,6 +151,6 @@ strategy ::
 strategy n as f = Decl n [] f (toHList as)
 
 -- | prop> anwer = Answer
-answer :: ProofData a => a -> Answer
-answer = Answer
+answer :: ProofData a => a -> SomeAnswer
+answer = SomeAnswer
 

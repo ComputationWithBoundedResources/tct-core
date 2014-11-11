@@ -115,10 +115,10 @@ data Return l
 
 -- Answer ------------------------------------------------------------------------------------------------------------
 
--- | The Answer type.
-data Answer               where Answer :: ProofData a => a -> Answer
-instance Show Answer      where show (Answer a) = show a
-instance PP.Pretty Answer where pretty (Answer a) = PP.pretty a
+-- | A generic answer type.
+data SomeAnswer                 where SomeAnswer :: ProofData a => a -> SomeAnswer
+instance Show (SomeAnswer)      where show (SomeAnswer a) = show a
+instance PP.Pretty (SomeAnswer) where pretty (SomeAnswer a) = PP.pretty a
 
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------
