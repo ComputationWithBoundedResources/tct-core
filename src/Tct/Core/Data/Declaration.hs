@@ -55,7 +55,6 @@ declFun (Decl _ _ f  _) = f
 declArgs :: Declaration (args :-> r) -> HList args
 declArgs (Decl _ _ _ as) = as
 
-
 -- | Specifies the default function of a 'Declaration'.
 type family DefaultFun c where
   DefaultFun ('[] :-> r) = r

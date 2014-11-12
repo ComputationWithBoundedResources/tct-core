@@ -2,9 +2,9 @@ module Tct.Core.Processor.Timeout
   ( 
   -- * Timeout
   -- ** Declaration
-  timeoutDeclaration
+  timeout
+  , timeoutDeclaration
   -- ** Strategies
-  , timeout
   , timeoutIn
   , timeoutUntil
   , timeoutRemaining
@@ -15,7 +15,6 @@ import           Data.Maybe                      (fromMaybe)
 
 import qualified Tct.Core.Common.Pretty          as PP
 import           Tct.Core.Data
-import           Tct.Core.Processor.Trivial
 
 
 instance Show p => Show (TimeoutProcessor p) where
@@ -30,9 +29,6 @@ instance Show TimeoutProof where
 instance PP.Pretty TimeoutProof where
   pretty (Timeout i) = PP.paragraph ("Computation aborted after a timeout of " ++ show i ++ " seconds")
 
-{-instance Processor p => Xml.Xml (TimeoutProof p) where-}
-  {-toXml (Timeout i)     = Xml.elt "timeout" [Xml.int i]-}
-
 -- | Wraps the application of a processor in a timeout.
 data TimeoutProcessor prob = TimeoutProc 
   { untilT :: Maybe Int
@@ -42,22 +38,6 @@ data TimeoutProcessor prob = TimeoutProc
 instance ProofData prob => Processor (TimeoutProcessor prob) where
   type ProofObject (TimeoutProcessor prob)   = TimeoutProof
   type Problem (TimeoutProcessor prob)       = prob
-  type ProcessorArgs (TimeoutProcessor prob) =
-    '[ Argument 'Optional (Maybe Nat)
-     , Argument 'Required (Maybe Nat)
-     , Argument 'Required (Strategy prob) ]
-
-  declaration _ = declareProcessor 
-    "timeout" 
-    [ "Wrappes the computation in a timeout."  ]
-    ( (some nat `optional` Nothing)
-      `withName` "until"
-      `withHelp` ["Aborts the computation after until <nat> seconds, wrt. the starting time. "]
-    , some nat
-      `withName` "in"
-      `withHelp` ["Aborts the comutation in <nat> seconds."]
-    , strat )
-    $ \n m s -> Proc (TimeoutProc n m s)
 
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
@@ -80,9 +60,18 @@ instance ProofData prob => Processor (TimeoutProcessor prob) where
       cutoff a b = max 0 (a -b)
       delta = 1 :: Int 
 
--- Standard timeout processor
-timeoutProcessor :: ProofData prob => TimeoutProcessor prob
-timeoutProcessor = TimeoutProc Nothing Nothing failing
+
+-- | prop> timeout m n st = timeoutUntil m (timoutIn n st) = timeoutIn n (timeoutUntil m st)
+timeout :: ProofData prob => Maybe Int -> Maybe Int -> Strategy prob -> Strategy prob
+timeout n m = Proc . TimeoutProc n m 
+
+timeoutInArg :: Argument 'Required Int
+timeoutInArg = nat `withName` "in" `withHelp` ["Aborts the comutation in <nat> seconds."]
+
+timeoutUntilArg :: Argument 'Required Int
+timeoutUntilArg = nat 
+  `withName` "until" 
+  `withHelp` ["Aborts the comutation after <nat> seconds wrt. the starting time."]
 
 -- | TimoutProcessor declaration.
 -- 
@@ -94,14 +83,12 @@ timeoutDeclaration :: ProofData prob => Declaration(
    , Argument 'Required (Maybe Nat)
    , Argument 'Required (Strategy prob) ]
   :-> Strategy prob)
-timeoutDeclaration = declaration $ timeoutProcessor
-
+timeoutDeclaration = declare "timeout" help args timeout
+  where
+    help = ["Wraps the computation in a timeout."]
+    args = (some timeoutUntilArg `optional` Nothing, some timeoutInArg, strat)
 
 -- Strategies --------------------------------------------------------------------------------------------------------
-
--- | prop> timeout m n st = timeoutUntil m (timoutIn n st) = timeoutIn n (timeoutUntil m st)
-timeout :: ProofData prob => Int -> Int -> Strategy prob -> Strategy prob
-timeout n m = Proc . TimeoutProc (Just n) (Just m)
 
 -- | @'timoutIn' i st@ aborts the application of @st@ after @min i 'remainingTime'@ seconds;
 --

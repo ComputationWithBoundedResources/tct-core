@@ -85,9 +85,6 @@ class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p
   type Problem p       :: *
   type Forking p       :: * -> *
   type Forking p       =  Id
-  type ProcessorArgs p :: [*]
-  type ProcessorArgs p =  '[]
-  declaration          :: p -> Declaration (ProcessorArgs p :-> Strategy (Problem p))
   solve                :: p -> Problem p -> TctM (Return (ProofTree (Problem p)))
 
 
@@ -187,12 +184,12 @@ type family ArgsType a where
 
 -- | A 'Strategy' or a 'Processor' is wrapped into a declaration 
 data Declaration :: * -> * where
-  Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f))
+  Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f), Ret (ArgsType args) f ~ Strategy prob)
     => String                                       -- The name of the declaration.
     -> [String]                                     -- A description of the declaration.
     -> f                                            -- A uncurried version of the Strategy or Processor.
     -> HList args                                   -- A list of arguments.
-    -> Declaration (args :-> Ret (ArgsType args) f)
+    -> Declaration (args :-> Strategy prob)
 
 -- | Specifies the construction of a argument parser.
 class ParsableArgs prob ats where

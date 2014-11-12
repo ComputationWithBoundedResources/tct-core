@@ -8,6 +8,7 @@ module Tct.Core.Data.Strategy
   -- * Declaration
   , StrategyDeclaration (..)
   , strategy
+  , declare
   -- * Answer
   , SomeAnswer (..)
   , answer
@@ -148,7 +149,19 @@ strategy ::
   -> as  -- ^ The arguments as tuples: (), (OneTuple a1), (a1,a2) ...
   -> f  -- ^ The strategy.
   -> Declaration (args :-> Strategy prob)
-strategy n as f = Decl n [] f (toHList as)
+strategy n = declare n [] 
+
+declare :: 
+  ( ToHList as, HListOf as ~ args
+  , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
+  , Ret (ArgsType args) f ~ Strategy prob )
+  => String -- ^ The name of the strategy.
+  -> [String]
+  -> as  -- ^ The arguments as tuples: (), (OneTuple a1), (a1,a2) ...
+  -> f  -- ^ The strategy.
+  -> Declaration (args :-> Strategy prob)
+declare n help as f = Decl n help f (toHList as)
+
 
 -- | prop> anwer = Answer
 answer :: ProofData a => a -> SomeAnswer

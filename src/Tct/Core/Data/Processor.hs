@@ -8,9 +8,6 @@ module Tct.Core.Data.Processor
   , Fork
   , ProofData
   , CertificateFn
-  , processorName
-  , processorHelp
-  , declareProcessor
   , resultToTree
     
   , ErroneousProcessor (..)
@@ -19,32 +16,10 @@ module Tct.Core.Data.Processor
 
 
 import qualified Tct.Core.Common.Pretty    as PP
-import qualified Tct.Core.Data.Declaration as Decl
 import           Tct.Core.Data.Types
 
 
 -- Processor ---------------------------------------------------------------------------------------------------------
-
-processorName :: Processor p => p -> String
-processorName p = Decl.declName (declaration p)
-
-processorHelp :: Processor p => p -> [String]
-processorHelp p = Decl.declHelp (declaration p)
-
-{-declareProcessor ::-}
-  {-(ToHList a, HListOf a ~ ProcessorArgs p-}
-  {-, f ~ Uncurry (ArgsType (ProcessorArgs p) :-> p)-}
-  {-, p ~ Ret (ArgsType (ProcessorArgs p)) f)-}
-  {-=> String -> a -> f -> Declaration ((ProcessorArgs p) :-> Strategy (Problem p))-}
-{-declareProcessor n as p = Decl n [] p (toHList as)-}
-
-
-declareProcessor :: 
-  ( ToHList as, HListOf as ~ args
-  , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
-  , Ret (ArgsType args) f ~ Strategy prob )
-  => String -> [String] -> as -> f -> Declaration (args :-> Strategy prob)
-declareProcessor n h as f = Decl n h f (toHList as)
 
 -- | Lifts the result of a 'Processor' application (see 'solve') to 'ProofTree'. Informally we have:
 --
@@ -65,7 +40,7 @@ data ErroneousProof p = ErroneousProof IOError p deriving Show
 
 instance Processor p => PP.Pretty (ErroneousProof p) where 
   pretty (ErroneousProof err p) = 
-    PP.text "Processor" PP.<+> PP.squotes (PP.text (processorName p)) PP.<+> PP.text "signalled the following error:"
+    PP.text "Processor" PP.<+> PP.squotes (PP.text (show p)) PP.<+> PP.text "signalled the following error:"
     PP.<$$> PP.indent 2 (PP.paragraph (show err))
 
 data ErroneousProcessor p = ErroneousProc IOError p deriving Show
@@ -74,5 +49,4 @@ instance Processor p => Processor (ErroneousProcessor p) where
   type ProofObject (ErroneousProcessor p) = ErroneousProof p
   type Problem (ErroneousProcessor p)     = Problem p
   solve e@(ErroneousProc err p) prob      = return $ resultToTree e prob (Fail (ErroneousProof err p))
-  declaration p@(ErroneousProc _ proc)    =  declareProcessor ("Erroneous processor: " ++ processorName proc) [] () $ Proc p
 
