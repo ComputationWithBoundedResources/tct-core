@@ -70,6 +70,7 @@ instance (SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument
 
 instance SParsable prob D.Nat where parseS = nat
 instance SParsable prob Bool where parseS = bool
+instance SParsable prob String where parseS = identifier
 instance SParsable prob (Strategy prob) where parseS = strategy
 instance (Typeable a, SParsable prob a) => SParsable prob (Maybe a) where 
   parseS = (try (symbol "none") >> return Nothing) <|> Just `fmap` parseS <?> "maybe"

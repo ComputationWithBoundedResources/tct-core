@@ -5,6 +5,7 @@ module Tct.Core.Main
   -- * Tct Configuration
   , TctConfig (..)
   , defaultTctConfig
+  , OutputMode (..)
   -- * Tct Initialisation
   , apply
   , applyMode

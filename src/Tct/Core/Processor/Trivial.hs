@@ -2,8 +2,12 @@
 module Tct.Core.Processor.Trivial
   ( 
   -- * Failed
-  failingDeclaration
+  failingWithDeclaration
+  , failingWith
   , failing
+  -- * Identity
+  , identity
+  , identityDeclaration
   -- * Succeed
   , succeedingDeclaration
   , succeeding
@@ -20,21 +24,25 @@ data TrivialProcessor prob
   = TrivialProc (TrivialProof) deriving Show
 
 data TrivialProof
-  = Failed
+  = Failed String
+  | Identity
   | Succeeded
   deriving Show
 
 
 instance PP.Pretty TrivialProof where
-  pretty Failed    = PP.text "Fail."
-  pretty Succeeded = PP.text "Success."
+  pretty (Failed []) = PP.text "Fail."
+  pretty (Failed xs) = PP.text "Fail. The reason is:" PP.<+> PP.text xs PP.<> PP.dot
+  pretty Identity    = PP.text "The identity transformation. No Progress."
+  pretty Succeeded   = PP.text "Success."
 
 instance ProofData prob => Processor (TrivialProcessor prob) where
   type ProofObject (TrivialProcessor prob) = TrivialProof
   type Problem (TrivialProcessor prob)     = prob
   solve p@(TrivialProc t) prob = return . resultToTree p prob $ case t of
-    Failed    -> Fail Failed
-    Succeeded -> Success (Id prob) Succeeded bigAdd
+    Failed xs  -> Fail (Failed xs)
+    Identity   -> Fail (Identity)
+    Succeeded  -> Success (Id prob) Succeeded bigAdd
 
 
 -- TODO: combinators are phantom types; we need explicit type signature
@@ -42,13 +50,27 @@ instance ProofData prob => Processor (TrivialProcessor prob) where
 
 -- | The failing Strategy.
 failing :: ProofData prob => Strategy prob
-failing = Proc (TrivialProc Failed :: ProofData prob => TrivialProcessor prob)
+failing = failingWith ""
+
+-- | The failing Strategy.
+failingWith :: ProofData prob => String -> Strategy prob
+failingWith xs = Proc (TrivialProc (Failed xs) :: ProofData prob => TrivialProcessor prob)
 
 -- | The failing Strategy declaration.
-failingDeclaration :: ProofData prob => Declaration('[] :-> Strategy prob)
-failingDeclaration = declare "failing" [help] () failing
-  where help = "This strategy always fails. Does not abort compuatation in combination with try."
+failingWithDeclaration :: ProofData prob => Declaration('[ Argument 'Optional String] :-> Strategy prob)
+failingWithDeclaration = declare "failingWith" [help] (OneTuple $ msg) failingWith
+  where 
+    help = "This strategy always fails. Does not abort compuatation in combination with try."
+    msg =  string `withHelp` ["The failing message."] `optional` ""
 
+-- | The identity strategy. Always fails.
+identity :: ProofData prob => Strategy prob
+identity = Proc (TrivialProc Identity :: ProofData prob => TrivialProcessor prob)
+
+-- | The succeeding strategy declaration.
+identityDeclaration :: ProofData prob => Declaration('[] :-> Strategy prob)
+identityDeclaration = declare "identity" [help] () identity
+  where help = "This strategy always fails."
 
 -- | The succeeding strategy..
 succeeding :: ProofData prob => Strategy prob

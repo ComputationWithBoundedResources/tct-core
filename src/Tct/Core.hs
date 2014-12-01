@@ -13,6 +13,7 @@ module Tct.Core
   -- * Configuring Tct
   TctConfig (..)
   , defaultTctConfig
+  , OutputMode (..)
   -- * Initialising Tct
   , TctMode
   , withStrategies

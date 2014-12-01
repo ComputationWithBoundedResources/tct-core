@@ -101,6 +101,7 @@ data Strategy prob where
   OrFaster   :: Strategy prob -> Strategy prob -> Strategy prob
   OrBetter   :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
+  Transform  :: (prob1 -> prob2) -> Strategy prob2
 
 -- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
 -- See "Combinators" fndor a detailed description.

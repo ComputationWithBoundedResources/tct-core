@@ -15,7 +15,6 @@ module Tct.Core.Combinators
   --  * is progressing if additionally @'progress' pt = 'True'@,
   --  * is failing if it is not continuing.
   declarations
-  , NList (..)
   -- ** Sequential
   , (>>>), (>||>), (>=>)
   , chain
@@ -33,16 +32,17 @@ module Tct.Core.Combinators
   -- ** Combinators
   , when
   , exhaustively
+  , te
   ) where
 
 
 import Tct.Core.Data
-import Tct.Core.Processor.Trivial (failingDeclaration)
+import Tct.Core.Processor.Trivial
 import Tct.Core.Processor.Timeout (timeoutDeclaration, timeoutRemaining)
 
 declarations :: ProofData prob  => [StrategyDeclaration prob]
 declarations =
-  [ SD failingDeclaration
+  [ SD failingWithDeclaration
   , SD timeoutDeclaration
   ]
 
@@ -136,24 +136,30 @@ withProblem :: (prob -> Strategy prob) -> Strategy prob
 withProblem g = WithStatus (g . currentProblem)
 
 
--- | Defines a non-empty list.
-data NList a = a :| [a] deriving (Eq, Ord, Show)
+emptyList :: ProofData prob => Strategy prob
+emptyList = identity
 
 -- | List version of ('>>>').
-chain :: NList (Strategy prob) -> Strategy prob
-chain (s:|ss) = foldr1 (>>>) (s:ss)
+--
+-- prop> chain [] = failWith "empty list"
+chain :: ProofData prob => [Strategy prob] -> Strategy prob
+chain [] = emptyList
+chain ss = foldr1 (>>>) ss
 
 -- | List version of ('<>').
-alternative :: NList (Strategy prob) -> Strategy prob
-alternative (s:|ss) = foldr1 (<>) (s:ss)
+alternative :: ProofData prob => [Strategy prob] -> Strategy prob
+alternative [] = emptyList
+alternative ss = foldr1 (<>) ss
 
 -- | List version of ('<||>').
-fastest :: NList (Strategy prob) -> Strategy prob
-fastest (s:|ss) = foldr1 (<||>) (s:ss)
+fastest :: ProofData prob => [Strategy prob] -> Strategy prob
+fastest [] = emptyList
+fastest ss = foldr1 (<||>) ss
 
 -- | List version of ('<?>').
-best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> NList (Strategy prob) -> Strategy prob
-best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
+best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> [Strategy prob] -> Strategy prob
+best _   [] = emptyList
+best cmp ss = foldr1 (cmp <?>) ss
 
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
@@ -161,8 +167,12 @@ best cmp (s:|ss) = foldr1 (cmp <?>) (s:ss)
 exhaustively :: Strategy prob -> Strategy prob
 exhaustively s =  s >>> try (exhaustively s)
 
--- | @'when' s then@ applies @then@ if @s@ is progressing. Never fails.
-when :: Strategy prob -> Strategy prob -> Strategy prob
-when s sthen = try $ force s >>> sthen
+-- | prop> te st = try (exhaustively st)
+te :: Strategy prob -> Strategy prob
+te = try . exhaustively
+
+-- | @'when' b st@ applies @st@ if @b@ is true.
+when :: ProofData prob => Bool ->  Strategy prob -> Strategy prob
+when b st = if b then st else identity
 --whenNot = try $ force s <> sthen
 
