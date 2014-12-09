@@ -89,9 +89,9 @@ tctl = Dyre.wrapMain $ Dyre.defaultParams
   , Dyre.configDir   = Just tctldir
   , Dyre.cacheDir    = Just tctldir
   , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
-  , Dyre.ghcOpts     = ["-threaded", "-package tct-core-" ++ version] }
-  where tctldir = getHomeDirectory >>= \home -> return (home </> "tctl")
-
+  , Dyre.ghcOpts     = ["-threaded", "-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"] }
+  --, Dyre.ghcOpts     = ["-threaded", "-package tct-its-" ++ version] }
+  where tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
 
 -- Mode Application --------------------------------------------------------------------------------------------------
 
