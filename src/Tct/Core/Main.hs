@@ -54,6 +54,7 @@ owl = unlines
 --   It is updated by command-line arguments and 'TctMode'.
 data TctConfig prob = TctConfig
   { outputMode :: OutputMode
+  , recompile  :: Bool
   , strategies :: [StrategyDeclaration prob] }
 
 -- | Output mode.
@@ -78,20 +79,24 @@ readOutputMode s
 defaultTctConfig :: ProofData prob => TctConfig prob
 defaultTctConfig = TctConfig
   { outputMode = OnlyAnswer
+  , recompile  = True
   , strategies = declarations }
 
 type TctConfiguration prob opt = Either TctError (TctConfig prob, TctMode prob opt)
 
 tctl :: ProofData prob => TctConfiguration prob opt -> IO ()
-tctl = Dyre.wrapMain $ Dyre.defaultParams
-  { Dyre.projectName = "tctl"
-  , Dyre.realMain    = realMain
-  , Dyre.configDir   = Just tctldir
-  , Dyre.cacheDir    = Just tctldir
-  , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
-  , Dyre.ghcOpts     = ["-threaded", "-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"] }
-  --, Dyre.ghcOpts     = ["-threaded", "-package tct-its-" ++ version] }
-  where tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
+tctl conf = Dyre.wrapMain params conf
+  where  
+    params = Dyre.defaultParams
+      { Dyre.projectName = "tctl"
+      , Dyre.configCheck = either (const True) (recompile .fst) conf 
+      , Dyre.realMain    = realMain
+      , Dyre.configDir   = Just tctldir
+      , Dyre.cacheDir    = Just tctldir
+      , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
+      , Dyre.ghcOpts     = ["-threaded", "-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"] }
+      --, Dyre.ghcOpts     = ["-threaded", "-package tct-its-" ++ version] }
+    tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
 
 -- Mode Application --------------------------------------------------------------------------------------------------
 
