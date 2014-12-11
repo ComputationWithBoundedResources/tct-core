@@ -7,7 +7,7 @@ module Tct.Core.Data.Certificate
   , linear
 
   -- * Semiring/Composition
-  -- , compose
+  , compose
   -- , iter
 
   -- * Certificates
@@ -82,8 +82,7 @@ instance Multiplicative Complexity where
   a               `mul` b               = max a b
   one = Poly (Just 0)
 
-{-
-TODO: check
+
 compose :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `compose` a
   | n == 0 = Poly (Just 0)
@@ -102,6 +101,7 @@ a `compose` (Poly (Just m))
 a               `compose` b               = maximum [Primrec, a, b]
 
 
+{-
 iter :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `iter` _
   | n == 0 = Poly $ Just 0
@@ -179,15 +179,17 @@ instance Pretty Certificate where
     text "SPACE(" <> pretty sl <> char ',' <> pretty su <> char ')'
 
 instance Pretty Complexity where
-  pretty (Poly (Just 0)) = text "n"
-  pretty (Poly (Just k)) = text "n" <> char '^' <> int k
-  pretty (Poly Nothing)  = text "Poly"
-  pretty (Exp Nothing)   = text "Elem"
-  pretty (Exp (Just 1))  = text "Exp"
-  pretty (Exp (Just k))  = text "Exp-" <> int k
-  pretty Supexp          = text "Supexp"
-  pretty Primrec         = text "Primrec"
-  pretty Multrec         = text "Multrec"
-  pretty Rec             = text "Rec"
-  pretty Unknown         = char '?'
+  pretty c = case c of 
+    (Poly (Just 0)) -> asym $ text "n"
+    (Poly (Just k)) -> asym $ text "n" <> char '^' <> int k
+    (Poly Nothing)  -> text "Poly"
+    (Exp Nothing)   -> text "Elem"
+    (Exp (Just 1))  -> text "Exp"
+    (Exp (Just k))  -> text "Exp-" <> int k
+    Supexp          -> text "Supexp"
+    Primrec         -> text "Primrec"
+    Multrec         -> text "Multrec"
+    Rec             -> text "Rec"
+    Unknown         -> char '?'
+    where asym p = char 'O' <> parens p
 
