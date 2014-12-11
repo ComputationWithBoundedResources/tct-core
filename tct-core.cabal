@@ -21,7 +21,7 @@ Synopsis: A Complexity Analysis Framework
 Description:
   The Tyrolean Complexity Tool (TcT for short) is a tool for proving 
   resource bounds for different formal systems. This package provides 
-  a generic transformation framework.
+  a general transformation framework.
 
 Cabal-version: >= 1.8
 Build-type: Simple
