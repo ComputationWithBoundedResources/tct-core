@@ -17,11 +17,11 @@ Stability: Experimental
 License: BSD3
 License-file: LICENSE
 Homepage: http://cl-informatik.uibk.ac.at/software/tct/
-Synopsis: A Complexity Analyser for Term Rewrite Systems
+Synopsis: A Complexity Analysis Framework
 Description:
-  The Tyrolean Complexity Tool (TcT for short) is a tool
-  for proving upper bounds on the derivational and runtime complexity
-  of term rewriting systems automatically.
+  The Tyrolean Complexity Tool (TcT for short) is a tool for proving 
+  resource bounds for different formal systems. This package provides 
+  a generic transformation framework.
 
 Cabal-version: >= 1.8
 Build-type: Simple
