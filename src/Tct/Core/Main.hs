@@ -39,13 +39,8 @@ import           Tct.Core.Processor.Timeout (timeoutIn)
 version :: String
 version = "3.0.0"
 
-owl :: String
-owl = unlines
-  [ " ,___, "
-  , " [O.o]   - TcT is a transformer framework for automated complexity analysis."
-  , "/)___) "
-  , "--\"-\"-"
-  ]
+synopsis :: String
+synopsis = "TcT is a transformer framework for automated complexity analysis."
 
 
 -- TctConfig ---------------------------------------------------------------------------------------------------------
@@ -159,7 +154,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
       <*> O.argument O.str (O.metavar "File")
     desc = mconcat
       [ O.headerDoc   . Just $ PP.string "TcT -- Tyrolean Complexity Tool"
-      , O.progDescDoc . Just $ PP.string owl ]
+      , O.progDescDoc . Just $ PP.string synopsis ]
 
 
 -- Main --------------------------------------------------------------------------------------------------------------
