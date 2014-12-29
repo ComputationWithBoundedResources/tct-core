@@ -89,7 +89,7 @@ tctl conf = Dyre.wrapMain params conf
       , Dyre.configDir   = Just tctldir
       , Dyre.cacheDir    = Just tctldir
       , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
-      , Dyre.ghcOpts     = ["-threaded", "-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"] }
+      , Dyre.ghcOpts     = ["-threaded", "-O2","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"] }
       --, Dyre.ghcOpts     = ["-threaded", "-package tct-its-" ++ version] }
     tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
 

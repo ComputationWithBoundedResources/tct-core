@@ -12,6 +12,7 @@ module Tct.Core.Data.TctM
   , async
   , wait
   , timed
+  , paused
   , raceWith
   , concurrently
   ) where
@@ -109,5 +110,13 @@ timed n m
         Time.TOD sec pico <- liftIO Time.getClockTime
         let newTime = Just $ Time.TOD (sec + toSec (toInteger n)) pico
         local (\ r -> r { stopTime = min newTime (stopTime r) }) m
-      toSec i = i*1000000
+
+-- | @'wait' seconds m@ pauses seconds
+paused :: Int -> TctM a -> TctM a
+paused n m 
+  | n <= 0 = m
+  | otherwise = liftIO (threadDelay (toSec n)) >> m
+
+toSec :: Num a => a -> a
+toSec i = i*1000000
 

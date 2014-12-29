@@ -8,13 +8,17 @@ module Tct.Core.Processor.Timeout
   , timeoutIn
   , timeoutUntil
   , timeoutRemaining
+
+  -- * Wait
+  , wait
+  , waitDeclaration
   ) where
 
 
-import           Data.Maybe                      (fromMaybe)
+import           Data.Maybe             (fromMaybe)
 
-import qualified Tct.Core.Common.Pretty          as PP
-import           Tct.Core.Data
+import qualified Tct.Core.Common.Pretty as PP
+import           Tct.Core.Data          hiding (wait)
 
 
 instance Show p => Show (TimeoutProcessor p) where
@@ -87,6 +91,41 @@ timeoutDeclaration = declare "timeout" help args timeout
   where
     help = ["Wraps the computation in a timeout."]
     args = (some timeoutUntilArg `optional` Nothing, some timeoutInArg, strat)
+
+-- * Wait
+instance Show (WaitProcessor prob) where
+  show p = show (stratW p)
+
+type WaitProof = ()
+
+-- | Wraps the application of a processor in a timeout.
+data WaitProcessor prob = WaitProc
+  { inW    :: Int
+  , stratW :: Strategy prob }
+
+instance ProofData prob => Processor (WaitProcessor prob) where
+  type ProofObject (WaitProcessor prob)   = WaitProof
+  type Problem (WaitProcessor prob)       = prob
+  solve p prob = do
+    remainingM <- remainingTime `fmap` askStatus prob
+    let pause = min (inW p) (inW p `fromMaybe` remainingM)
+    paused pause (evaluate (stratW p) prob)
+
+wait :: ProofData prob => Int -> Strategy prob -> Strategy prob
+wait n m = Proc $ WaitProc n m
+
+waitForArg :: Argument 'Required Nat
+waitForArg = nat `withName` "for" `withHelp` ["Pauses the computation <nat> seconds."]
+
+waitDeclaration :: ProofData prob => Declaration(
+  '[ Argument 'Required Nat
+   , Argument 'Required (Strategy prob) ]
+  :-> Strategy prob)
+waitDeclaration = declare "wait" help args wait
+  where
+    help = ["Pauses for <nat> seconds."]
+    args = (waitForArg, strat)
+
 
 -- Strategies --------------------------------------------------------------------------------------------------------
 

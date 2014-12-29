@@ -180,7 +180,7 @@ instance Pretty Certificate where
 
 instance Pretty Complexity where
   pretty c = case c of 
-    (Poly (Just 0)) -> asym $ text "n"
+    (Poly (Just 0)) -> asym $ text "1"
     (Poly (Just k)) -> asym $ text "n" <> char '^' <> int k
     (Poly Nothing)  -> text "Poly"
     (Exp Nothing)   -> text "Elem"
