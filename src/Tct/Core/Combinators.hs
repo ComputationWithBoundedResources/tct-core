@@ -46,6 +46,11 @@ declarations =
   , SD timeoutDeclaration
   ]
 
+-- FIXME: 
+-- alternative left or right biased
+-- associativy of infix operators; associativity of list versions
+-- <||>, fastest;  operate not as expected; possible all async related strats
+
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
 

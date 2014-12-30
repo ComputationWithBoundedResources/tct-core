@@ -11,12 +11,17 @@ module Tct.Core.Processor.Trivial
   -- * Succeed
   , succeedingDeclaration
   , succeeding
+  -- * Annotations
+  , named
+  , timed
   ) where
 
+import qualified System.Time              as Time
+import Control.Monad.Trans (liftIO)
 
 import           Tct.Core.Common.SemiRing        as PP
 import qualified Tct.Core.Common.Pretty          as PP
-import           Tct.Core.Data
+import           Tct.Core.Data hiding (timed)
 import           Tct.Core.Data.Declaration.Parse as P ()
 
 
@@ -44,9 +49,6 @@ instance ProofData prob => Processor (TrivialProcessor prob) where
     Identity   -> Fail (Identity)
     Succeeded  -> Success (Id prob) Succeeded bigAdd
 
-
--- TODO: combinators are phantom types; we need explicit type signature
--- can we do better
 
 -- | The failing Strategy.
 failing :: ProofData prob => Strategy prob
@@ -80,4 +82,39 @@ succeeding = Proc (TrivialProc Succeeded :: ProofData prob => TrivialProcessor p
 succeedingDeclaration :: ProofData prob => Declaration('[] :-> Strategy prob)
 succeedingDeclaration = declare "succeeding" [help] () succeeding
   where help = "This strategy always succeeds."
+
+data AnnotationProcessor prob
+  = TimedProc (Strategy prob)
+  | NamedProc String (Strategy prob)
+  deriving Show
+
+data AnnotationProof
+  = TimedProof Double
+  | NamedProof String
+  deriving Show
+
+instance PP.Pretty AnnotationProof where
+  pretty = PP.text . show
+
+instance ProofData prob => Processor (AnnotationProcessor prob) where
+  type ProofObject (AnnotationProcessor prob) = AnnotationProof
+  type Problem (AnnotationProcessor prob)     = prob
+  solve p@(TimedProc st) prob = do
+    t1 <- liftIO Time.getClockTime
+    ret <- evaluate st prob
+    t2 <- liftIO Time.getClockTime
+    let 
+      diff = fromIntegral (Time.tdPicosec (Time.diffClockTimes t2 t1)) / (10**(-12))
+      pn = ProofNode { processor = p, problem = prob, proof = TimedProof (diff :: Double) } 
+    return $  NoProgress pn `fmap` ret
+  solve p@(NamedProc n st) prob = do
+    ret <- evaluate st prob
+    let pn = ProofNode {processor = p, problem = prob, proof = NamedProof n} 
+    return $  NoProgress pn `fmap` ret
+
+named :: ProofData prob => String -> Strategy prob -> Strategy prob
+named n = Proc . NamedProc n
+
+timed :: ProofData prob => Strategy prob -> Strategy prob
+timed = Proc . TimedProc
 

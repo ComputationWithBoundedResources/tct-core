@@ -91,15 +91,21 @@ instance Processor p => PP.Pretty (ProofNode p) where
     , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
     where ind = PP.indent 2
 
+ppNodeShort :: (PP.Pretty (ProofObject a), Show a) => ProofNode a -> PP.Doc
+ppNodeShort (ProofNode p _ po) = PP.vcat
+    [ PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
+    , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
+    where ind = PP.indent 2
+
 instance PP.Pretty l => PP.Pretty (ProofTree l) where
   pretty (Open l) = PP.vcat
     [ PP.text "*** Open ***"
     , PP.indent 4 (PP.pretty l) ]
-  pretty (NoProgress _ pt) = PP.pretty pt
-  {-pretty (NoProgress pn pt) = PP.vcat-}
-    {-[ PP.text "*** NoProgress ***"-}
-    {-, PP.indent 4 (PP.pretty pn)-}
-    {-, PP.indent 2 (PP.pretty pt) ]-}
+  {-pretty (NoProgress _ pt) = PP.pretty pt-}
+  pretty (NoProgress pn pt) = PP.vcat
+    [ PP.text "*** NoProgress ***"
+    , PP.indent 4 (ppNodeShort pn)
+    , PP.indent 2 (PP.pretty pt) ]
   pretty (Progress pn _ pts) = PP.vcat
     [ PP.text "*** Progress ***"
     , PP.indent 4 (PP.pretty pn)

@@ -18,7 +18,6 @@ module Tct.Core.Data.TctM
   ) where
 
 
-import           Control.Applicative      ((<$>), (<*>))
 import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
@@ -59,7 +58,8 @@ wait = liftIO . Async.wait
 -- | Lifts 'Async.concurrently'.
 concurrently :: TctM a -> TctM b -> TctM (a,b)
 concurrently m1 m2 = do
-  (io1,io2) <- (,) <$> toIO m1 <*> toIO m2
+  io1 <- toIO m1
+  io2 <- toIO m2
   liftIO $ Async.withAsync io1 $ \a1 ->
     liftIO $ Async.withAsync io2 $ \a2 ->
     liftIO $ Async.waitBoth a1 a2
@@ -71,7 +71,8 @@ concurrently m1 m2 = do
 -- * If none fullfills neiter @p1@ nor @p2@, it returns the latter result.
 raceWith :: (a -> Bool) -> (a -> Bool) -> TctM a -> TctM a -> TctM a
 raceWith p1 p2 m1 m2 = do
-  (io1,io2) <- (,) <$> toIO m1 <*> toIO m2
+  io1 <- toIO m1
+  io2 <- toIO m2
   liftIO $ raceWithIO p1 p2 io1 io2
 
 -- TODO refactor
