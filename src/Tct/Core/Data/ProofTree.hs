@@ -105,9 +105,10 @@ instance PP.Pretty l => PP.Pretty (ProofTree l) where
   pretty (NoProgress pn pt) = PP.vcat
     [ PP.text "*** NoProgress ***"
     , PP.indent 4 (ppNodeShort pn)
-    , PP.indent 2 (PP.pretty pt) ]
+    , PP.pretty pt]
   pretty (Progress pn _ pts) = PP.vcat
     [ PP.text "*** Progress ***"
     , PP.indent 4 (PP.pretty pn)
-    , PP.indent 2 (PP.vcat $ map PP.pretty (F.toList pts)) ]
+    , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
+      where ppts = map PP.pretty (F.toList pts)
 
