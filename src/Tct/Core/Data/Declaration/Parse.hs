@@ -11,6 +11,7 @@ module Tct.Core.Data.Declaration.Parse
 import           Control.Applicative       ((<$>))
 import           Data.Data                 (Typeable)
 import           Data.Dynamic              (fromDynamic, toDyn)
+import           Data.List                 (sortBy)
 import           Data.Maybe                (fromMaybe)
 import           Tct.Core.Common.Parser
 import qualified Tct.Core.Data.Declaration as D
@@ -20,12 +21,12 @@ import qualified Text.Parsec.Expr          as PE
 
 
 curried :: f ~ Uncurry (args :-> Ret args f) => f -> HList args -> Ret args f
-curried f HNil = f
+curried f HNil         = f
 curried f (HCons a as) = curried (f a) as
 
 decl :: (ParsableArgs prob args) => Declaration (args :-> r) -> SParser prob r
 decl (Decl n _ f as) = do
-  _    <- try (symbol n)  
+  _    <- try (symbol n)
   opts <- many (choice (map try (mkOptParsers as)))
   vs   <- mkArgParser as opts
   return (curried f vs)
@@ -39,11 +40,13 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
     predefined :: SParser prob (Strategy prob)      
     predefined = do
       decls <- getState
-      choice [ decl d | SD d <- decls ]
+      -- MS: there is an issue when declarations have only optional arguments and a common prefix
+      -- as decl will always be successfull; so we sort the list in rev. lex order
+      choice [ decl d | SD d <- sortBy k decls ]
+        where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
       
-    table = [ [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ]
-            , [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
-            ]
+    table = [ [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
+            , [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
 
 instance ParsableArgs prob '[] where

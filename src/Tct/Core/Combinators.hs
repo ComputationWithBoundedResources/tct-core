@@ -23,6 +23,7 @@ module Tct.Core.Combinators
   , alternative
   , fastest
   , best
+  , cmpTimeUB
   -- ** Optional
   , try, force
   -- ** Stateful
@@ -165,6 +166,11 @@ fastest ss = foldr1 (<||>) ss
 best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> [Strategy prob] -> Strategy prob
 best _   [] = emptyList
 best cmp ss = foldr1 (cmp <?>) ss
+
+-- | Compares time upperbounds. Useful with 'best'.
+cmpTimeUB :: ProofTree prob -> ProofTree prob -> Ordering
+cmpTimeUB pt1 pt2 = compare (tu pt1) (tu pt2)
+  where tu = timeUB . certificate
 
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.

@@ -19,7 +19,7 @@ data TctMode prob opt = TctMode
                                                                  --   These are added to the standard Tct options.
   , modeModifyer        :: prob -> opt -> prob                   -- ^ This function is applied to the initial problem,
                                                                  --   using the options parsed from command line.
-  , modeAnswer          :: Return (ProofTree prob) -> SomeAnswer -- ^ Custom Answer.
+  , modeAnswer          :: ProofTree prob -> SomeAnswer          -- ^ Custom Answer.
   }
 
 

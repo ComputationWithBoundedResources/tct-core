@@ -196,7 +196,7 @@ realMain dcfg = do
     st   <- mkStrategy theDefaultStrategy theStrategies theStrategyName
     let stt = maybe st (`timeoutIn` st) theTimeout
     r    <- runIt cfg stt prob
-    output theOutputMode theAnswer r
+    output theOutputMode theAnswer (fromReturn r)
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
@@ -213,9 +213,8 @@ realMain dcfg = do
         prob <- parser f
         return $ modifyer prob opts
     runIt cfg st prob = liftIO $ run cfg (evaluate st prob)
-    output a f r = liftIO $ do
-      putPretty $ f r
-      let pt = fromReturn r
+    output a f pt = liftIO $ do
+      putPretty $ f pt
       case a of
         WithProof -> putPretty pt
         --WithXml   -> Xml.putXml $ Xml.toXml pt
