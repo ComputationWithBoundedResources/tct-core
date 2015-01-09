@@ -101,11 +101,11 @@ instance PP.Pretty l => PP.Pretty (ProofTree l) where
   pretty (Open l) = PP.vcat
     [ PP.text "*** Open ***"
     , PP.indent 4 (PP.pretty l) ]
-  {-pretty (NoProgress _ pt) = PP.pretty pt-}
-  pretty (NoProgress pn pt) = PP.vcat
-    [ PP.text "*** NoProgress ***"
-    , PP.indent 4 (ppNodeShort pn)
-    , PP.pretty pt]
+  pretty (NoProgress _ pt) = PP.pretty pt
+  {-pretty (NoProgress pn pt) = PP.vcat-}
+    {-[ PP.text "*** NoProgress ***"-}
+    {-, PP.indent 4 (ppNodeShort pn)-}
+    {-, PP.pretty pt]-}
   pretty (Progress pn _ pts) = PP.vcat
     [ PP.text "*** Progress ***"
     , PP.indent 4 (PP.pretty pn)
