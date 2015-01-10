@@ -182,14 +182,14 @@ instance Pretty Complexity where
   pretty c = case c of 
     (Poly (Just 0)) -> asym $ text "1"
     (Poly (Just k)) -> asym $ text "n" <> char '^' <> int k
-    (Poly Nothing)  -> text "Poly"
-    (Exp Nothing)   -> text "Elem"
-    (Exp (Just 1))  -> text "Exp"
-    (Exp (Just k))  -> text "Exp-" <> int k
-    Supexp          -> text "Supexp"
-    Primrec         -> text "Primrec"
-    Multrec         -> text "Multrec"
-    Rec             -> text "Rec"
+    (Poly Nothing)  -> text "POLY"
+    (Exp Nothing)   -> text "ELEM"
+    (Exp (Just 1))  -> text "EXP"
+    (Exp (Just k))  -> text "EXP-" <> int k
+    Supexp          -> text "SUPEXP"
+    Primrec         -> text "PRIMREC"
+    Multrec         -> text "MULTREC"
+    Rec             -> text "REC"
     Unknown         -> char '?'
     where asym p = char 'O' <> parens p
 
