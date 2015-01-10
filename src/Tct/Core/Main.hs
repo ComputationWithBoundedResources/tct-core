@@ -83,15 +83,18 @@ tctl :: ProofData prob => TctConfiguration prob opt -> IO ()
 tctl conf = Dyre.wrapMain params conf
   where  
     params = Dyre.defaultParams
-      { Dyre.projectName = "tctl"
-      , Dyre.configCheck = either (const True) (recompile .fst) conf 
+      { Dyre.projectName = name
+      , Dyre.configCheck = either (const True) (recompile . fst) conf 
       , Dyre.realMain    = realMain
       , Dyre.configDir   = Just tctldir
       , Dyre.cacheDir    = Just tctldir
       , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
-      , Dyre.ghcOpts     = ["-threaded", "-O2","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"] }
+      , Dyre.ghcOpts     = ghcOpts}
       --, Dyre.ghcOpts     = ["-threaded", "-package tct-its-" ++ version] }
     tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
+    name    = either (const "all") (modeId . snd) conf
+    ghcOpts =
+      ["-threaded", "-O2","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"]
 
 -- Mode Application --------------------------------------------------------------------------------------------------
 
