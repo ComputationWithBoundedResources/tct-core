@@ -16,6 +16,7 @@ module Tct.Core.Data.Processor
 
 
 import qualified Tct.Core.Common.Pretty    as PP
+import qualified Tct.Core.Common.Xml       as Xml
 import           Tct.Core.Data.Types
 
 
@@ -33,15 +34,15 @@ resultToTree p prob (Success probs po certfn) = Continue $ Progress (ProofNode p
 
 data ErroneousProof p = ErroneousProof IOError p deriving Show
 
--- instance Processor p => Xml.Xml (ErroneousProof p) where
---   toXml (ErroneousProof err p) = 
---     Xml.elt "error" [] [ Xml.elt "processor" [] [Xml.text (name p)]
---                        , Xml.elt "message" [] [Xml.text (show err)] ]
-
 instance Processor p => PP.Pretty (ErroneousProof p) where 
   pretty (ErroneousProof err p) = 
     PP.text "Processor" PP.<+> PP.squotes (PP.text (show p)) PP.<+> PP.text "signalled the following error:"
     PP.<$$> PP.indent 2 (PP.paragraph (show err))
+
+instance Processor p => Xml.Xml (ErroneousProof p) where
+  toXml (ErroneousProof err p) = Xml.elts "error" 
+    [ Xml.elt "processor" (Xml.text $ show p)
+    , Xml.elt "message"   (Xml.text $ show err) ] 
 
 data ErroneousProcessor p = ErroneousProc IOError p deriving Show
 

@@ -9,9 +9,6 @@ module Tct.Core.Data.Strategy
   , StrategyDeclaration (..)
   , strategy
   , declare
-  -- * Answer
-  , SomeAnswer (..)
-  , answer
   ) where
 
 
@@ -161,9 +158,4 @@ declare ::
   -> f  -- ^ The strategy.
   -> Declaration (args :-> Strategy prob)
 declare n help as f = Decl n help f (toHList as)
-
-
--- | prop> anwer = Answer
-answer :: ProofData a => a -> SomeAnswer
-answer = SomeAnswer
 

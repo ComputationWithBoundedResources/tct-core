@@ -93,7 +93,7 @@ arg = ReqArg {argName = "arg", argDomain = "<arg>", argHelp = []}
 optional :: Argument Required a -> a -> Argument Optional a
 optional ar a = OptArg {argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = a }
 
--- | Wraps an argument into 'Mayb'.
+-- | Wraps an argument into 'Maybe'.
 some :: Argument r a -> Argument r (Maybe a)
 some ar = Just `fmap` ar { argDomain = argDomain ar ++ "|none"}
 

@@ -30,6 +30,7 @@ import           Tct.Core.Combinators       (declarations)
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import           Tct.Core.Data
+import           Tct.Core.Data.Answer
 import           Tct.Core.Main.Mode
 import           Tct.Core.Main.Options
 import           Tct.Core.Processor.Timeout (timeoutIn)
@@ -56,18 +57,24 @@ data TctConfig prob = TctConfig
 data OutputMode
   = OnlyAnswer
   | WithProof
-  | WithXml
+  | WithDetailedProof
+  | AsXml
+  | CustomAnswer
 
 instance Show OutputMode where
-  show OnlyAnswer = "a"
-  show WithProof  = "p"
-  show WithXml    = "x"
+  show OnlyAnswer        = "a"
+  show WithProof         = "p"
+  show WithDetailedProof = "d"
+  show AsXml             = "x"
+  show CustomAnswer      = "c"
 
 readOutputMode :: Monad m => String -> m OutputMode
 readOutputMode s
-  | s == show OnlyAnswer = return  OnlyAnswer
-  | s == show WithProof  = return  WithProof
-  | s == show WithXml    = return  WithXml
+  | s == show OnlyAnswer        = return OnlyAnswer
+  | s == show WithProof         = return WithProof
+  | s == show WithDetailedProof = return WithDetailedProof
+  | s == show AsXml             = return AsXml
+  | s == show CustomAnswer      = return CustomAnswer
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
 
 -- | The default Tct configuration. A good starting point for custom configurations.
@@ -141,9 +148,11 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
         , O.short 'a'
         , O.long "answer"
         , O.helpDoc . Just $ PP.vcat
-          [ PP.hsep [PP.text (show OnlyAnswer), PP.char '-', PP.text "only answer"]
-          , PP.hsep [PP.text (show WithProof) , PP.char '-', PP.text "with proof"]
-          , PP.hsep [PP.text (show WithXml)   , PP.char '-', PP.text "with xml"] ]]))
+          [ PP.hsep [PP.text (show OnlyAnswer)        , PP.text "- only answer"]
+          , PP.hsep [PP.text (show WithProof)         , PP.text "- with proof"]
+          , PP.hsep [PP.text (show WithDetailedProof) , PP.text "- with detailed proof"]
+          , PP.hsep [PP.text (show AsXml)             , PP.text "- as xml"]
+          , PP.hsep [PP.text (show CustomAnswer)      , PP.text "- as custom answer"] ]]))
       <*> O.optional (O.option (mconcat
         [ O.short 't'
         , O.long "timeout"
@@ -216,15 +225,17 @@ realMain dcfg = do
         prob <- parser f
         return $ modifyer prob opts
     runIt cfg st prob = liftIO $ run cfg (evaluate st prob)
-    output a f pt = liftIO $ do
-      putPretty $ f pt
-      case a of
-        WithProof -> putPretty pt
-        --WithXml   -> Xml.putXml $ Xml.toXml pt
-        _         -> return ()
+    output v custom pt = liftIO $ 
+      case v of
+        OnlyAnswer        -> putPretty (answering pt)
+        WithProof         -> putPretty (answering pt) >> putPretty (ppProofTree pt)
+        WithDetailedProof -> putPretty (answering pt) >> putPretty (ppDetailedProofTree pt)
+        AsXml             -> error "missing: toXml prooftree"
+        CustomAnswer      -> custom pt
     putPretty :: PP.Pretty a => a -> IO ()
     putPretty = putStrLn . PP.display . PP.pretty
     parseStrategy sds s = case strategyFromString sds s of
       Left err -> Left $ TctParseError (show err)
       Right st -> Right st
+
 

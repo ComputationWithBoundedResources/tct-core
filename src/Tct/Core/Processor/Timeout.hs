@@ -18,6 +18,7 @@ module Tct.Core.Processor.Timeout
 import           Data.Maybe             (fromMaybe)
 
 import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Common.Xml    as Xml
 import           Tct.Core.Data          hiding (wait)
 
 
@@ -32,6 +33,9 @@ instance Show TimeoutProof where
 
 instance PP.Pretty TimeoutProof where
   pretty (Timeout i) = PP.paragraph ("Computation aborted after a timeout of " ++ show i ++ " seconds")
+
+instance Xml.Xml TimeoutProof where
+  toXml (Timeout i) = Xml.elt "timeout" (Xml.text $ show (PP.double (fromIntegral i)))
 
 -- | Wraps the application of a processor in a timeout.
 data TimeoutProcessor prob = TimeoutProc 

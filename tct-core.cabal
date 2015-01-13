@@ -36,6 +36,7 @@ Library
     Tct.Core.Common.SemiRing
     Tct.Core.Common.Xml
     Tct.Core.Data
+    Tct.Core.Data.Answer
     Tct.Core.Data.Certificate
     Tct.Core.Data.Declaration
     Tct.Core.Data.Declaration.Parse

@@ -16,6 +16,7 @@ import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
 
 import qualified Tct.Core.Common.Pretty        as PP
+import qualified Tct.Core.Common.Xml           as Xml
 import qualified Tct.Core.Data.Certificate     as C
 import           Tct.Core.Data.Forks           (Id (..))
 
@@ -66,7 +67,7 @@ type Fork t = (Foldable t, Functor t, Traversable t)
 
 -- | Provides the interface for the proof construction.
 -- All types which occur in the proof construction have to implement 'ProofData'.
-type ProofData d = (PP.Pretty d, Show d)
+type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
 
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of @'C.Certificate's@.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate

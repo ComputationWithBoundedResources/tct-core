@@ -13,6 +13,10 @@ module Tct.Core.Data.ProofTree
   , open
   , isOpen
   , isClosed
+
+  -- * Output
+  , ppProofTree
+  , ppDetailedProofTree
   ) where
 
 
@@ -75,40 +79,44 @@ instance Traversable ProofTree where
   f `traverse` (NoProgress pn pt)    = NoProgress pn A.<$> f `traverse` pt
   f `traverse` (Progress pn cfn pts) = Progress pn cfn A.<$> (f `traverse`) `traverse` pts
 
-
 instance Show (ProofTree l) where
   show _ = undefined
 
 
 -- Pretty Printing ---------------------------------------------------------------------------------------------------
 
--- TODO: different modes; compact ...
-
-instance Processor p => PP.Pretty (ProofNode p) where
-  pretty (ProofNode p prob po) = PP.vcat
-    [ PP.text "Considered Problem:" PP.<$$> ind (PP.pretty prob)
-    , PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
-    , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
-    where ind = PP.indent 2
+ppProofNode :: Processor p => ProofNode p -> PP.Doc
+ppProofNode (ProofNode p prob po) = PP.vcat
+  [ PP.text "Considered Problem:" PP.<$$> ind (PP.pretty prob)
+  , PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
+  , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
+  where ind = PP.indent 2
 
 ppNodeShort :: (PP.Pretty (ProofObject a), Show a) => ProofNode a -> PP.Doc
 ppNodeShort (ProofNode p _ po) = PP.vcat
-    [ PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
-    , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
-    where ind = PP.indent 2
+  [ PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
+  , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
+  where ind = PP.indent 2
 
-instance PP.Pretty l => PP.Pretty (ProofTree l) where
-  pretty (Open l) = PP.vcat
-    [ PP.text "*** Open ***"
-    , PP.indent 4 (PP.pretty l) ]
-  pretty (NoProgress _ pt) = PP.pretty pt
-  {-pretty (NoProgress pn pt) = PP.vcat-}
-    {-[ PP.text "*** NoProgress ***"-}
-    {-, PP.indent 4 (ppNodeShort pn)-}
-    {-, PP.pretty pt]-}
-  pretty (Progress pn _ pts) = PP.vcat
-    [ PP.text "*** Progress ***"
-    , PP.indent 4 (PP.pretty pn)
-    , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
-      where ppts = map PP.pretty (F.toList pts)
+ppProofTree' :: PP.Pretty l => Bool -> ProofTree l -> PP.Doc
+ppProofTree' _ (Open l) = PP.vcat
+  [ PP.text "*** Open ***"
+  , PP.indent 4 (PP.pretty l) ]
+ppProofTree' detailed (NoProgress pn pt)
+  | detailed = PP.vcat
+    [ PP.text "*** NoProgress ***"
+    , PP.indent 4 (ppNodeShort pn)
+    , ppProofTree' detailed pt]
+  | otherwise   = ppProofTree' detailed pt
+ppProofTree' b (Progress pn _ pts) = PP.vcat
+  [ PP.text "*** Progress ***"
+  , PP.indent 4 (ppProofNode pn)
+  , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
+    where ppts = map (ppProofTree' b) (F.toList pts)
+
+ppProofTree :: PP.Pretty l => ProofTree l -> PP.Doc
+ppProofTree = ppProofTree' True
+
+ppDetailedProofTree :: PP.Pretty l => ProofTree l -> PP.Doc
+ppDetailedProofTree = ppProofTree' False
 

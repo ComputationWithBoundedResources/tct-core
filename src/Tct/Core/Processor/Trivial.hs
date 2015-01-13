@@ -2,15 +2,15 @@
 module Tct.Core.Processor.Trivial
   ( 
   -- * Failed
-  failingWithDeclaration
+  failing
   , failingWith
-  , failing
+  , failingWithDeclaration
   -- * Identity
   , identity
   , identityDeclaration
   -- * Succeed
-  , succeedingDeclaration
   , succeeding
+  , succeedingDeclaration
   -- * Annotations
   , named
   , timed
@@ -19,8 +19,9 @@ module Tct.Core.Processor.Trivial
 import qualified System.Time              as Time
 import Control.Monad.Trans (liftIO)
 
-import           Tct.Core.Common.SemiRing        as PP
+import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Pretty          as PP
+import qualified Tct.Core.Common.Xml             as Xml
 import           Tct.Core.Data hiding (timed)
 import           Tct.Core.Data.Declaration.Parse as P ()
 
@@ -40,6 +41,12 @@ instance PP.Pretty TrivialProof where
   pretty (Failed xs) = PP.text "Fail. The reason is:" PP.<+> PP.text xs PP.<> PP.dot
   pretty Identity    = PP.text "The identity transformation. No Progress."
   pretty Succeeded   = PP.text "Success."
+
+instance Xml.Xml TrivialProof where
+  toXml (Failed []) = Xml.text "failed"
+  toXml (Failed xs) = Xml.elt "failed" (Xml.text xs)
+  toXml Identity    = Xml.text "identity"
+  toXml Succeeded   = Xml.text "success"
 
 instance ProofData prob => Processor (TrivialProcessor prob) where
   type ProofObject (TrivialProcessor prob) = TrivialProof
@@ -95,6 +102,10 @@ data AnnotationProof
 
 instance PP.Pretty AnnotationProof where
   pretty = PP.text . show
+
+instance Xml.Xml AnnotationProof where
+  toXml (TimedProof d) = Xml.elt "timed" (Xml.text . show $ PP.double d)
+  toXml (NamedProof n) = Xml.elt "named" (Xml.text n)
 
 instance ProofData prob => Processor (AnnotationProcessor prob) where
   type ProofObject (AnnotationProcessor prob) = AnnotationProof
