@@ -26,7 +26,9 @@ module Tct.Core.Data.Certificate
   ) where
 
 
-import Tct.Core.Common.Pretty
+import Data.Monoid
+import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Common.Xml    as Xml
 import Tct.Core.Common.SemiRing
 
 
@@ -171,25 +173,37 @@ updateTimeUBCert  cert f = cert { timeUB  = f $ timeUB  cert }
 updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
 
 
--- Pretty Printing ---------------------------------------------------------------------------------------------------
+-- Proof Data --------------------------------------------------------------------------------------------------------
 
-instance Pretty Certificate where
-  pretty (Certificate su sl tu tl) =
-    text "TIME (" <> pretty tu <> char ',' <> pretty tl <> char ')' <$$>
-    text "SPACE(" <> pretty sl <> char ',' <> pretty su <> char ')'
-
-instance Pretty Complexity where
+instance PP.Pretty Complexity where
   pretty c = case c of 
-    (Poly (Just 0)) -> asym $ text "1"
-    (Poly (Just k)) -> asym $ text "n" <> char '^' <> int k
-    (Poly Nothing)  -> text "POLY"
-    (Exp Nothing)   -> text "ELEM"
-    (Exp (Just 1))  -> text "EXP"
-    (Exp (Just k))  -> text "EXP-" <> int k
-    Supexp          -> text "SUPEXP"
-    Primrec         -> text "PRIMREC"
-    Multrec         -> text "MULTREC"
-    Rec             -> text "REC"
-    Unknown         -> char '?'
-    where asym p = char 'O' <> parens p
+    (Poly (Just 0)) -> asym $ PP.text "1"
+    (Poly (Just k)) -> asym $ PP.text "n" <> PP.char '^' <> PP.int k
+    (Poly Nothing)  -> PP.text "POLY"
+    (Exp Nothing)   -> PP.text "ELEM"
+    (Exp (Just 1))  -> PP.text "EXP"
+    (Exp (Just k))  -> PP.text "EXP-" <> PP.int k
+    Supexp          -> PP.text "SUPEXP"
+    Primrec         -> PP.text "PRIMREC"
+    Multrec         -> PP.text "MULTREC"
+    Rec             -> PP.text "REC"
+    Unknown         -> PP.char '?'
+    where asym p = PP.char 'O' <> PP.parens p
+
+instance PP.Pretty Certificate where
+  pretty (Certificate su sl tu tl) =
+    PP.text "TIME (" <> PP.pretty tu <> PP.char ',' <> PP.pretty tl <> PP.char ')' PP.<$$>
+    PP.text "SPACE(" <> PP.pretty sl <> PP.char ',' <> PP.pretty su <> PP.char ')'
+
+instance Xml.Xml Complexity where
+  toXml c = case c of 
+    (Poly Nothing)  -> Xml.elts "polynomial" []
+    (Poly (Just k)) -> Xml.elts "polynomial" [Xml.text $ show k] 
+    (Exp Nothing)   -> Xml.elts "exponential" []
+    (Exp (Just k))  -> Xml.elts "exponential" [Xml.text $ show k]
+    Supexp          -> Xml.elts "superexponential" []
+    Primrec         -> Xml.elts "primitiverecursive" []
+    Multrec         -> Xml.elts "multiplerecursive" []
+    Rec             -> Xml.elts "recursive" []
+    Unknown         -> Xml.elts "unknown" []
 
