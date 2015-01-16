@@ -197,13 +197,13 @@ instance PP.Pretty Certificate where
 
 instance Xml.Xml Complexity where
   toXml c = case c of 
-    (Poly Nothing)  -> Xml.elts "polynomial" []
-    (Poly (Just k)) -> Xml.elts "polynomial" [Xml.text $ show k] 
-    (Exp Nothing)   -> Xml.elts "exponential" []
-    (Exp (Just k))  -> Xml.elts "exponential" [Xml.text $ show k]
-    Supexp          -> Xml.elts "superexponential" []
-    Primrec         -> Xml.elts "primitiverecursive" []
-    Multrec         -> Xml.elts "multiplerecursive" []
-    Rec             -> Xml.elts "recursive" []
-    Unknown         -> Xml.elts "unknown" []
+    (Poly Nothing)  -> Xml.elt "polynomial" []
+    (Poly (Just k)) -> Xml.elt "polynomial" [Xml.int k]
+    (Exp Nothing)   -> Xml.elt "exponential" []
+    (Exp (Just k))  -> Xml.elt "exponential" [Xml.int k]
+    Supexp          -> Xml.elt "superexponential" []
+    Primrec         -> Xml.elt "primitiverecursive" []
+    Multrec         -> Xml.elt "multiplerecursive" []
+    Rec             -> Xml.elt "recursive" []
+    Unknown         -> Xml.elt "unknown" []
 

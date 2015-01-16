@@ -40,9 +40,9 @@ instance Processor p => PP.Pretty (ErroneousProof p) where
     PP.<$$> PP.indent 2 (PP.paragraph (show err))
 
 instance Processor p => Xml.Xml (ErroneousProof p) where
-  toXml (ErroneousProof err p) = Xml.elts "error" 
-    [ Xml.elt "processor" (Xml.text $ show p)
-    , Xml.elt "message"   (Xml.text $ show err) ] 
+  toXml (ErroneousProof err p) = Xml.elt "error" 
+    [ Xml.elt "processor" [Xml.text $ show p]
+    , Xml.elt "message"   [Xml.text $ show err] ] 
 
 data ErroneousProcessor p = ErroneousProc IOError p deriving Show
 

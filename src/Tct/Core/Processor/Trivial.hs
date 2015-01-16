@@ -43,10 +43,10 @@ instance PP.Pretty TrivialProof where
   pretty Succeeded   = PP.text "Success."
 
 instance Xml.Xml TrivialProof where
-  toXml (Failed []) = Xml.text "failed"
-  toXml (Failed xs) = Xml.elt "failed" (Xml.text xs)
-  toXml Identity    = Xml.text "identity"
-  toXml Succeeded   = Xml.text "success"
+  toXml (Failed []) = Xml.elt "failed" []
+  toXml (Failed xs) = Xml.elt "failed" [Xml.text xs]
+  toXml Identity    = Xml.elt "identity" []
+  toXml Succeeded   = Xml.elt "success" [] 
 
 instance ProofData prob => Processor (TrivialProcessor prob) where
   type ProofObject (TrivialProcessor prob) = TrivialProof
@@ -104,8 +104,8 @@ instance PP.Pretty AnnotationProof where
   pretty = PP.text . show
 
 instance Xml.Xml AnnotationProof where
-  toXml (TimedProof d) = Xml.elt "timed" (Xml.text . show $ PP.double d)
-  toXml (NamedProof n) = Xml.elt "named" (Xml.text n)
+  toXml (TimedProof d) = Xml.elt "timed" [Xml.text $ show d]
+  toXml (NamedProof n) = Xml.elt "named" [Xml.text n]
 
 instance ProofData prob => Processor (AnnotationProcessor prob) where
   type ProofObject (AnnotationProcessor prob) = AnnotationProof

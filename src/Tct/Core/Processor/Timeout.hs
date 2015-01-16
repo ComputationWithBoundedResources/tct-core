@@ -35,7 +35,7 @@ instance PP.Pretty TimeoutProof where
   pretty (Timeout i) = PP.paragraph ("Computation aborted after a timeout of " ++ show i ++ " seconds")
 
 instance Xml.Xml TimeoutProof where
-  toXml (Timeout i) = Xml.elt "timeout" (Xml.text $ show (PP.double (fromIntegral i)))
+  toXml (Timeout i) = Xml.elt "timeout" [Xml.int i]
 
 -- | Wraps the application of a processor in a timeout.
 data TimeoutProcessor prob = TimeoutProc 

@@ -6,52 +6,88 @@ module Tct.Core.Common.Xml
   , XmlAttribute
   , XmlDocument
   , elt
-  , elts
-  , elts'
-  , strAttrib
   , int
   , text
-  , putXml
+  , att
+  , setAtts
+  -- * output
   , toDocument
-  )where
+  , putXml
+  -- * search and manipulation
+  , search
+  , find
+  , rootTag
+  , child
+  , children
+  , addChildren
+  ) where
 
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text            as Txt
-import           Text.XML.Generator   ((<#>))
-import qualified Text.XML.Generator   as Xml
+
+import qualified Data.ByteString.Lazy  as BS
+import           Data.Monoid
+import           Data.Maybe (fromMaybe)
+import qualified Data.Text             as Txt
+import qualified Data.Text.IO          as Txt (putStr)
+import qualified Text.XML.Expat.Format as Xml (formatNode)
+import qualified Text.XML.Expat.Tree   as Xml
+import qualified Text.XML.Expat.Proc   as Xml
 
 
-type XmlContent   = Xml.Xml Xml.Elem
-type XmlAttribute = Xml.Xml Xml.Attr
-type XmlDocument  = Xml.Xml Xml.Doc
+type XmlContent   = Xml.UNode Txt.Text
+type XmlAttribute = (Txt.Text, Txt.Text)
+type XmlDocument  = (Txt.Text, XmlContent)
 
 class Xml a where
   toXml :: a -> XmlContent
 
 instance Xml () where
-  toXml _ = Xml.xempty
+  toXml _ = text ""
 
-elt :: String -> XmlContent -> XmlContent
-elt name child = Xml.xelem (Txt.pack name) $ Xml.xattrs [] <#> [child]
+elt :: String -> [XmlContent] -> XmlContent
+elt name = Xml.Element (Txt.pack name) []
 
-elts :: String -> [XmlContent] -> XmlContent
-elts name children = Xml.xelem (Txt.pack name) $ Xml.xattrs [] <#> children
+setAtts :: [XmlAttribute] -> XmlContent -> XmlContent
+setAtts atts e = e{ Xml.eAttributes = atts }
 
-elts' :: String -> [XmlAttribute] -> [XmlContent] -> Xml.Xml Xml.Elem
-elts' name atts children = Xml.xelem (Txt.pack name) $ Xml.xattrs atts <#> children
-
-strAttrib :: String -> String -> XmlAttribute
-strAttrib n s = Xml.xattr (Txt.pack n) (Txt.pack s)
+att :: String -> String -> XmlAttribute
+att n s = (Txt.pack n, Txt.pack s)
 
 int :: (Integral i) => i -> XmlContent
-int i = Xml.xtext $ Txt.pack $ show $ toInteger i
+int i = Xml.Text . Txt.pack . show $ toInteger i
 
 text :: String -> XmlContent
-text = Xml.xtext  . Txt.pack
-
-putXml :: Xml.Renderable t => Xml.Xml t -> IO ()
-putXml = BS.putStr . Xml.xrender
+text = Xml.Text . Txt.pack
 
 toDocument :: Maybe String -> XmlContent -> XmlDocument
-toDocument s = Xml.doc $ Xml.defaultDocInfo{ Xml.docInfo_docType = s }
+toDocument Nothing c  = (mempty, c)
+toDocument (Just s) c = (Txt.pack $ header ++ s ++ "\n", c)
+  where header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" 
+
+putXml :: XmlDocument -> IO ()
+putXml (header, content)= Txt.putStr header >> BS.putStr (Xml.formatNode content)
+
+search :: String -> XmlContent -> Maybe XmlContent
+search s = Xml.findElement (Txt.pack s)
+
+find :: String -> XmlContent -> XmlContent
+find s c = err `fromMaybe` search s c
+  where err = error $ "Tct.Core.Common.Xml.find: element not found " ++ s ++ " ."
+
+rootTag :: XmlContent -> String
+rootTag (Xml.Element t _ _) = Txt.unpack t
+rootTag _                   = ""
+
+child :: XmlContent -> XmlContent
+child (Xml.Element _ _ [e]) = e
+child _                     = error "Tct.Core.Common.Xml.children: not a single child."
+
+children :: XmlContent -> [XmlContent]
+children (Xml.Element _ _ es) = es
+children (Xml.Text _)         = []
+
+-- | Adds elements below the root element.
+addChildren :: XmlContent -> [XmlContent] -> XmlContent
+addChildren (Xml.Element n as es1) es2 = Xml.Element n as (es1 ++ es2)
+addChildren e _                        = e
+
 

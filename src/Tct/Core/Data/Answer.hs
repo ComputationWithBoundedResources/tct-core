@@ -22,11 +22,11 @@ instance PP.Pretty Answer where
 
 instance Xml.Xml Answer where
   toXml (CertAnswer (lb, ub)) 
-    | lb /= T.Unknown || ub /= T.Unknown = Xml.elts "certified" 
-      [ Xml.elt "lowerbound" (Xml.toXml lb)
-      , Xml.elt "upperbound" (Xml.toXml ub)]
-  toXml NoAnswer = Xml.elts "no" []
-  toXml _        = Xml.elts "maybe" []
+    | lb /= T.Unknown || ub /= T.Unknown = Xml.elt "certified" 
+      [ Xml.elt "lowerbound" [Xml.toXml lb]
+      , Xml.elt "upperbound" [Xml.toXml ub] ]
+  toXml NoAnswer = Xml.elt "no" []
+  toXml _        = Xml.elt "maybe" []
 
 -- | Returns the time upper bound as an answer.
 answering :: ProofTree l -> Answer
