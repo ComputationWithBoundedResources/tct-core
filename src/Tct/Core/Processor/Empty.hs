@@ -23,8 +23,11 @@ instance PP.Pretty EmptyProof where
   pretty OpenProblem  = PP.text "The problem is still open."
 
 instance Xml.Xml EmptyProof where
-  toXml EmptyProblem = Xml.elt "rIsEmpty" [] -- TODO: this is the ceta tag;
-  toXml OpenProblem  = Xml.elt "open" []
+  toXml EmptyProblem  = Xml.elt "closed" []
+  toXml OpenProblem   = Xml.elt "open" []
+
+  toCeTA EmptyProblem = Xml.elt "rIsEmpty" []
+  toCeTA OpenProblem  = Xml.elt "open" []
 
 instance T.ProofData prob => T.Processor (EmptyProcessor prob) where
   type ProofObject (EmptyProcessor prob) = EmptyProof

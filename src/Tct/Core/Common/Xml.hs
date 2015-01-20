@@ -38,7 +38,9 @@ type XmlAttribute = (Txt.Text, Txt.Text)
 type XmlDocument  = (Txt.Text, XmlContent)
 
 class Xml a where
-  toXml :: a -> XmlContent
+  toXml  :: a -> XmlContent
+  toCeTA :: a -> XmlContent
+  toCeTA = toXml
 
 instance Xml () where
   toXml _ = text ""
