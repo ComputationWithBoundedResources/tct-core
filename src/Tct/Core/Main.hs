@@ -101,7 +101,7 @@ tctl conf = Dyre.wrapMain params conf
     tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
     name    = either (const "all") (modeId . snd) conf
     ghcOpts =
-      ["-threaded", "-O2","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"]
+      ["-threaded", "-O","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"]
 
 -- Mode Application --------------------------------------------------------------------------------------------------
 

@@ -6,6 +6,7 @@ module Tct.Core.Data.Forks
     Judgement (..)
   , judgement
   , Id (..)
+  , toId, fromId
   , Pair (..)
   , Optional (..) -- TODO Naming
 --  , Exclusive (..)
@@ -16,7 +17,6 @@ module Tct.Core.Data.Forks
 import Control.Applicative (liftA2, (<$>))
 import Data.Foldable       as F (Foldable (..))
 import Data.Traversable    as T (Traversable (..))
-
 
 -- | 'Judgement' representst a node with no successor.
 data Judgement a = Judgement deriving (Foldable,Functor,Traversable)
@@ -30,6 +30,14 @@ judgement a _ = a
 -- | 'Id' represents a node with one successor.
 newtype Id a = Id a
   deriving (Foldable, Functor, Traversable)
+
+-- | 'Id' constructor.
+toId :: a -> Id a
+toId = Id
+
+-- | 'Id' deconstructor.
+fromId :: Id a -> a
+fromId (Id c) = c
 
 -- | 'Pair' represents a node with two successors.
 newtype Pair a = Pair (a,a)
