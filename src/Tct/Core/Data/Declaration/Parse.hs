@@ -35,7 +35,8 @@ strategy :: SParser prob (Strategy prob)
 strategy = PE.buildExpressionParser table strat <?> "stratgy"
   where
     strat = 
-      predefined
+      parens strategy
+      <|> predefined
       <?> "expression"
     predefined :: SParser prob (Strategy prob)      
     predefined = do
@@ -45,9 +46,11 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
       choice [ decl d | SD d <- sortBy k decls ]
         where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
       
-    table = [ [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
+    table = [ [unary "try" (S.Trying True) ,      unary "force" (S.Trying False) ]
+            , [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
             , [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
+    unary name fun = PE.Prefix (do{ reserved name; return fun })
 
 instance ParsableArgs prob '[] where
   mkOptParsers  _ = []
