@@ -143,9 +143,8 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
       , O.help "Display Version."
       , O.hidden]
     tctp = TctOptions
-      <$> O.optional (O.nullOption (mconcat
-        [ O.reader readOutputMode
-        , O.short 'a'
+      <$> O.optional (O.option (O.str >>= readOutputMode) (mconcat
+        [ O.short 'a'
         , O.long "answer"
         , O.helpDoc . Just $ PP.vcat
           [ PP.hsep [PP.text (show OnlyAnswer)        , PP.text "- only answer"]
@@ -153,7 +152,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
           , PP.hsep [PP.text (show WithDetailedProof) , PP.text "- with detailed proof"]
           , PP.hsep [PP.text (show AsXml)             , PP.text "- as xml"]
           , PP.hsep [PP.text (show CustomAnswer)      , PP.text "- as custom answer"] ]]))
-      <*> O.optional (O.option (mconcat
+      <*> O.optional (O.option O.auto (mconcat
         [ O.short 't'
         , O.long "timeout"
         , O.metavar "Sec"

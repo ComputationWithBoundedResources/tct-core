@@ -88,11 +88,11 @@ opt `withMetavar` str = opt <> O.metavar str
 
 -- | Constructs and Option given the empty option together with its modifiers.
 option :: Read a => O.Mod O.OptionFields a -> O.Parser a
-option = O.option
+option = O.option O.auto
 
 -- | Constructs a hidden unit option. This option is ignored during parsing.
 unit :: O.Parser ()
-unit = O.option $ O.idm `withDefault` () <> O.internal <> O.hidden
+unit = O.option O.auto $ O.idm `withDefault` () <> O.internal <> O.hidden
 
 -- | A Flag option..
 flag :: a -> a -> O.Mod O.FlagFields a -> O.Parser a
@@ -103,7 +103,7 @@ switch :: O.Mod O.FlagFields Bool -> O.Parser Bool
 switch = O.switch
 
 -- | An argument opton without any id.
-argument :: (String -> Maybe a) -> O.Mod O.ArgumentFields a -> O.Parser a
+argument :: O.ReadM a -> O.Mod O.ArgumentFields a -> O.Parser a
 argument = O.argument
 
 -- | Given a parser and a description this function constructs the actual parser.
