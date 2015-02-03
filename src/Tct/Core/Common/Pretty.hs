@@ -4,6 +4,7 @@
 module Tct.Core.Common.Pretty
   (
   module Text.PrettyPrint.ANSI.Leijen
+  , set
   , Align (..)
   , table
   , itemise
@@ -15,6 +16,10 @@ module Tct.Core.Common.Pretty
 import Data.List                    (transpose)
 import Text.PrettyPrint.ANSI.Leijen
 
+ 
+-- | @set ds@ encloses @ds@ in braces and seperates them using commas.
+set :: [Doc] -> Doc
+set = encloseSep lbrace rbrace comma
 
 -- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
