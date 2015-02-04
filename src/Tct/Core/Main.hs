@@ -229,7 +229,7 @@ realMain dcfg = do
         OnlyAnswer        -> putPretty (answering pt)
         WithProof         -> putPretty (answering pt) >> putPretty (ppProofTree pt)
         WithDetailedProof -> putPretty (answering pt) >> putPretty (ppDetailedProofTree pt)
-        AsXml             -> error "missing: toXml prooftree"
+        AsXml             -> error "missing: toXml prooftree" -- FIXME
         CustomAnswer      -> custom pt
     putPretty :: PP.Pretty a => a -> IO ()
     putPretty = putStrLn . PP.display . PP.pretty

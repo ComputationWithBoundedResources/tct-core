@@ -6,6 +6,7 @@ module Tct.Core.Common.Xml
   , XmlAttribute
   , XmlDocument
   , elt
+  , unsupported
   , int
   , text
   , att
@@ -13,6 +14,7 @@ module Tct.Core.Common.Xml
   -- * output
   , toDocument
   , putXml
+  , putXmlHandle
   -- * search and manipulation
   , search
   , find
@@ -23,11 +25,12 @@ module Tct.Core.Common.Xml
   ) where
 
 
+import GHC.IO.Handle
 import qualified Data.ByteString.Lazy  as BS
 import           Data.Monoid
 import           Data.Maybe (fromMaybe)
 import qualified Data.Text             as Txt
-import qualified Data.Text.IO          as Txt (putStr)
+import qualified Data.Text.IO          as Txt (putStr, hPutStr)
 import qualified Text.XML.Expat.Format as Xml (formatNode)
 import qualified Text.XML.Expat.Tree   as Xml
 import qualified Text.XML.Expat.Proc   as Xml
@@ -40,10 +43,11 @@ type XmlDocument  = (Txt.Text, XmlContent)
 class Xml a where
   toXml  :: a -> XmlContent
   toCeTA :: a -> XmlContent
-  toCeTA = toXml
+  toCeTA = const unsupported
 
 instance Xml () where
-  toXml _ = text ""
+  toXml _  = text ""
+  toCeTA _ = text ""
 
 elt :: String -> [XmlContent] -> XmlContent
 elt name = Xml.Element (Txt.pack name) []
@@ -53,6 +57,9 @@ setAtts atts e = e{ Xml.eAttributes = atts }
 
 att :: String -> String -> XmlAttribute
 att n s = (Txt.pack n, Txt.pack s)
+
+unsupported :: XmlContent
+unsupported = elt "unsupported" []
 
 int :: (Integral i) => i -> XmlContent
 int i = Xml.Text . Txt.pack . show $ toInteger i
@@ -68,6 +75,10 @@ toDocument (Just s) c = (Txt.pack $ header ++ s ++ "\n", c)
 putXml :: XmlDocument -> IO ()
 putXml (header, content)= Txt.putStr header >> BS.putStr (Xml.formatNode content)
 
+putXmlHandle :: XmlDocument -> Handle -> IO ()
+putXmlHandle (header, content) h = Txt.hPutStr h header >> BS.hPutStr h (Xml.formatNode content)
+
+-- TODO: we actually do not use all; to be deleted
 search :: String -> XmlContent -> Maybe XmlContent
 search s = Xml.findElement (Txt.pack s)
 

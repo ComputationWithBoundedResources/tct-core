@@ -206,4 +206,8 @@ instance Xml.Xml Complexity where
     Multrec         -> Xml.elt "multiplerecursive" []
     Rec             -> Xml.elt "recursive" []
     Unknown         -> Xml.elt "unknown" []
+  toCeTA (Poly (Just k)) = Xml.elt "polynomial" [Xml.int k]
+  toCeTA _               = Xml.unsupported
+
+
 

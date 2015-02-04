@@ -8,6 +8,7 @@ module Tct.Core.Data.ProofTree
   -- * Certification
   , collectCertificate
   , certificate
+  , certificateWith
   -- * Properites
   , progress
   , open
@@ -42,6 +43,12 @@ collectCertificate (Progress _ certfn' subtrees) = certfn' (collectCertificate `
 certificate :: ProofTree l -> Certificate
 certificate pt = collectCertificate $ const unbounded `fmap` pt
 
+-- | Computes the 'Certificate' of a 'ProofTree'.
+-- 'Open' nodes have the 'Certificate' provided certificate'.
+--
+-- prop> certificate pt cert = collectCertificate (const cert `fmap` pt)
+certificateWith :: ProofTree l -> Certificate -> Certificate
+certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 
 -- | Checks if the 'ProofTree' contains a 'Progress' node.
 progress :: ProofTree l -> Bool

@@ -27,7 +27,7 @@ instance Xml.Xml EmptyProof where
   toXml OpenProblem   = Xml.elt "open" []
 
   toCeTA EmptyProblem = Xml.elt "rIsEmpty" []
-  toCeTA OpenProblem  = Xml.elt "open" []
+  toCeTA _            = Xml.unsupported
 
 instance T.ProofData prob => T.Processor (EmptyProcessor prob) where
   type ProofObject (EmptyProcessor prob) = EmptyProof
