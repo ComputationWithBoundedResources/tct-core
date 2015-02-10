@@ -6,6 +6,7 @@ module Tct.Core.Data.TctM
   TctM (..)
   , TctROState (..)
   , TctStatus (..)
+  , askState
   , askStatus
 
   -- * Lifted IO functions

@@ -24,6 +24,7 @@ import           System.Directory           (getHomeDirectory)
 import           System.Exit                (exitFailure, exitSuccess)
 import           System.FilePath            ((</>))
 import           System.IO                  (hPrint, stderr)
+import           System.IO.Temp             (withTempDirectory)
 import qualified System.Time                as Time
 
 import           Tct.Core.Combinators       (declarations)
@@ -171,13 +172,14 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
 -- Main --------------------------------------------------------------------------------------------------------------
 
 run :: TctConfig prob -> TctM a -> IO a
-run _ m = do
+run conf m = do
   time <- Time.getClockTime
   let
-    state = TctROState
-      { startTime    = time
-      , stopTime     = Nothing }
-  runReaderT (runTct m) state
+    state tmp  = TctROState
+      { startTime     = time
+      , stopTime      = Nothing 
+      , tempDirectory = tmp}
+  withTempDirectory "/tmp" "tct" $ runReaderT (runTct m) . state
 
 realMain :: ProofData prob => TctConfiguration prob opt -> IO ()
 realMain dcfg = do

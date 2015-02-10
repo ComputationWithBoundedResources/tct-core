@@ -66,6 +66,7 @@ Library
     old-time             == 1.1.*,
     optparse-applicative == 0.11.*,
     parsec               == 3.1.*,
+    temporary            == 1.2.*,
     text                 == 1.2.*,
     hexpat               >= 0.20.7
     

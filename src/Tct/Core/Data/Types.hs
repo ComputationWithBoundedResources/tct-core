@@ -25,8 +25,9 @@ import           Tct.Core.Data.Forks           (Id (..))
 
 -- | Provides Tct runtime options.
 data TctROState = TctROState
-  { startTime    :: Time.ClockTime
-  , stopTime     :: Maybe Time.ClockTime }
+  { startTime     :: Time.ClockTime
+  , stopTime      :: Maybe Time.ClockTime 
+  , tempDirectory :: FilePath }
 
 -- | The Tct monad.
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
