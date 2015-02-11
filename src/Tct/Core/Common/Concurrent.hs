@@ -30,7 +30,8 @@ spawn cmd args putInh = C.bracketOnError create release run where
     terminateProcess ph
     _ <- tryIOError $ hClose inh
     hClose outh >> hClose errh
-    _ <- tryIOError $ forkIO (void $ waitForProcess ph)
+    _ <- forkIO $ C.catch (void $ waitForProcess ph) (\e -> void (return (e :: C.SomeException)))
+    -- _ <- tryIOError . void $ waitForProcess ph
     return ()
 
   run (inh, outh, errh, ph) = do
