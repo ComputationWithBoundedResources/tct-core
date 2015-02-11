@@ -30,6 +30,7 @@ Library
   exposed-modules:
     Tct.Core
     Tct.Core.Combinators
+    Tct.Core.Common.Concurrent
     Tct.Core.Common.Error
     Tct.Core.Common.Parser
     Tct.Core.Common.Pretty
@@ -66,6 +67,7 @@ Library
     old-time             == 1.1.*,
     optparse-applicative == 0.11.*,
     parsec               == 3.1.*,
+    process              == 1.2.*,
     temporary            == 1.2.*,
     text                 == 1.2.*,
     hexpat               >= 0.20.7
