@@ -1,4 +1,6 @@
-module Tct.Core.Common.Concurrent where
+module Tct.Core.Common.Concurrent 
+  ( spawn
+  ) where
 
 
 import           Control.Concurrent      (forkIO)
@@ -31,7 +33,6 @@ spawn cmd args putInh = C.bracketOnError create release run where
     _ <- tryIOError $ hClose inh
     hClose outh >> hClose errh
     _ <- forkIO $ C.catch (void $ waitForProcess ph) (\e -> void (return (e :: C.SomeException)))
-    -- _ <- tryIOError . void $ waitForProcess ph
     return ()
 
   run (inh, outh, errh, ph) = do
@@ -45,5 +46,5 @@ spawn cmd args putInh = C.bracketOnError create release run where
     ex <- waitForProcess ph
     return $ case ex of
       ExitFailure i -> Left ("Exitcode:" ++ show i ++ ". " ++ errs)
-      ExitSuccess -> Right outs
+      ExitSuccess   -> Right outs
 

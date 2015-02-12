@@ -26,7 +26,7 @@ import           Tct.Core.Data.Forks           (Id (..))
 -- | Provides Tct runtime options.
 data TctROState = TctROState
   { startTime     :: Time.ClockTime
-  , stopTime      :: Maybe Time.ClockTime 
+  , stopTime      :: Maybe Time.ClockTime
   , tempDirectory :: FilePath }
 
 -- | The Tct monad.
@@ -110,14 +110,6 @@ data Return l
   = Continue { fromReturn :: l }
   | Abort    { fromReturn :: l }
   deriving (Show, Functor)
-
-
--- Answer ------------------------------------------------------------------------------------------------------------
-
--- | A generic answer type.
-data SomeAnswer                 where SomeAnswer :: ProofData a => a -> SomeAnswer
-instance Show (SomeAnswer)      where show (SomeAnswer a) = show a
-instance PP.Pretty (SomeAnswer) where pretty (SomeAnswer a) = PP.pretty a
 
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------

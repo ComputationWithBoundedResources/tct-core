@@ -38,12 +38,10 @@ Otherwise, all leafs of the 'ProofTree' are 'Progress' nodes providing a 'Certif
 These are recursively combined (in a bottom-up way) using the certification function of 'Progress' nodes.
 
 -}
-module Tct.Core.Data
-  (
-  module M
-  ) where
+module Tct.Core.Data (module M) where
 
 
+import Tct.Core.Data.Answer            as M
 import Tct.Core.Data.Certificate       as M
 import Tct.Core.Data.Declaration       as M
 import Tct.Core.Data.Declaration.Parse as M

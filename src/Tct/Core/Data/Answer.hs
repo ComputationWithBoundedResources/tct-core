@@ -1,5 +1,8 @@
 -- | This module provides the standard answer type.
-module Tct.Core.Data.Answer where
+module Tct.Core.Data.Answer 
+  ( Answer (..)
+  , answer
+  ) where
 
 import           Tct.Core.Data.ProofTree
 import qualified Tct.Core.Data.Certificate as T
@@ -29,7 +32,7 @@ instance Xml.Xml Answer where
   toXml _        = Xml.elt "maybe" []
 
 -- | Returns the time upper bound as an answer.
-answering :: ProofTree l -> Answer
-answering = cert . certificate
+answer :: ProofTree l -> Answer
+answer = cert . certificate
   where cert c = CertAnswer (T.timeLB c, T.timeUB c)
 

@@ -9,10 +9,12 @@ module Tct.Core.Main
   -- * Tct Initialisation
   , apply
   , applyMode
-  , module Tct.Core.Main.Options
-  , module Tct.Core.Main.Mode
+  , module M
   ) where
 
+import           Tct.Core.Data              as M (ProofTree, answer)
+import           Tct.Core.Main.Mode         as M
+import           Tct.Core.Main.Options      as M
 
 import qualified Config.Dyre                as Dyre (Params (..), defaultParams, wrapMain)
 import           Control.Applicative        ((<$>), (<*>))
@@ -31,10 +33,8 @@ import           Tct.Core.Combinators       (declarations)
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import           Tct.Core.Data
-import           Tct.Core.Data.Answer
-import           Tct.Core.Main.Mode
-import           Tct.Core.Main.Options
 import           Tct.Core.Processor.Timeout (timeoutIn)
+
 
 
 -- | Current version.
@@ -47,7 +47,7 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 
 -- TctConfig ---------------------------------------------------------------------------------------------------------
 
--- | The Tct configuration defines global properties. 
+-- | The Tct configuration defines global properties.
 --   It is updated by command-line arguments and 'TctMode'.
 data TctConfig prob = TctConfig
   { outputMode :: OutputMode
@@ -89,10 +89,10 @@ type TctConfiguration prob opt = Either TctError (TctConfig prob, TctMode prob o
 
 tctl :: ProofData prob => TctConfiguration prob opt -> IO ()
 tctl conf = Dyre.wrapMain params conf
-  where  
+  where
     params = Dyre.defaultParams
       { Dyre.projectName = name
-      , Dyre.configCheck = either (const True) (recompile . fst) conf 
+      , Dyre.configCheck = either (const True) (recompile . fst) conf
       , Dyre.realMain    = realMain
       , Dyre.configDir   = Just tctldir
       , Dyre.cacheDir    = Just tctldir
@@ -171,15 +171,16 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
 
 -- Main --------------------------------------------------------------------------------------------------------------
 
-run :: TctConfig prob -> TctM a -> IO a
-run conf m = do
+--run :: TctConfig prob -> TctM a -> IO a
+run :: TctM a -> IO a
+run m = do
   time <- Time.getClockTime
   let
-    state tmp  = TctROState
+    state tmp = TctROState
       { startTime     = time
       , stopTime      = Nothing 
-      , tempDirectory = tmp}
-  withTempDirectory "/tmp" "tct" $ runReaderT (runTct m) . state
+      , tempDirectory = tmp }
+  withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
 
 realMain :: ProofData prob => TctConfiguration prob opt -> IO ()
 realMain dcfg = do
@@ -208,7 +209,7 @@ realMain dcfg = do
     prob <- mkProblem theProblemFile theProblemParser theModifyer theOptions
     st   <- mkStrategy theDefaultStrategy theStrategies theStrategyName
     let stt = maybe st (`timeoutIn` st) theTimeout
-    r    <- runIt cfg stt prob
+    r    <- runIt stt prob
     output theOutputMode theAnswer (fromReturn r)
   case r of
     Left err -> hPrint stderr err >> exitFailure
@@ -225,16 +226,14 @@ realMain dcfg = do
       liftEither $ do
         prob <- parser f
         return $ modifyer prob opts
-    runIt cfg st prob = liftIO $ run cfg (evaluate st prob)
-    output v custom pt = liftIO $ 
+    runIt st prob = liftIO $ run (evaluate st prob)
+    output v custom pt = liftIO $
       case v of
-        OnlyAnswer        -> putPretty (answering pt)
-        WithProof         -> putPretty (answering pt) >> putPretty (ppProofTree pt)
-        WithDetailedProof -> putPretty (answering pt) >> putPretty (ppDetailedProofTree pt)
+        OnlyAnswer        -> PP.putPretty (answer pt)
+        WithProof         -> PP.putPretty (answer pt) >> PP.putPretty (ppProofTree pt)
+        WithDetailedProof -> PP.putPretty (answer pt) >> PP.putPretty (ppDetailedProofTree pt)
         AsXml             -> error "missing: toXml prooftree" -- FIXME
         CustomAnswer      -> custom pt
-    putPretty :: PP.Pretty a => a -> IO ()
-    putPretty = putStrLn . PP.display . PP.pretty
     parseStrategy sds s = case strategyFromString sds s of
       Left err -> Left $ TctParseError (show err)
       Right st -> Right st

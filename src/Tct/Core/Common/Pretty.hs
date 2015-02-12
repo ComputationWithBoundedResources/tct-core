@@ -10,6 +10,7 @@ module Tct.Core.Common.Pretty
   , itemise
   , paragraph
   , display
+  , putPretty
   ) where
 
 
@@ -62,3 +63,8 @@ paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
 -- | Default 'Doc' rendering.
 display :: Doc -> String
 display d = displayS (renderPretty 0.9 1000 d) ""
+
+-- | Pretty print to stdout.
+putPretty :: Pretty a => a -> IO ()
+putPretty = putStrLn . display . pretty
+
