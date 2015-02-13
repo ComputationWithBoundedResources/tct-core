@@ -18,6 +18,7 @@ module Tct.Core.Combinators
   -- ** Sequential
   , (>>>), (>||>)
   , chain
+  , chainWith
   -- ** Alternative
   , (<>), (<||>), (<?>)
   , alternative
@@ -50,7 +51,6 @@ declarations =
 -- FIXME: 
 -- alternative left or right biased
 -- associativy of infix operators; associativity of list versions
--- <||>, fastest;  operate not as expected; possible all async related strats
 
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
@@ -150,9 +150,9 @@ chain ss = foldr1 (>>>) ss
 --
 -- > chainWith [] (try empty)      == try empty
 -- > chainWith [s1,s2] (try empty) == s1 >>> try empty >>> s2 >>> try empty
-chainWith :: ProofData prob => [Strategy prob] -> Strategy prob -> Strategy prob
-chainWith []   = s
-chainWith ss s = foldr1 (\as t  -> as >>> s >>> t)  >>> s
+chainWith :: ProofData prob => Strategy prob -> [Strategy prob] -> Strategy prob
+chainWith s [] = s
+chainWith s ss = foldr1 (\t ts -> t >>> s >>> ts) ss >>> s
 
 -- | List version of ('<>').
 alternative :: ProofData prob => [Strategy prob] -> Strategy prob
