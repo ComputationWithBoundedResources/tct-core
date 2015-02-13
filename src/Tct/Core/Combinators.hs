@@ -16,7 +16,7 @@ module Tct.Core.Combinators
   --  * is failing if it is not continuing.
   declarations
   -- ** Sequential
-  , (>>>), (>||>), (>=>)
+  , (>>>), (>||>)
   , chain
   -- ** Alternative
   , (<>), (<||>), (<?>)
@@ -55,7 +55,7 @@ declarations =
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
 
-infixl 5 >>>, >||> , >=>
+infixl 5 >>>, >||>
 infixl 6 <>, <||>
 
 -- | Infix version of 'Then'.
@@ -70,12 +70,6 @@ infixl 6 <>, <||>
 -- Like ('>>>') but applies @s2@ on all problems in parallel.
 (>||>) :: Strategy prob -> Strategy prob -> Strategy prob
 (>||>) = ThenPar
-
--- | Like ('>>>') but first strategy is optional.
---
--- prop> s1 >=> s2 = try s1 >>> s2
-(>=>) :: Strategy prob -> Strategy prob -> Strategy prob
-(>=>) s1 s2  = try s1 >>> s2
 
 -- | Infix version of 'Alt'.
 -- @s1 '<>' s2@
@@ -151,6 +145,14 @@ emptyList = identity
 chain :: ProofData prob => [Strategy prob] -> Strategy prob
 chain [] = emptyList
 chain ss = foldr1 (>>>) ss
+
+-- | Like 'chain' but additionally executes the provided strategy after each strategy of the list.
+--
+-- > chainWith [] (try empty)      == try empty
+-- > chainWith [s1,s2] (try empty) == s1 >>> try empty >>> s2 >>> try empty
+chainWith :: ProofData prob => [Strategy prob] -> Strategy prob -> Strategy prob
+chainWith []   = s
+chainWith ss s = foldr1 (\as t  -> as >>> s >>> t)  >>> s
 
 -- | List version of ('<>').
 alternative :: ProofData prob => [Strategy prob] -> Strategy prob
