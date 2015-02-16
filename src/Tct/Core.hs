@@ -18,8 +18,8 @@ module Tct.Core
   , TctMode
   , withStrategies
   , withDefaultStrategy
-  , apply
-  , applyMode
+  , setMode
+  , setModeWith
   -- * Strategy Declaration
   , ProofData
   , Strategy

@@ -5,6 +5,8 @@ module Tct.Core.Data.Strategy
   , Return (..)
   , returning
   , evaluate
+  , liftProgress
+  , liftNoProgress
   -- * Declaration
   , StrategyDeclaration (..)
   , strategy

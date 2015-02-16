@@ -47,6 +47,7 @@ Library
     Tct.Core.Data.Strategy
     Tct.Core.Data.TctM
     Tct.Core.Data.Types
+    Tct.Core.Interactive
     Tct.Core.Main
     Tct.Core.Main.Mode
     Tct.Core.Main.Options

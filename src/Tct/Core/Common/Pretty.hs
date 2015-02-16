@@ -8,6 +8,7 @@ module Tct.Core.Common.Pretty
   , Align (..)
   , table
   , itemise
+  , enumerate
   , paragraph
   , display
   , putPretty
@@ -52,9 +53,14 @@ table cols = vcat [ pprow row | row <- rows]
             r    = diff - l
         ws n = replicate n ' '
 
--- | Provides a itemise environment. @itemise d ds@ enumerates @ds@ with bullet @d@.
+-- | Provides an itemise environment. @itemise d ds@ with bullet @d@.
 itemise :: Doc -> [Doc] -> Doc
-itemise d ds = indent 2 $ vcat (map (d <+>) ds)
+itemise d ds = table [( AlignRight, replicate (length ds) d), (AlignLeft, ds)]
+
+-- | Provides an enumerate environment.
+enumerate :: [Doc] -> Doc
+enumerate ds = table [( AlignRight, enumeration), (AlignLeft, ds)]
+  where enumeration = take (length ds) [ int i <> text ".) " | i <- [1..]]
 
 -- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc

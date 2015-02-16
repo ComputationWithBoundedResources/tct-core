@@ -105,25 +105,28 @@ ppNodeShort (ProofNode p _ po) = PP.vcat
   , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
   where ind = PP.indent 2
 
-ppProofTree' :: PP.Pretty l => Bool -> ProofTree l -> PP.Doc
-ppProofTree' _ (Open l) = PP.vcat
+ppProofTree' :: (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
+ppProofTree' ppProb _ (Open l) = PP.vcat
   [ PP.text "*** Open ***"
-  , PP.indent 4 (PP.pretty l) ]
-ppProofTree' detailed (NoProgress pn pt)
+  , PP.indent 4 (ppProb l) ]
+ppProofTree' ppProb detailed (NoProgress pn pt)
   | detailed = PP.vcat
     [ PP.text "*** NoProgress ***"
     , PP.indent 4 (ppNodeShort pn)
-    , ppProofTree' detailed pt]
-  | otherwise   = ppProofTree' detailed pt
-ppProofTree' b (Progress pn _ pts) = PP.vcat
+    , ppProofTree' ppProb detailed pt]
+  | otherwise   = ppProofTree' ppProb detailed pt
+ppProofTree' ppProb detailed (Progress pn _ pts) = PP.vcat
   [ PP.text "*** Progress ***"
   , PP.indent 4 (ppProofNode pn)
   , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
-    where ppts = map (ppProofTree' b) (F.toList pts)
+    where ppts = map (ppProofTree' ppProb detailed) (F.toList pts)
 
-ppProofTree :: PP.Pretty l => ProofTree l -> PP.Doc
-ppProofTree = ppProofTree' True
+ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
+ppProofTree pp = ppProofTree' pp False
 
-ppDetailedProofTree :: PP.Pretty l => ProofTree l -> PP.Doc
-ppDetailedProofTree = ppProofTree' False
+ppDetailedProofTree :: (l -> PP.Doc ) -> ProofTree l -> PP.Doc
+ppDetailedProofTree pp = ppProofTree' pp True
+
+instance PP.Pretty prob => PP.Pretty (ProofTree prob) where
+  pretty = ppProofTree PP.pretty
 

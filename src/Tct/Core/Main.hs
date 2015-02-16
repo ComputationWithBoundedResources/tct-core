@@ -7,27 +7,31 @@ module Tct.Core.Main
   , defaultTctConfig
   , OutputMode (..)
   -- * Tct Initialisation
-  , apply
-  , applyMode
+  , setMode
+  , setModeWith
+  , run
+  , runInteractive
   , module M
   ) where
 
-import           Tct.Core.Data              as M (ProofTree, answer)
-import           Tct.Core.Main.Mode         as M
-import           Tct.Core.Main.Options      as M
 
 import qualified Config.Dyre                as Dyre (Params (..), defaultParams, wrapMain)
-import           Control.Applicative        ((<$>), (<*>))
+import           Control.Applicative        ((<$>), (<*>), (<|>))
 import           Control.Monad.Reader       (runReaderT)
 import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid                (mconcat)
 import qualified Options.Applicative        as O
-import           System.Directory           (getHomeDirectory)
+import           System.Directory           (getHomeDirectory, setCurrentDirectory)
 import           System.Exit                (exitFailure, exitSuccess)
 import           System.FilePath            ((</>))
 import           System.IO                  (hPrint, stderr)
 import           System.IO.Temp             (withTempDirectory)
+import           System.Process             (system)
 import qualified System.Time                as Time
+
+import           Tct.Core.Data              as M (ProofTree, answer)
+import           Tct.Core.Main.Mode         as M
+import           Tct.Core.Main.Options      as M
 
 import           Tct.Core.Combinators       (declarations)
 import           Tct.Core.Common.Error
@@ -85,6 +89,12 @@ defaultTctConfig = TctConfig
   , recompile  = True
   , strategies = declarations }
 
+configDir :: IO FilePath
+configDir = getHomeDirectory >>= \home -> return (home </> ".tctl")
+
+{-configFile :: String -> IO FilePath-}
+{-configFile n = configDir >>= return . (</> n)-}
+
 type TctConfiguration prob opt = Either TctError (TctConfig prob, TctMode prob opt)
 
 tctl :: ProofData prob => TctConfiguration prob opt -> IO ()
@@ -94,12 +104,11 @@ tctl conf = Dyre.wrapMain params conf
       { Dyre.projectName = name
       , Dyre.configCheck = either (const True) (recompile . fst) conf
       , Dyre.realMain    = realMain
-      , Dyre.configDir   = Just tctldir
-      , Dyre.cacheDir    = Just tctldir
+      , Dyre.configDir   = Just configDir
+      , Dyre.cacheDir    = Just configDir
       , Dyre.showError   = \_ emsg -> Left (TctDyreError emsg)
       , Dyre.ghcOpts     = ghcOpts}
       --, Dyre.ghcOpts     = ["-threaded", "-package tct-its-" ++ version] }
-    tctldir = getHomeDirectory >>= \home -> return (home </> ".tctl")
     name    = either (const "all") (modeId . snd) conf
     ghcOpts =
       ["-threaded", "-O","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"]
@@ -108,15 +117,15 @@ tctl conf = Dyre.wrapMain params conf
 
 -- | Construct a customised Tct. Example usage:
 --
--- > main = tctl $ apply defaultTctConfig trsMode
-apply :: ProofData prob => TctConfig prob -> TctMode prob opt -> IO ()
-apply c m = tctl $ Right (c,m)
+-- > main = tctl $ setModeWith defaultTctConfig trsMode
+setModeWith :: ProofData prob => TctConfig prob -> TctMode prob opt -> IO ()
+setModeWith c m = tctl $ Right (c,m)
 
 -- | Construct a customised Tct with default configuration.
 --
--- > applyMode m = apply defaultTctConfig m
-applyMode :: ProofData prob => TctMode prob opt -> IO ()
-applyMode = apply defaultTctConfig
+-- > setMode m = setModeWith defaultTctConfig m
+setMode :: ProofData prob => TctMode prob opt -> IO ()
+setMode = setModeWith defaultTctConfig
 
 
 -- Command-Line Options ----------------------------------------------------------------------------------------------
@@ -132,8 +141,13 @@ data TctOptions m = TctOptions
 updateTctConfig :: TctConfig prob -> TctOptions m -> TctConfig prob
 updateTctConfig cfg opt = cfg { outputMode = outputMode cfg `fromMaybe` outputMode_ opt }
 
-mkParser :: [StrategyDeclaration proc] -> O.Parser m -> O.ParserInfo (TctOptions m)
-mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
+
+data TctAction m
+  = Run (TctOptions m)
+  | RunInteractive
+
+mkParser :: [StrategyDeclaration proc] -> O.Parser m -> O.ParserInfo (TctAction m)
+mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive <|> tctp) desc
   where
     listed = O.infoOption (PP.display . PP.vcat $ map PP.pretty ps) $ mconcat
       [ O.long "list"
@@ -143,7 +157,11 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
       , O.short 'v'
       , O.help "Display Version."
       , O.hidden]
-    tctp = TctOptions
+    interactive = O.flag' RunInteractive  $ mconcat
+      [ O.long "interactive"
+      , O.short 'i'
+      , O.help "Interactive mode." ]
+    tctp = fmap Run $ TctOptions
       <$> O.optional (O.option (O.str >>= readOutputMode) (mconcat
         [ O.short 'a'
         , O.long "answer"
@@ -171,16 +189,24 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> tctp) desc
 
 -- Main --------------------------------------------------------------------------------------------------------------
 
---run :: TctConfig prob -> TctM a -> IO a
 run :: TctM a -> IO a
 run m = do
   time <- Time.getClockTime
   let
     state tmp = TctROState
       { startTime     = time
-      , stopTime      = Nothing 
+      , stopTime      = Nothing
       , tempDirectory = tmp }
   withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
+
+runInteractive :: String -> IO ()
+runInteractive theModeId = do
+  ret <- runErroneousIO $ do
+    _ <- tryIO $ setCurrentDirectory `fmap` configDir
+    _ <- tryIO $ system $ "ghci +RTS -N -RTS -package tct-" ++ theModeId ++ " " ++ theModeId ++ ".hs"
+    return ()
+  either print return ret
+
 
 realMain :: ProofData prob => TctConfiguration prob opt -> IO ()
 realMain dcfg = do
@@ -195,22 +221,25 @@ realMain dcfg = do
         , modeAnswer           = theAnswer
         } = mode
       theStrategies = strategies cfg ++ modeStrategies mode
-    opts <- mkOptions theOptionParser theStrategies
-    let
-      TctOptions
-        { strategyName_ = theStrategyName
-        , timeout_      = theTimeout
-        , problemFile_  = theProblemFile
-        , modeOptions_  = theOptions
-        } = opts
-      ucfg = updateTctConfig cfg opts
-      TctConfig
-        { outputMode = theOutputMode } = ucfg
-    prob <- mkProblem theProblemFile theProblemParser theModifyer theOptions
-    st   <- mkStrategy theDefaultStrategy theStrategies theStrategyName
-    let stt = maybe st (`timeoutIn` st) theTimeout
-    r    <- runIt stt prob
-    output theOutputMode theAnswer (fromReturn r)
+    action <- mkOptions theOptionParser theStrategies
+    case action of
+      RunInteractive -> tryIO $ runInteractive (modeId mode)
+      Run opts       -> do
+        let
+          TctOptions
+            { strategyName_ = theStrategyName
+            , timeout_      = theTimeout
+            , problemFile_  = theProblemFile
+            , modeOptions_  = theOptions
+            } = opts
+          ucfg = updateTctConfig cfg opts
+          TctConfig
+            { outputMode = theOutputMode } = ucfg
+        prob <- mkProblem theProblemFile theProblemParser theModifyer theOptions
+        st   <- mkStrategy theDefaultStrategy theStrategies theStrategyName
+        let stt = maybe st (`timeoutIn` st) theTimeout
+        r    <- runIt stt prob
+        output theOutputMode theAnswer (fromReturn r)
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
@@ -230,8 +259,8 @@ realMain dcfg = do
     output v custom pt = liftIO $
       case v of
         OnlyAnswer        -> PP.putPretty (answer pt)
-        WithProof         -> PP.putPretty (answer pt) >> PP.putPretty (ppProofTree pt)
-        WithDetailedProof -> PP.putPretty (answer pt) >> PP.putPretty (ppDetailedProofTree pt)
+        WithProof         -> PP.putPretty (answer pt) >> PP.putPretty (ppProofTree PP.pretty pt)
+        WithDetailedProof -> PP.putPretty (answer pt) >> PP.putPretty (ppDetailedProofTree PP.pretty pt)
         AsXml             -> error "missing: toXml prooftree" -- FIXME
         CustomAnswer      -> custom pt
     parseStrategy sds s = case strategyFromString sds s of
