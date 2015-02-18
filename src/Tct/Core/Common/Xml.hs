@@ -52,8 +52,8 @@ instance Xml () where
 elt :: String -> [XmlContent] -> XmlContent
 elt name = Xml.Element (Txt.pack name) []
 
-setAtts :: [XmlAttribute] -> XmlContent -> XmlContent
-setAtts atts e = e{ Xml.eAttributes = atts }
+setAtts :: XmlContent -> [XmlAttribute] -> XmlContent
+setAtts e atts = e{ Xml.eAttributes = atts }
 
 att :: String -> String -> XmlAttribute
 att n s = (Txt.pack n, Txt.pack s)
