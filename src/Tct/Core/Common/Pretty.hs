@@ -4,25 +4,27 @@
 module Tct.Core.Common.Pretty
   (
   module Text.PrettyPrint.ANSI.Leijen
-  , set
   , Align (..)
   , table
-  , itemise
-  , enumerate
+
+  , list, list'
+  , tupled, tupled'
+  , set, set'
+  , itemise, itemise'
+  , enumerate, enumerate'
+
   , paragraph
   , display
   , putPretty
   ) where
 
 
+import qualified Data.Foldable as F
+import qualified Data.Set as S
 import Data.List                    (transpose)
-import Text.PrettyPrint.ANSI.Leijen
+import Text.PrettyPrint.ANSI.Leijen hiding (list,tupled)
 
  
--- | @set ds@ encloses @ds@ in braces and seperates them using commas.
-set :: [Doc] -> Doc
-set = encloseSep lbrace rbrace comma
-
 -- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
@@ -53,14 +55,51 @@ table cols = vcat [ pprow row | row <- rows]
             r    = diff - l
         ws n = replicate n ' '
 
+
+-- | Generalised version of Pretty.list.
+list :: F.Foldable f => f Doc -> Doc
+list = encloseSep lbracket rbracket comma . F.toList
+
+-- | prop> list' xs == list (fmap pretty xs)
+list' :: (F.Foldable f, Pretty a) =>  f a -> Doc
+list' = list . fmap pretty . F.toList
+
+-- | Generalised version of Pretty.tupled.
+tupled :: F.Foldable f => f Doc -> Doc
+tupled = encloseSep lparen rparen comma . F.toList
+
+-- | prop> tupled' xs == tupled (fmap pretty xs)
+tupled' :: (F.Foldable f, Pretty a) =>  f a -> Doc
+tupled' = tupled . fmap pretty . F.toList
+
+-- | @set ds@ encloses @ds@ in braces and seperates them using commas.
+set :: F.Foldable f => f Doc -> Doc
+set = encloseSep lbrace rbrace comma . F.toList
+
+-- | set' xs == set (nub . fmap pretty xs)
+set' :: (F.Foldable f, Pretty a, Ord a) =>  f a -> Doc
+set' = set . fmap pretty . F.toList . F.foldr S.insert S.empty
+
 -- | Provides an itemise environment. @itemise d ds@ with bullet @d@.
-itemise :: Doc -> [Doc] -> Doc
-itemise d ds = table [( AlignRight, replicate (length ds) d), (AlignLeft, ds)]
+itemise :: F.Foldable f => Doc -> f Doc -> Doc
+itemise d ds = table [( AlignRight, replicate (length ds') d), (AlignLeft, ds')]
+  where ds' = F.toList ds
+
+-- | itemise' d ds == itemise d (fmap pretty ds)
+itemise' :: (F.Foldable f, Pretty a) => Doc -> f a -> Doc
+itemise' d = itemise d . fmap pretty . F.toList
 
 -- | Provides an enumerate environment.
-enumerate :: [Doc] -> Doc
-enumerate ds = table [( AlignRight, enumeration), (AlignLeft, ds)]
-  where enumeration = take (length ds) [ int i <> text ".) " | i <- [1..]]
+enumerate :: F.Foldable f => f Doc -> Doc
+enumerate ds = table [(AlignRight, enumeration), (AlignLeft, ds')]
+  where 
+    ds'         = F.toList ds
+    enumeration = take (length ds') [ int i <> text ".) " | i <- [1..]]
+
+-- | enumerate' ds == enumerate (fmap pretty ds)
+enumerate' :: (F.Foldable f, Pretty a) => f a -> Doc
+enumerate' = enumerate . fmap pretty . F.toList
+
 
 -- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc

@@ -34,6 +34,8 @@ import           Tct.Core.Main
 -- Proofdata constraints; currently I just put necessary functions into the state
 -- this will not work if we extend strategy with problem transformations in the future
 
+-- MS: at least for pretty printing we could cheat: apply a "closing" processor before printing
+-- is it a problem to update the parser?
 
 --- * selection ------------------------------------------------------------------------------------------------------
 
