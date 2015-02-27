@@ -1,24 +1,23 @@
 -- | This module provides a basic interactive functionality via ghci.
--- NOTE: Totally unsafe at the moment.
-module Tct.Core.Interactive 
+module Tct.Core.Interactive
   (
   load
+  , select
+  , unselect
+
+  , modifyProblem
+  , apply
 
   , reset
   , undo
 
-  , select
-  , unselect
-
-  , apply
   , state
-  , proof, proof'
+  , proof
   ) where
 
 
 import           Control.Monad
 import qualified Control.Monad.State.Strict as S
-import qualified Data.Foldable              as F
 import           Data.IORef
 import qualified Data.Traversable           as F
 import           System.IO.Unsafe
@@ -28,27 +27,23 @@ import qualified Tct.Core.Common.Pretty     as PP
 import           Tct.Core.Data              hiding (proof)
 import           Tct.Core.Main
 
--- MS
--- * currently unsafe; we have to initialise IORef; use MVar or Maybe
--- * IORefs do not work well with polymorphic types; it works but we can not use
--- Proofdata constraints; currently I just put necessary functions into the state
--- this will not work if we extend strategy with problem transformations in the future
-
--- MS: at least for pretty printing we could cheat: apply a "closing" processor before printing
--- is it a problem to update the parser?
 
 --- * selection ------------------------------------------------------------------------------------------------------
 
 type Selected l = Either l l
 
-select :: [Int] -> ProofTree (Selected l) -> ProofTree (Selected l)
-select ns pt = S.evalState (F.mapM k pt) 0
+instance PP.Pretty l => PP.Pretty (Selected l) where
+  pretty (Left _)  = PP.empty
+  pretty (Right l) = PP.pretty l
+
+selectLeafs :: ProofData l => [Int] -> ProofTree (Selected l) -> ProofTree (Selected l)
+selectLeafs ns pt = S.evalState (F.mapM k pt) 0
   where
     k p = S.modify succ >> S.get >>= \i -> return (either (f i) (f i) p)
     f i = if i `elem` ns then Right else Left
 
-unselect :: ProofTree (Selected l) -> ProofTree (Selected l)
-unselect = fmap (either Right Right) where
+unselectLeafs :: ProofTree (Selected l) -> ProofTree (Selected l)
+unselectLeafs = fmap (either Right Right) where
 
 evaluateSelected :: Strategy prob -> ProofTree (Selected prob) -> TctM (Return (ProofTree (Selected prob)))
 evaluateSelected _ pt@(Open (Left _))           = return (Continue pt)
@@ -57,25 +52,19 @@ evaluateSelected s (NoProgress n subtree)       = liftNoProgress n `fmap` evalua
 evaluateSelected s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateSelected s `F.mapM` subtrees)
 
 
-newtype St l = St { unSt :: ProofTree (Selected l) }
+--- * state ----------------------------------------------------------------------------------------------------------
 
-{-onPt :: ProofData l => (ProofTree (Selected l1) -> ProofTree (Selected l)) -> St l1 -> St l-}
-{-onPt f = St . f . unSt-}
+data St l where
+  St :: ProofData l => ProofTree (Selected l) -> St l
 
-{-eonSt :: ProofData l => (ProofTree (Selected l) -> a) -> St l -> a-}
-{-eonSt f = f . unSt-}
+unSt :: St l -> ProofTree (Selected l)
+unSt (St pt) = pt
 
-data State l = State
-  { current :: St l
-  , history :: [St l]
-
-  , pretty  :: l -> PP.Doc
-  , parse   :: String -> Either TctError l }
-
+newtype State l = State { history_ :: [St l] }
 
 stateRef :: IORef (State l)
 stateRef = unsafePerformIO $ newIORef st
-  where st = State { current = undefined, history = undefined, pretty = undefined, parse = undefined }
+  where st = State { history_ = [] }
 {-# NOINLINE stateRef #-}
 
 getState :: IO (State l)
@@ -87,78 +76,76 @@ putState = writeIORef stateRef
 modifyState :: (State l -> State l) -> IO ()
 modifyState f = getState >>= putState . f
 
-getSt :: IO (St l)
-getSt = current `fmap` getState
+initSt :: ProofData l => l -> IO ()
+initSt st' = modifyState (\st -> st{ history_ = [St (Open (Right st'))] })
 
-getPretty :: IO (l -> PP.Doc)
-getPretty = pretty `fmap` getState
+getSt :: IO (Maybe (St l))
+getSt = do
+  hst <- history_ `fmap` getState
+  return $ if null hst then Nothing else Just (head hst)
 
+maybeSt :: IO a -> (St l -> IO a) -> IO a
+maybeSt a f = getSt >>= maybe a f
 
-initSt :: l -> IO ()
-initSt st' = modifyState (\st -> st{ current = St (Open (Right st')), history = [] })
+onSt :: (St l -> IO ()) -> IO ()
+onSt = maybeSt (print "no problem specified")
 
 putSt :: St l -> IO ()
 putSt st' = do
   st <- readIORef stateRef
-  writeIORef stateRef $ st { current = st', history = current st: history st }
+  writeIORef stateRef $ st { history_ = st': history_ st }
 
-reset :: IO ()
-reset = do
-  hst <- history `fmap` getState
-  unless (null hst) $  modifyState (\st -> st { current = last hst, history = [] })
-
-undo :: IO ()
-undo = do
-  hst <- history `fmap` getState
-  unless (null hst) $ modifyState (\st -> st { current = head hst, history = tail hst })
-
-{-modifySt :: (St l -> St l) -> IO ()-}
-{-modifySt f = getSt >>= putSt . f-}
-
-
-getProblems :: IO [l]
-getProblems = do
-  (St l) <- getSt
-  return [ p | Right p <- F.toList l]
+modifySt :: ProofData l => (ProofTree (Selected l) -> ProofTree (Selected l)) -> IO ()
+modifySt f = onSt (putSt . St . f . unSt)
 
 printState :: IO ()
-printState = do
-  pp <- pretty `fmap` getState
-  ps <- getProblems
-  putStrLn $ PP.display $ PP.enumerate (map pp ps)
+printState = onSt (PP.putPretty . pp)
+  where pp (St l) = ppProofTreeLeafes PP.pretty l
 
-{-loadMode :: ProofData l => TctMode l o -> IO () -}
-{-loadMode m = modifyState $ \st -> st { pretty = PP.pretty, parse = modeParser m }-}
+
+--- * interface ------------------------------------------------------------------------------------------------------
 
 load :: ProofData l => TctMode l o -> FilePath -> IO ()
 load m fp = do
-  modifyState $ \st -> st { pretty = PP.pretty, parse = modeParser m }
   ret <- runErroneousIO $ do
     p  <- tryIO $ readFile fp
-    pa <- liftIO $ parse `fmap` getState
-    liftEither (pa p)
+    liftEither (modeParser m p)
   either print (\prob -> initSt prob >> print "Problem loaded." >> printState) ret
 
-apply :: Strategy prob -> IO ()
-apply str = do
-  st1 <- getSt
-  ret <- run $ evaluateSelected str (unSt st1)
+modifyProblem :: ProofData l => (l -> l) -> IO ()
+modifyProblem = modifySt . fmap . fmap
+
+select :: [Int] -> IO ()
+select is = onSt $ \(St l) -> putSt (St (selectLeafs is l)) >> printState
+
+unselect :: IO ()
+unselect = onSt $ \(St l) -> putSt (St (unselectLeafs l)) >> printState
+
+apply :: ProofData prob => Strategy prob -> IO ()
+apply str = onSt $ \st -> do
+  ret <- run $ evaluateSelected str (unSt st)
+  -- MS: FIXME should be isProgressing and som more informative output
   returning
     (\s -> putSt (St s) >> printState)
-    (const $ print "no progress :/") ret
+    (const $ print "no progress :/")
+    ret
 
 proof :: IO ()
-proof = do
-  pp <- getPretty
-  st <- getSt
-  PP.putPretty $ ppProofTree pp (unSt st)
-
-proof' :: IO ()
-proof' = do
-  pp <- getPretty
-  st <- getSt
-  PP.putPretty $ ppDetailedProofTree pp (unSt st)
+proof = onSt (PP.putPretty . pp)
+  where pp (St l) = ppProofTree PP.pretty l
 
 state :: IO ()
 state = printState
+
+undo :: IO ()
+undo = do
+  hst <- history_ `fmap` getState
+  unless (null hst) $ modifyState (\st -> st { history_ = tail hst })
+  printState
+
+reset :: IO ()
+reset = do
+  hst <- history_ `fmap` getState
+  unless (null hst) $ modifyState (\st -> st { history_ = [last hst] })
+  printState
 

@@ -17,6 +17,7 @@ module Tct.Core.Data.ProofTree
 
   -- * Output
   , ppProofTree
+  , ppProofTreeLeafes
   , ppDetailedProofTree
   ) where
 
@@ -126,6 +127,11 @@ ppProofTree pp = ppProofTree' pp False
 
 ppDetailedProofTree :: (l -> PP.Doc ) -> ProofTree l -> PP.Doc
 ppDetailedProofTree pp = ppProofTree' pp True
+
+
+ppProofTreeLeafes :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
+ppProofTreeLeafes pp = PP.enumerate . map pp . F.toList
+
 
 instance PP.Pretty prob => PP.Pretty (ProofTree prob) where
   pretty = ppProofTree PP.pretty

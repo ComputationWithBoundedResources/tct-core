@@ -12,6 +12,7 @@ module Tct.Core.Common.Pretty
   , set, set'
   , itemise, itemise'
   , enumerate, enumerate'
+  , listing, listing'
 
   , paragraph
   , display
@@ -19,6 +20,7 @@ module Tct.Core.Common.Pretty
   ) where
 
 
+import Control.Arrow ((***))
 import qualified Data.Foldable as F
 import qualified Data.Set as S
 import Data.List                    (transpose)
@@ -39,7 +41,7 @@ table cols = vcat [ pprow row | row <- rows]
     cols'     = [ (al,len,cs')
                 | (al,cs) <- cols
                 , let cs' = [ lines $ show c | c <- cs ++ replicate (numrows - length cs) empty]
-                      len = maximum $ concat [ map length c | c <- cs']]
+                      len = maximum $ 0: concat [ map length c | c <- cs']]
     numrows = maximum $ 0 : [length cs | (_,cs) <- cols ]
     pprow row =
       vcat [ hcat [ text $ pad al len c | (al, len, c) <- rl ]
@@ -68,7 +70,7 @@ list' = list . fmap pretty . F.toList
 tupled :: F.Foldable f => f Doc -> Doc
 tupled = encloseSep lparen rparen comma . F.toList
 
--- | prop> tupled' xs == tupled (fmap pretty xs)
+-- | > tupled' xs == tupled (fmap pretty xs)
 tupled' :: (F.Foldable f, Pretty a) =>  f a -> Doc
 tupled' = tupled . fmap pretty . F.toList
 
@@ -76,7 +78,7 @@ tupled' = tupled . fmap pretty . F.toList
 set :: F.Foldable f => f Doc -> Doc
 set = encloseSep lbrace rbrace comma . F.toList
 
--- | set' xs == set (nub . fmap pretty xs)
+-- | > set' xs == set (nub . fmap pretty xs)
 set' :: (F.Foldable f, Pretty a, Ord a) =>  f a -> Doc
 set' = set . fmap pretty . F.toList . F.foldr S.insert S.empty
 
@@ -85,9 +87,18 @@ itemise :: F.Foldable f => Doc -> f Doc -> Doc
 itemise d ds = table [( AlignRight, replicate (length ds') d), (AlignLeft, ds')]
   where ds' = F.toList ds
 
--- | itemise' d ds == itemise d (fmap pretty ds)
+-- | > itemise' d ds == itemise d (fmap pretty ds)
 itemise' :: (F.Foldable f, Pretty a) => Doc -> f a -> Doc
 itemise' d = itemise d . fmap pretty . F.toList
+
+-- | Provides a listing environment.
+listing :: F.Foldable f => f (Doc, Doc) -> Doc
+listing xs = table [( AlignLeft, is), (AlignLeft, ds)]
+  where (is,ds) = unzip (F.toList xs)
+
+-- | > listing' ds == listing (fmap (pretty *** pretty) ds)
+listing' :: (F.Foldable f, Pretty a, Pretty b) => f (a,b) -> Doc
+listing' = listing . map (pretty *** pretty) . F.toList
 
 -- | Provides an enumerate environment.
 enumerate :: F.Foldable f => f Doc -> Doc
