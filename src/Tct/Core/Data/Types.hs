@@ -3,6 +3,7 @@
 module Tct.Core.Data.Types where
 
 
+import Data.Typeable
 import           Control.Applicative           (Applicative)
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
@@ -103,6 +104,7 @@ data Strategy prob where
   OrFaster   :: Strategy prob -> Strategy prob -> Strategy prob
   OrBetter   :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
   WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
+  deriving Typeable
 
 -- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
 -- See "Combinators" fndor a detailed description.
