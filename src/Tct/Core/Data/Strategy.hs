@@ -4,6 +4,8 @@ module Tct.Core.Data.Strategy
   Strategy (..)
   , Return (..)
   , returning
+  , isContinuing
+  , isProgressing
   , evaluate
   , liftProgress
   , liftNoProgress

@@ -6,6 +6,7 @@ module Tct.Core.Interactive
   , unselect
 
   , modifyProblem
+  , onProblem
   , apply
 
   , reset
@@ -18,6 +19,8 @@ module Tct.Core.Interactive
 
 import           Control.Monad
 import qualified Control.Monad.State.Strict as S
+import           Data.Either                (rights)
+import qualified Data.Foldable              as F
 import           Data.IORef
 import qualified Data.Traversable           as F
 import           System.IO.Unsafe
@@ -114,6 +117,9 @@ load m fp = do
 
 modifyProblem :: ProofData l => (l -> l) -> IO ()
 modifyProblem = modifySt . fmap . fmap
+
+onProblem :: (l -> IO ()) -> IO ()
+onProblem f = onSt $ F.mapM_ f . rights . F.toList . unSt
 
 select :: [Int] -> IO ()
 select is = onSt $ \(St l) -> putSt (St (selectLeafs is l)) >> printState

@@ -23,6 +23,7 @@ module Tct.Core.Combinators
   , (<>), (<||>), (<?>)
   , alternative
   , fastest
+  , fastestN
   , best
   , cmpTimeUB
   -- ** Optional
@@ -34,6 +35,7 @@ module Tct.Core.Combinators
   -- ** Combinators
   , when
   , exhaustively
+  , exhaustivelyN
   , te
   ) where
 
@@ -48,7 +50,7 @@ declarations =
   , SD timeoutDeclaration
   ]
 
--- FIXME: 
+-- FIXME:
 -- alternative left or right biased
 -- associativy of infix operators; associativity of list versions
 
@@ -164,6 +166,12 @@ fastest :: ProofData prob => [Strategy prob] -> Strategy prob
 fastest [] = emptyList
 fastest ss = foldr1 (<||>) ss
 
+-- | Like 'fastest'. But only runs @n@ strategies in parallel.
+fastestN :: ProofData prob => Int -> [Strategy prob] -> Strategy prob
+fastestN _ [] = identity
+fastestN n ss = fastest ss1 <> fastestN n ss2
+  where (ss1,ss2) = splitAt n ss
+
 -- | List version of ('<?>').
 best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> [Strategy prob] -> Strategy prob
 best _   [] = emptyList
@@ -179,6 +187,12 @@ cmpTimeUB pt1 pt2 = compare (tu pt1) (tu pt2)
 -- Fails if the first application of @s@ fails.
 exhaustively :: Strategy prob -> Strategy prob
 exhaustively s =  s >>> try (exhaustively s)
+
+-- | Like 'exhaustively'. But maximal @n@ times.
+exhaustivelyN :: ProofData prob => Int -> Strategy prob -> Strategy prob
+exhaustivelyN n s
+  | n<0       = identity
+  | otherwise = s >>> try (exhaustivelyN (n-1) s)
 
 -- | prop> te st = try (exhaustively st)
 te :: Strategy prob -> Strategy prob
