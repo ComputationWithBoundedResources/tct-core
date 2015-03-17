@@ -179,13 +179,36 @@ type family ArgsType a where
   ArgsType '[]                  = '[]
 
 -- | A 'Strategy' or a 'Processor' is wrapped into a declaration 
+-- data Declaration :: * -> * where
+--   Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f), Ret (ArgsType args) f ~ Strategy prob)
+--     => String                                       -- The name of the declaration.
+--     -> [String]                                     -- A description of the declaration.
+--     -> f                                            -- A uncurried version of the Strategy or Processor.
+--     -> HList args                                   -- A list of arguments.
+--     -> Declaration (args :-> Strategy prob)
+
 data Declaration :: * -> * where
-  Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f), Ret (ArgsType args) f ~ Strategy prob)
-    => String                                       -- The name of the declaration.
-    -> [String]                                     -- A description of the declaration.
-    -> f                                            -- A uncurried version of the Strategy or Processor.
-    -> HList args                                   -- A list of arguments.
-    -> Declaration (args :-> Strategy prob)
+  Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)) =>
+          String -> [String] -> f -> HList args -> Declaration (args :-> Ret (ArgsType args) f)
+
+-- declareProcessor ::
+--   (ToHList a, HListOf a ~ ProcessorArgs p
+--   , f ~ Uncurry (ArgsType (ProcessorArgs p) :-> p)
+--   , p ~ Ret (ArgsType (ProcessorArgs p)) f)
+--   => String -> a -> f -> DeclarationA ((ProcessorArgs p) :-> p)
+declare :: 
+  (ToHList a, Uncurry (ArgsType (HListOf a) :-> Ret (ArgsType (HListOf a)) f) ~ f) => 
+  String -> [String] -> a -> f -> Declaration (HListOf a :-> Ret (ArgsType (HListOf a)) f)
+declare n desc as p = Decl n desc p (toHList as)
+
+class LiftP arg where
+  liftP :: Processor p => Declaration (arg :-> p) ->  Declaration (arg :-> Strategy (Problem p))
+
+instance LiftP '[] where
+  liftP (Decl n h f as) = Decl n h (Proc f) as
+
+instance LiftP as => LiftP (a ': as) where
+  liftP (Decl n h f as) = liftP (Decl n h f as)
 
 -- | Specifies the construction of a argument parser.
 class ParsableArgs prob ats where

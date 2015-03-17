@@ -8,9 +8,9 @@ import qualified Tct.Core.Common.Xml      as Xml
 import qualified Tct.Core.Data            as T
 
 
-data EmptyProcessor prob = EmptyProc (prob -> Bool)
+data Empty prob = Empty (prob -> Bool)
 
-instance Show (EmptyProcessor prob) where
+instance Show (Empty prob) where
   show _ = "EmptyProcessor"
 
 data EmptyProof
@@ -29,16 +29,16 @@ instance Xml.Xml EmptyProof where
   toCeTA EmptyProblem = Xml.elt "rIsEmpty" []
   toCeTA _            = Xml.unsupported
 
-instance T.ProofData prob => T.Processor (EmptyProcessor prob) where
-  type ProofObject (EmptyProcessor prob) = EmptyProof
-  type Problem (EmptyProcessor prob)     = prob
-  type Forking (EmptyProcessor prob)     = T.Judgement
+instance T.ProofData prob => T.Processor (Empty prob) where
+  type ProofObject (Empty prob) = EmptyProof
+  type Problem (Empty prob)     = prob
+  type Forking (Empty prob)     = T.Judgement
 
-  solve p@(EmptyProc f) prob = return . T.resultToTree p prob $
+  solve p@(Empty f) prob = return . T.resultToTree p prob $
     if f prob
       then T.Success T.Judgement EmptyProblem (T.judgement zero)
       else T.Fail OpenProblem
 
 empty :: T.ProofData prob => (prob -> Bool) -> T.Strategy prob
-empty = T.Proc . EmptyProc
+empty = T.Proc . Empty
 

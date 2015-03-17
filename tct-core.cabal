@@ -52,8 +52,9 @@ Library
     Tct.Core.Main.Mode
     Tct.Core.Main.Options
     Tct.Core.Processor.Empty
-    Tct.Core.Processor.Trivial
+    Tct.Core.Processor.Simple
     Tct.Core.Processor.Timeout
+    Tct.Core.Processor.Wait
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,
     async                == 2.*,

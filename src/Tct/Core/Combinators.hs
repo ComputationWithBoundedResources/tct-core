@@ -2,10 +2,9 @@
 module Tct.Core.Combinators
   (
   -- * Strategy Combinators
-  -- | We define left-associative infix versions of 'Strategy' constructors.
+  -- | We define right-associative infix versions of 'Strategy' constructors.
   -- Following precedence holds: optionally,stateful > alternative > sequential.
   -- For example,
-  -- TODO: left or right + update
   --
   -- prop> try s1 >>> s2 >||> s3 <> s4 >>> s5 = (try s1) >>> (s2 >||> ((s3 <> s4) >>> s5))
   --
@@ -14,7 +13,8 @@ module Tct.Core.Combinators
   --  * is continuing if the evaluation returns @'Continue' pt@,
   --  * is progressing if additionally @'progress' pt = 'True'@,
   --  * is failing if it is not continuing.
-  declarations
+  module M
+  , declarations
   -- ** Sequential
   , (>>>), (>||>)
   , chain
@@ -41,24 +41,22 @@ module Tct.Core.Combinators
 
 
 import Tct.Core.Data
-import Tct.Core.Processor.Trivial
-import Tct.Core.Processor.Timeout (timeoutDeclaration, timeoutRemaining)
+import Tct.Core.Processor.Timeout as M
+import Tct.Core.Processor.Simple  as M
+import Tct.Core.Processor.Wait    as M
 
 declarations :: ProofData prob  => [StrategyDeclaration prob]
 declarations =
   [ SD failingWithDeclaration
   , SD timeoutDeclaration
+  , SD waitDeclaration
   ]
-
--- FIXME:
--- alternative left or right biased
--- associativy of infix operators; associativity of list versions
 
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
 
-infixl 5 >>>, >||>
-infixl 6 <>, <||>
+infixr 5 >>>, >||>
+infixr 6 <>, <||>
 
 -- | Infix version of 'Then'.
 -- @s1 '>>>' s2@ applies @s1@ before @s2@.

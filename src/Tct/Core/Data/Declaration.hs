@@ -9,7 +9,7 @@ module Tct.Core.Data.Declaration
   , declFun
   , declArgs
   
-  , defaultFun
+  , deflFun
 
   -- * StrategyDeclaration
   , StrategyDeclaration
@@ -56,26 +56,26 @@ declArgs :: Declaration (args :-> r) -> HList args
 declArgs (Decl _ _ _ as) = as
 
 -- | Specifies the default function of a 'Declaration'.
-type family DefaultFun c where
-  DefaultFun ('[] :-> r) = r
-  DefaultFun (Argument Optional a ': as :-> r) = DefaultFun (as :-> r)
-  DefaultFun (Argument Required a ': as :-> r) = a -> DefaultFun (as :-> r)
+type family DeflFun c where
+  DeflFun ('[] :-> r) = r
+  DeflFun (Argument Optional a ': as :-> r) = DeflFun (as :-> r)
+  DeflFun (Argument Required a ': as :-> r) = a -> DeflFun (as :-> r)
 
 -- | Specifies the default function of a 'Declaration'.
 -- The default function instantiates all optional arguments with their default value.
 class DefF c where
-  defaultFun :: Declaration c -> DefaultFun c
+  deflFun :: Declaration c -> DeflFun c
 
 instance DefF ('[] :-> f) where
-  defaultFun (Decl _ _ f _) = f
+  deflFun (Decl _ _ f _) = f
 
 instance (DefF (as :-> r)) => DefF (Argument Optional a ': as :-> r) where
-  defaultFun (Decl n h f (HCons a as)) = defaultFun (Decl n h (f (argDefault a)) as)
-  defaultFun Decl{}                    = error "Tct.Core.Declaration.defaultFun: something ubelievable happened"
+  deflFun (Decl n h f (HCons a as)) = deflFun (Decl n h (f (argDefault a)) as)
+  deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
 instance DefF (as :-> r) => DefF (Argument Required a ': as :-> r) where
-  defaultFun (Decl n h f (HCons _ as)) = \ a' -> defaultFun (Decl n h (f a') as)
-  defaultFun Decl{}                    = error "Tct.Core.Declaration.defaultFun: something ubelievable happened"
+  deflFun (Decl n h f (HCons _ as)) = \ a' -> deflFun (Decl n h (f a') as)
+  deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
 
 -- arguments ---------------------------------------------------------------------------------------------------------
