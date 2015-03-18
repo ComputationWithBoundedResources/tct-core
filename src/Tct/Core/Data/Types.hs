@@ -201,15 +201,6 @@ declare ::
   String -> [String] -> a -> f -> Declaration (HListOf a :-> Ret (ArgsType (HListOf a)) f)
 declare n desc as p = Decl n desc p (toHList as)
 
-class LiftP arg where
-  liftP :: Processor p => Declaration (arg :-> p) ->  Declaration (arg :-> Strategy (Problem p))
-
-instance LiftP '[] where
-  liftP (Decl n h f as) = Decl n h (Proc f) as
-
-instance LiftP as => LiftP (a ': as) where
-  liftP (Decl n h f as) = liftP (Decl n h f as)
-
 -- | Specifies the construction of a argument parser.
 class ParsableArgs prob ats where
   mkOptParsers :: HList ats -> [SParser prob (String,Dynamic)]
