@@ -5,6 +5,7 @@ module Tct.Core.Data.Declaration.Parse
   SParsable
   , ParsableArgs
   , strategyFromString
+  , mkEnumParser
   ) where
 
 
@@ -73,6 +74,10 @@ instance (SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument
     vs <- mkArgParser as ls
     return (HCons v  vs)
 
+-- MS: can we get rid of the argument?
+mkEnumParser :: (Bounded a, Enum a, Show a) => a -> SParser prob a
+mkEnumParser a = choice $ k `fmap` [(minBound `asTypeOf` a)..]
+  where k b = string (show b) >> return b
 
 instance SParsable prob D.Nat where parseS = nat
 instance SParsable prob Bool where parseS = bool

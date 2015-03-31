@@ -22,6 +22,7 @@ module Tct.Core.Data.Declaration
   , arg
   , optional
   , some
+  , withDomain
 
   -- * Instances  
   , Nat 
@@ -32,8 +33,10 @@ module Tct.Core.Data.Declaration
   ) where
 
 
-import           Tct.Core.Data.Types
+import           Data.List              (intercalate)
+
 import qualified Tct.Core.Common.Pretty as PP
+import           Tct.Core.Data.Types
 
 
 instance WithName (Declaration c) where withName (Decl _ h f as) n' = Decl n' h f as
@@ -109,14 +112,18 @@ bool :: Argument Required Bool
 bool = arg { argName = "bool", argDomain = "<bool>" }
 
 string :: Argument Required String
-string = arg { argName = "string", argDomain = "<String>" }
+string = arg { argName = "string", argDomain = "<string>" }
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Argument Required (Strategy prob)
 strat = arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
 
-instance WithName (Argument r a) where withName ar n = ar { argName = n}
-instance WithHelp (Argument r a) where withHelp ar n = ar { argHelp = n}
+withDomain :: Argument r a -> [String] -> Argument r a
+withDomain ar ns = ar { argDomain = k $ intercalate "|" ns }
+  where k s = '<':s++">"
+
+instance WithName (Argument r a) where withName ar n = ar { argName = n }
+instance WithHelp (Argument r a) where withHelp ar n = ar { argHelp = n }
 
 
 -- StrategyDeclaration
