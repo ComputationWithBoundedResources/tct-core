@@ -6,6 +6,7 @@ module Tct.Core.Common.Xml
   , XmlAttribute
   , XmlDocument
   , elt
+  , empty
   , unsupported
   , int
   , text
@@ -46,11 +47,14 @@ class Xml a where
   toCeTA = const unsupported
 
 instance Xml () where
-  toXml _  = text ""
-  toCeTA _ = text ""
+  toXml _  = empty
+  toCeTA _ = empty
 
 elt :: String -> [XmlContent] -> XmlContent
 elt name = Xml.Element (Txt.pack name) []
+
+empty :: XmlContent
+empty = text ""
 
 setAtts :: XmlContent -> [XmlAttribute] -> XmlContent
 setAtts e atts = e{ Xml.eAttributes = atts }
