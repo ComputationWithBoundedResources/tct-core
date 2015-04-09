@@ -51,6 +51,7 @@ Library
     Tct.Core.Main
     Tct.Core.Main.Mode
     Tct.Core.Main.Options
+    Tct.Core.Processor.Assumption
     Tct.Core.Processor.Empty
     Tct.Core.Processor.Simple
     Tct.Core.Processor.Timeout

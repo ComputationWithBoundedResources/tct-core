@@ -203,8 +203,8 @@ declare n desc as p = Decl n desc p (toHList as)
 
 -- | Specifies the construction of a argument parser.
 class ParsableArgs prob ats where
-  mkOptParsers :: HList ats -> [SParser prob (String,Dynamic)]
-  mkArgParser  :: HList ats -> [(String, Dynamic)] -> SParser prob (HList (ArgsType ats))
+  mkOptParser :: HList ats -> [SParser prob (String,Dynamic)]
+  mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser prob (HList (ArgsType ats))
 
 -- | Collects the meta information of a list of arguments.
 class ArgsInfo as where

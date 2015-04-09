@@ -5,6 +5,7 @@ module Tct.Core.Data.Declaration.Parse
   SParsable
   , ParsableArgs
   , strategyFromString
+  , decl -- TODO: MS: rename
   , mkEnumParser
   ) where
 
@@ -28,7 +29,7 @@ curried f (HCons a as) = curried (f a) as
 decl :: (ParsableArgs prob args) => Declaration (args :-> r) -> SParser prob r
 decl (Decl n _ f as) = do
   _    <- try (symbol n)
-  opts <- many (choice (map try (mkOptParsers as)))
+  opts <- many (choice (map try (mkOptParser as)))
   vs   <- mkArgParser as opts
   return (curried f vs)
   
@@ -54,11 +55,11 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
     unary name fun = PE.Prefix (do{ reserved name; return fun })
 
 instance ParsableArgs prob '[] where
-  mkOptParsers  _ = []
+  mkOptParser _   = []
   mkArgParser _ _ = return HNil
 
 instance (Typeable a, SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument Optional a ': as) where
-  mkOptParsers (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParsers as
+  mkOptParser (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParser as
     where
       pa :: SParsable prob a => Argument Optional a -> SParser prob a
       pa _ = symbol (':' : argName a) >> parseS                                            
@@ -68,20 +69,20 @@ instance (Typeable a, SParsable prob a, ParsableArgs prob as) => ParsableArgs pr
     return (HCons v  vs)
 
 instance (SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument Required a ': as) where
-  mkOptParsers (HCons ReqArg{} as) = mkOptParsers as
-  mkArgParser (HCons _ as) ls = do
+  mkOptParser (HCons ReqArg{} as) = mkOptParser as
+  mkArgParser (HCons _ as) ls     = do
     v  <- lexeme parseS
     vs <- mkArgParser as ls
-    return (HCons v  vs)
+    return (HCons v vs)
 
 -- MS: can we get rid of the argument?
 mkEnumParser :: (Bounded a, Enum a, Show a) => a -> SParser prob a
 mkEnumParser a = choice $ k `fmap` [(minBound `asTypeOf` a)..]
   where k b = string (show b) >> return b
 
-instance SParsable prob D.Nat where parseS = nat
-instance SParsable prob Bool where parseS = bool
-instance SParsable prob String where parseS = identifier
+instance SParsable prob D.Nat           where parseS = nat
+instance SParsable prob Bool            where parseS = bool
+instance SParsable prob String          where parseS = identifier
 instance SParsable prob (Strategy prob) where parseS = strategy
 instance (Typeable a, SParsable prob a) => SParsable prob (Maybe a) where 
   parseS = (try (symbol "none") >> return Nothing) <|> Just `fmap` parseS <?> "maybe"
