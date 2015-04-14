@@ -8,7 +8,6 @@ module Tct.Core.Data.Declaration
   , declHelp
   , declFun
   , declArgs
-  
   , deflFun
 
   -- * StrategyDeclaration
@@ -80,6 +79,8 @@ instance DefF (as :-> r) => DefF (Argument Required a ': as :-> r) where
   deflFun (Decl n h f (HCons _ as)) = \ a' -> deflFun (Decl n h (f a') as)
   deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
+-- liftD :: (r -> s) -> Declaration('[] :-> r) -> Declaration('[] :-> s)
+-- liftD g (Decl n h f as) = Decl n h (g $ f) as
 
 -- arguments ---------------------------------------------------------------------------------------------------------
 instance Functor (Argument r) where

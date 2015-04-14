@@ -88,7 +88,7 @@ instance Traversable ProofTree where
   f `traverse` (Progress pn cfn pts) = Progress pn cfn A.<$> (f `traverse`) `traverse` pts
 
 instance Show (ProofTree l) where
-  show _ = undefined
+  show _ = "showTree"
 
 
 -- Pretty Printing ---------------------------------------------------------------------------------------------------

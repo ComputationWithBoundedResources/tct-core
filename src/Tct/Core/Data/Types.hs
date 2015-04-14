@@ -191,11 +191,6 @@ data Declaration :: * -> * where
   Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)) =>
           String -> [String] -> f -> HList args -> Declaration (args :-> Ret (ArgsType args) f)
 
--- declareProcessor ::
---   (ToHList a, HListOf a ~ ProcessorArgs p
---   , f ~ Uncurry (ArgsType (ProcessorArgs p) :-> p)
---   , p ~ Ret (ArgsType (ProcessorArgs p)) f)
---   => String -> a -> f -> DeclarationA ((ProcessorArgs p) :-> p)
 declare :: 
   (ToHList a, Uncurry (ArgsType (HListOf a) :-> Ret (ArgsType (HListOf a)) f) ~ f) => 
   String -> [String] -> a -> f -> Declaration (HListOf a :-> Ret (ArgsType (HListOf a)) f)
