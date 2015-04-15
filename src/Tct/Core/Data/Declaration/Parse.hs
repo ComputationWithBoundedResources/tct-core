@@ -20,6 +20,7 @@ import qualified Tct.Core.Data.Strategy    as S
 import           Tct.Core.Data.Types
 import qualified Text.Parsec.Expr          as PE
 
+-- FIXME: MS: resolve cyclic dependencies; combinators dependes on this module; but we also want; exhaustively and co
 
 curried :: f ~ Uncurry (args :-> Ret args f) => f -> HList args -> Ret args f
 curried f HNil         = f
@@ -48,6 +49,7 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
         where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
       
     table = [ [unary "try" (S.Trying True) ,      unary "force" (S.Trying False) ]
+            , [unary "es" (\s1 -> s1 `S.Then` S.Trying True s1) ]
             , [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
             , [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
