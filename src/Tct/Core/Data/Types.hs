@@ -122,12 +122,13 @@ data HList :: [*] -> * where
   HCons :: a -> HList t -> HList (a ': t)
 
 type family HListOf a :: [*] where
-  HListOf ()               = '[]
-  HListOf (a1,a2)          = '[a1,a2]
-  HListOf (a1,a2,a3)       = '[a1,a2,a3]
-  HListOf (a1,a2,a3,a4)    = '[a1,a2,a3,a4]
-  HListOf (a1,a2,a3,a4,a5) = '[a1,a2,a3,a4,a5]
-  HListOf (OneTuple a)     = '[a]
+  HListOf ()                   = '[]
+  HListOf (a1,a2)             = '[a1,a2]
+  HListOf (a1,a2,a3)          = '[a1,a2,a3]
+  HListOf (a1,a2,a3,a4)       = '[a1,a2,a3,a4]
+  HListOf (a1,a2,a3,a4,a5)    = '[a1,a2,a3,a4,a5]
+  HListOf (a1,a2,a3,a4,a5,a6) = '[a1,a2,a3,a4,a5,a6]
+  HListOf (OneTuple a)        = '[a]
 
 class ToHList a                   where toHList :: a -> HList (HListOf a)
 instance ToHList ()               where toHList ()               = HNil
@@ -135,6 +136,7 @@ instance ToHList (a1,a2)          where toHList (a1,a2)          = HCons a1 (HCo
 instance ToHList (a1,a2,a3)       where toHList (a1,a2,a3)       = HCons a1 (toHList (a2,a3))
 instance ToHList (a1,a2,a3,a4)    where toHList (a1,a2,a3,a4)    = HCons a1 (toHList (a2,a3,a4))
 instance ToHList (a1,a2,a3,a4,a5) where toHList (a1,a2,a3,a4,a5) = HCons a1 (toHList (a2,a3,a4,a5))
+instance ToHList (a1,a2,a3,a4,a5,a6) where toHList (a1,a2,a3,a4,a5,a6) = HCons a1 (toHList (a2,a3,a4,a5,a6))
 instance ToHList (OneTuple a)     where toHList (OneTuple a)     = HCons a HNil
 
 -- | Should be used in 'strategy' ('declareProcessor') if the Strategy (Processor) has a single argument.
@@ -168,9 +170,9 @@ data ArgFlag = Optional | Required
 -- An argument contains meta information - name, domain and description - for displaying and parsing.
 -- An optional argument additionally requires a default value.
 data Argument :: ArgFlag -> * -> * where
-  ReqArg :: r ~ Required => 
+  ReqArg :: r ~ Required =>
     { argName :: String, argDomain :: String, argHelp :: [String] } -> Argument r a
-  OptArg :: r ~ Optional => 
+  OptArg :: r ~ Optional =>
     { argName :: String, argDomain :: String, argHelp :: [String], argDefault :: a } -> Argument r a
 
 -- | Associates the types to a list of arguments.
@@ -178,7 +180,7 @@ type family ArgsType a where
   ArgsType (Argument r a ': as) = a ': ArgsType as
   ArgsType '[]                  = '[]
 
--- | A 'Strategy' or a 'Processor' is wrapped into a declaration 
+-- | A 'Strategy' or a 'Processor' is wrapped into a declaration
 -- data Declaration :: * -> * where
 --   Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f), Ret (ArgsType args) f ~ Strategy prob)
 --     => String                                       -- The name of the declaration.
@@ -196,8 +198,8 @@ data Declaration :: * -> * where
 --   , f ~ Uncurry (ArgsType (ProcessorArgs p) :-> p)
 --   , p ~ Ret (ArgsType (ProcessorArgs p)) f)
 --   => String -> a -> f -> DeclarationA ((ProcessorArgs p) :-> p)
-declare :: 
-  (ToHList a, Uncurry (ArgsType (HListOf a) :-> Ret (ArgsType (HListOf a)) f) ~ f) => 
+declare ::
+  (ToHList a, Uncurry (ArgsType (HListOf a) :-> Ret (ArgsType (HListOf a)) f) ~ f) =>
   String -> [String] -> a -> f -> Declaration (HListOf a :-> Ret (ArgsType (HListOf a)) f)
 declare n desc as p = Decl n desc p (toHList as)
 
@@ -208,7 +210,7 @@ class ParsableArgs prob ats where
 
 -- | Collects the meta information of a list of arguments.
 class ArgsInfo as where
-  argsInfo :: 
+  argsInfo ::
     HList as ->                                -- A heterogenous list of arguments.
     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
 
@@ -248,4 +250,3 @@ class WithName a where  withName :: a -> String -> a
 
 -- | Update of meta information.
 class WithHelp a where  withHelp :: a -> [String] -> a
-
