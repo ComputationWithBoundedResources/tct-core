@@ -19,6 +19,7 @@ module Tct.Core.Data.TctM
   ) where
 
 
+import           Control.Applicative      ((<|>))
 import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
@@ -111,11 +112,11 @@ timed n m
       m' = do
         Time.TOD sec pico <- liftIO Time.getClockTime
         let newTime = Just $ Time.TOD (sec + toSec (toInteger n)) pico
-        local (\ r -> r { stopTime = min newTime (stopTime r) }) m
+        local (\ r -> r { stopTime = min newTime (stopTime r) <|> newTime }) m
 
 -- | @'wait' seconds m@ pauses seconds
 paused :: Int -> TctM a -> TctM a
-paused n m 
+paused n m
   | n <= 0 = m
   | otherwise = liftIO (threadDelay (toSec n)) >> m
 
