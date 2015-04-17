@@ -111,7 +111,7 @@ timed n m
     where
       m' = do
         Time.TOD sec pico <- liftIO Time.getClockTime
-        let newTime = Just $ Time.TOD (sec + toSec (toInteger n)) pico
+        let newTime = Just $ Time.TOD (sec + toInteger n) pico
         local (\ r -> r { stopTime = min newTime (stopTime r) <|> newTime }) m
 
 -- | @'wait' seconds m@ pauses seconds
