@@ -37,6 +37,7 @@ module Tct.Core.Combinators
   , exhaustively
   , exhaustivelyN
   , te
+  , check
   ) where
 
 
@@ -197,7 +198,12 @@ te :: Strategy prob -> Strategy prob
 te = try . exhaustively
 
 -- | @'when' b st@ applies @st@ if @b@ is true.
-when :: ProofData prob => Bool ->  Strategy prob -> Strategy prob
+when :: ProofData prob => Bool -> Strategy prob -> Strategy prob
 when b st = if b then st else identity
 --whenNot = try $ force s <> sthen
+
+-- | @'check' test msg@. Applies @test@ to the problem.
+-- Fails with @msg@ if the test fails. Succeeds otherwise.
+check :: ProofData prob => (prob -> Bool) -> String -> Strategy prob
+check f msg = withProblem $ \p -> if f p then succeeding else failingWith msg
 

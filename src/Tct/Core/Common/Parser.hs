@@ -52,7 +52,7 @@ bool = try (symbol "True" >> return True) <|> (symbol "False" >> return False)
 
 enum :: (Bounded a, Enum a, Show a) => CharParser s a
 enum = choice $ k `fmap` [minBound ..]
-  where k b = symbol (show b) >> return b
+  where k b = try $ symbol (show b) >> return b
 
 int :: CharParser s Integer
 int = PT.natural strategyTP

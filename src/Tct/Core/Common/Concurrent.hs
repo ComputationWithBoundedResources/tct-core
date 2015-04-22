@@ -45,6 +45,6 @@ spawn cmd args putInh = C.bracketOnError create release run where
     takeMVar outMVar
     ex <- waitForProcess ph
     return $ case ex of
-      ExitFailure i -> Left ("Exitcode:" ++ show i ++ ". " ++ errs)
+      ExitFailure i -> Left ("Tct.Core.Common.Concurrent.spawn: Exitcode: " ++ show i ++ ": " ++ errs)
       ExitSuccess   -> Right outs
 
