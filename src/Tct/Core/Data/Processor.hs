@@ -4,6 +4,7 @@ module Tct.Core.Data.Processor
   ( 
     Result (..)
   , Processor (..)
+  , toStrategy
     
   , Fork
   , ProofData
@@ -19,6 +20,9 @@ import qualified Tct.Core.Common.Pretty    as PP
 import qualified Tct.Core.Common.Xml       as Xml
 import           Tct.Core.Data.Types
 
+
+toStrategy :: Processor p => p -> Strategy (Problem p)
+toStrategy = Proc
 
 -- Processor ---------------------------------------------------------------------------------------------------------
 

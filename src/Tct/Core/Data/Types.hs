@@ -122,22 +122,26 @@ data HList :: [*] -> * where
   HCons :: a -> HList t -> HList (a ': t)
 
 type family HListOf a :: [*] where
-  HListOf ()                   = '[]
-  HListOf (a1,a2)             = '[a1,a2]
-  HListOf (a1,a2,a3)          = '[a1,a2,a3]
-  HListOf (a1,a2,a3,a4)       = '[a1,a2,a3,a4]
-  HListOf (a1,a2,a3,a4,a5)    = '[a1,a2,a3,a4,a5]
-  HListOf (a1,a2,a3,a4,a5,a6) = '[a1,a2,a3,a4,a5,a6]
-  HListOf (OneTuple a)        = '[a]
+  HListOf ()                        = '[]
+  HListOf (a1,a2)                   = '[a1,a2]
+  HListOf (a1,a2,a3)                = '[a1,a2,a3]
+  HListOf (a1,a2,a3,a4)             = '[a1,a2,a3,a4]
+  HListOf (a1,a2,a3,a4,a5)          = '[a1,a2,a3,a4,a5]
+  HListOf (a1,a2,a3,a4,a5,a6)       = '[a1,a2,a3,a4,a5,a6]
+  HListOf (a1,a2,a3,a4,a5,a6,a7)    = '[a1,a2,a3,a4,a5,a6,a7]
+  HListOf (a1,a2,a3,a4,a5,a6,a7,a8) = '[a1,a2,a3,a4,a5,a6,a7,a8]
+  HListOf (OneTuple a)              = '[a]
 
-class ToHList a                   where toHList :: a -> HList (HListOf a)
-instance ToHList ()               where toHList ()               = HNil
-instance ToHList (a1,a2)          where toHList (a1,a2)          = HCons a1 (HCons a2 HNil)
-instance ToHList (a1,a2,a3)       where toHList (a1,a2,a3)       = HCons a1 (toHList (a2,a3))
-instance ToHList (a1,a2,a3,a4)    where toHList (a1,a2,a3,a4)    = HCons a1 (toHList (a2,a3,a4))
-instance ToHList (a1,a2,a3,a4,a5) where toHList (a1,a2,a3,a4,a5) = HCons a1 (toHList (a2,a3,a4,a5))
-instance ToHList (a1,a2,a3,a4,a5,a6) where toHList (a1,a2,a3,a4,a5,a6) = HCons a1 (toHList (a2,a3,a4,a5,a6))
-instance ToHList (OneTuple a)     where toHList (OneTuple a)     = HCons a HNil
+class ToHList a                            where toHList :: a -> HList (HListOf a)
+instance ToHList ()                        where toHList ()                        = HNil
+instance ToHList (a1,a2)                   where toHList (a1,a2)                   = HCons a1 (HCons a2 HNil)
+instance ToHList (a1,a2,a3)                where toHList (a1,a2,a3)                = HCons a1 (toHList (a2,a3))
+instance ToHList (a1,a2,a3,a4)             where toHList (a1,a2,a3,a4)             = HCons a1 (toHList (a2,a3,a4))
+instance ToHList (a1,a2,a3,a4,a5)          where toHList (a1,a2,a3,a4,a5)          = HCons a1 (toHList (a2,a3,a4,a5))
+instance ToHList (a1,a2,a3,a4,a5,a6)       where toHList (a1,a2,a3,a4,a5,a6)       = HCons a1 (toHList (a2,a3,a4,a5,a6))
+instance ToHList (a1,a2,a3,a4,a5,a6,a7)    where toHList (a1,a2,a3,a4,a5,a6,a7)    = HCons a1 (toHList (a2,a3,a4,a5,a6,a7))
+instance ToHList (a1,a2,a3,a4,a5,a6,a7,a8) where toHList (a1,a2,a3,a4,a5,a6,a7,a8) = HCons a1 (toHList (a2,a3,a4,a5,a6,a7,a8))
+instance ToHList (OneTuple a)              where toHList (OneTuple a)              = HCons a HNil
 
 -- | Should be used in 'strategy' ('declareProcessor') if the Strategy (Processor) has a single argument.
 newtype OneTuple a = OneTuple a

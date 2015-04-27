@@ -14,6 +14,7 @@ module Tct.Core.Data.ProofTree
   , open
   , isOpen
   , isClosed
+  , flatten
 
   -- * Output
   , ppProofTree
@@ -71,6 +72,10 @@ isOpen = not . isClosed
 isClosed :: ProofTree l -> Bool
 isClosed = null . open
 
+flatten :: ProofTree (ProofTree l) -> ProofTree l
+flatten (Open pt)             = pt
+flatten (NoProgress pn pt)    = NoProgress pn (flatten pt)
+flatten (Progress pn cns pts) = Progress pn cns (flatten `fmap` pts)
 
 instance Functor ProofTree where
   f `fmap` Open l              = Open (f l)
@@ -128,10 +133,8 @@ ppProofTree pp = ppProofTree' pp False
 ppDetailedProofTree :: (l -> PP.Doc ) -> ProofTree l -> PP.Doc
 ppDetailedProofTree pp = ppProofTree' pp True
 
-
 ppProofTreeLeafes :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
 ppProofTreeLeafes pp = PP.enumerate . map pp . F.toList
-
 
 instance PP.Pretty prob => PP.Pretty (ProofTree prob) where
   pretty = ppProofTree PP.pretty

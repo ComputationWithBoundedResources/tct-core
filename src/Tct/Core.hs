@@ -20,7 +20,8 @@ module Tct.Core
   , withDefaultStrategy
   , setMode
   , setModeWith
-  -- * Strategy Declaration
+  -- * Processor / Strategy
+  , toStrategy
   , ProofData
   , Strategy
   -- ** Argument
