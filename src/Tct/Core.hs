@@ -16,6 +16,7 @@ module Tct.Core
   , OutputMode (..)
   -- * Initialising Tct
   , TctMode
+  , defaultMode
   , withStrategies
   , withDefaultStrategy
   , setMode
