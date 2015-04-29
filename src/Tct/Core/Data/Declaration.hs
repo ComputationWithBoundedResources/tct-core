@@ -116,7 +116,7 @@ string :: Argument Required String
 string = arg { argName = "string", argDomain = "<string>" }
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
-strat :: Argument Required (Strategy prob)
+strat :: Argument Required (Strategy i i)
 strat = arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
 
 withDomain :: Argument r a -> [String] -> Argument r a

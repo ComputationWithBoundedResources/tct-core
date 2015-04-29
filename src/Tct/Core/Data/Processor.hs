@@ -21,7 +21,7 @@ import qualified Tct.Core.Common.Xml       as Xml
 import           Tct.Core.Data.Types
 
 
-toStrategy :: Processor p => p -> Strategy (Problem p)
+toStrategy :: Processor p => p -> Strategy (Problem p) (Problem p)
 toStrategy = Proc
 
 -- Processor ---------------------------------------------------------------------------------------------------------

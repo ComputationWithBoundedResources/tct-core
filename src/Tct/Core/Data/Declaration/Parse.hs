@@ -1,6 +1,6 @@
--- | 
+-- |
 
-module Tct.Core.Data.Declaration.Parse 
+module Tct.Core.Data.Declaration.Parse
   (
   SParsable
   , ParsableArgs
@@ -32,22 +32,22 @@ decl (Decl n _ f as) = do
   opts <- many (choice (map try (mkOptParser as)))
   vs   <- mkArgParser as opts
   return (curried f vs)
-  
-strategy :: SParser prob (Strategy prob)
+
+strategy :: SParser i (Strategy i i)
 strategy = PE.buildExpressionParser table strat <?> "stratgy"
   where
-    strat = 
+    strat =
       parens strategy
       <|> predefined
       <?> "expression"
-    predefined :: SParser prob (Strategy prob)      
+    predefined :: SParser prob (Strategy prob prob)
     predefined = do
       decls <- getState
       -- MS: there is an issue when declarations have only optional arguments and a common prefix
       -- as decl will always be successfull; so we sort the list in rev. lex order
       choice [ decl d | SD d <- sortBy k decls ]
         where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
-      
+
     table = [ [unary "try" (S.Trying True) ,      unary "force" (S.Trying False) ]
             , [unary "es" (\s1 -> s1 `S.Then` S.Trying True s1) ]
             , [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
@@ -63,7 +63,7 @@ instance (Typeable a, SParsable prob a, ParsableArgs prob as) => ParsableArgs pr
   mkOptParser (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParser as
     where
       pa :: SParsable prob a => Argument Optional a -> SParser prob a
-      pa _ = symbol (':' : argName a) >> parseS                                            
+      pa _ = symbol (':' : argName a) >> parseS
   mkArgParser (HCons a as) ls = do
     let v = fromMaybe (argDefault a) (lookup (argName a) ls >>= fromDynamic)
     vs <- mkArgParser as ls
@@ -79,10 +79,10 @@ instance (SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument
 instance SParsable prob D.Nat           where parseS = nat
 instance SParsable prob Bool            where parseS = bool
 instance SParsable prob String          where parseS = identifier
-instance SParsable prob (Strategy prob) where parseS = strategy
-instance (Typeable a, SParsable prob a) => SParsable prob (Maybe a) where 
+instance SParsable prob (Strategy prob prob) where parseS = strategy
+instance (Typeable a, SParsable prob a) => SParsable prob (Maybe a) where
   parseS = (try (symbol "none") >> return Nothing) <|> Just `fmap` parseS <?> "maybe"
 
-strategyFromString :: [StrategyDeclaration prob] -> String -> Either ParseError (Strategy prob)
+strategyFromString :: [StrategyDeclaration i] -> String -> Either ParseError (Strategy i i)
 strategyFromString ls = runParser (do {_ <- whiteSpace; p <- strategy; eof; return p}) ls "supplied string"
 

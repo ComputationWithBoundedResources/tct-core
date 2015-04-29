@@ -27,10 +27,10 @@ import           Tct.Core.Data.Types
 --import qualified Tct.Xml as Xml
 
 
-instance Show (Strategy prob) where
+instance Show (Strategy i o) where
   show _ = "someStrategy" -- TODO
 
-instance PP.Pretty (Strategy prob) where
+instance PP.Pretty (Strategy i o) where
   pretty _ = PP.text "someStrategy" -- TODO
 
 -- | @'returning f g r' returns @f (fromReturn r)@ if @r@ is continuing, otherwise @g (fromReturn r)@.
@@ -49,9 +49,13 @@ isProgressing _             = False
 
 -- | @'evaluate' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
-evaluate :: Strategy prob -> prob -> TctM (Return (ProofTree prob))
+evaluate :: Strategy i o -> i -> TctM (Return (ProofTree o))
 evaluate (Proc p) prob = solve p prob `catchError` errNode
   where errNode err = evaluate (Proc (ErroneousProc err p)) prob
+
+evaluate (Trans f s1 s2) prob = do
+  r1 <- evaluate s1 prob
+  evaluateTree s2 (f `fmap` fromReturn r1)
 
 evaluate (Trying True s) prob = f `fmap` evaluate s prob
   where
@@ -119,12 +123,12 @@ liftProgress n certfn rs
     isAbort (Abort _) = True
     isAbort _         = False
 
-evaluateTree :: Strategy prob -> ProofTree prob -> TctM (Return (ProofTree prob))
+evaluateTree :: Strategy i o -> ProofTree i -> TctM (Return (ProofTree o))
 evaluateTree s (Open p)                     = evaluate s p
 evaluateTree s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateTree s subtree
 evaluateTree s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateTree s `T.mapM` subtrees)
 
-evaluateTreePar :: Strategy prob -> ProofTree prob -> TctM (Return (ProofTree prob))
+evaluateTreePar :: Strategy i o -> ProofTree i -> TctM (Return (ProofTree o))
 evaluateTreePar s t = spawnTree t >>= collect
   where
     spawnTree (Open p)                     = Open `fmap` async (evaluate s p)
@@ -144,10 +148,10 @@ evaluateTreePar s t = spawnTree t >>= collect
 strategy :: 
   ( ToHList as, HListOf as ~ args
   , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
-  , Ret (ArgsType args) f ~ Strategy prob )
+  , Ret (ArgsType args) f ~ Strategy prob prob)
   => String -- ^ The name of the strategy.
   -> as  -- ^ The arguments as tuples: (), (OneTuple a1), (a1,a2) ...
   -> f  -- ^ The strategy.
-  -> Declaration (args :-> Strategy prob)
+  -> Declaration (args :-> Strategy prob prob)
 strategy n = declare n [] 
 

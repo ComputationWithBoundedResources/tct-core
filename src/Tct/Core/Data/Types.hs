@@ -84,26 +84,33 @@ data Result p
     , certificateFn :: CertificateFn p }
 
 class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p)) => Processor p where
-  type ProofObject p   :: *
-  type Problem p       :: *
-  type Forking p       :: * -> *
-  type Forking p       =  Id
-  solve                :: p -> Problem p -> TctM (Return (ProofTree (Problem p)))
+  type ProofObject p :: *
+  type Problem p     :: *
+  type Forking p     :: * -> *
+  solve              :: p -> Problem p -> TctM (Return (ProofTree (Problem p)))
+
+  type Forking p     =  Id
 
 
 -- Strategy ----------------------------------------------------------------------------------------------------------
 
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
 -- For a detailed description of the combinators see "Tct.Combinators".
-data Strategy prob where
-  Proc       :: (Processor p, Problem p ~ prob) => p -> Strategy prob
-  Trying     :: Bool -> Strategy prob -> Strategy prob
-  Then       :: Strategy prob -> Strategy prob -> Strategy prob
-  ThenPar    :: Strategy prob -> Strategy prob -> Strategy prob
-  Alt        :: Strategy prob -> Strategy prob -> Strategy prob
-  OrFaster   :: Strategy prob -> Strategy prob -> Strategy prob
-  OrBetter   :: (ProofTree prob -> ProofTree prob -> Ordering) -> Strategy prob -> Strategy prob -> Strategy prob
-  WithStatus :: (TctStatus prob -> Strategy prob) -> Strategy prob
+data Strategy i o where
+  Proc       :: (Processor p, Problem p ~ i) => p -> Strategy i i
+
+  Trying     :: Bool -> Strategy i o -> Strategy i o
+
+  Trans      :: (o1 -> i2) -> Strategy i1 o1 -> Strategy i2 o2 -> Strategy i1 o2
+
+  Then       :: Strategy i i -> Strategy i i -> Strategy i i 
+  ThenPar    :: Strategy i i -> Strategy i i -> Strategy i i
+
+  Alt        :: Strategy i o -> Strategy i o -> Strategy i o
+  OrFaster   :: Strategy i o -> Strategy i o -> Strategy i o
+  OrBetter   :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
+
+  WithStatus :: (TctStatus i -> Strategy i o) -> Strategy i o
   deriving Typeable
 
 -- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
@@ -215,7 +222,7 @@ class ArgsInfo as where
 
 -- | Existential type for declarations specifying a Strategy.
 data StrategyDeclaration prob where
-  SD :: (ParsableArgs prob args, ArgsInfo args) => Declaration (args :-> Strategy prob) -> StrategyDeclaration prob
+  SD :: (ParsableArgs prob args, ArgsInfo args) => Declaration (args :-> Strategy prob prob) -> StrategyDeclaration prob
 
 
 -- Parsing -----------------------------------------------------------------------------------------------------------
