@@ -53,10 +53,10 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 
 -- | The Tct configuration defines global properties.
 --   It is updated by command-line arguments and 'TctMode'.
-data TctConfig i = TctConfig
+data TctConfig i o = TctConfig
   { outputMode :: OutputMode
   , recompile  :: Bool
-  , strategies :: [StrategyDeclaration i i] }
+  , strategies :: [StrategyDeclaration i o] }
 
 -- | Output mode.
 data OutputMode
@@ -83,7 +83,7 @@ readOutputMode s
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
 
 -- | The default Tct configuration. A good starting point for custom configurations.
-defaultTctConfig :: ProofData prob => TctConfig prob
+defaultTctConfig :: ProofData i => TctConfig i o
 defaultTctConfig = TctConfig
   { outputMode = OnlyAnswer
   , recompile  = True
@@ -95,9 +95,9 @@ configDir = getHomeDirectory >>= \home -> return (home </> ".tctl")
 {-configFile :: String -> IO FilePath-}
 {-configFile n = configDir >>= return . (</> n)-}
 
-type TctConfiguration i opt = Either TctError (TctConfig i, TctMode i i opt)
+type TctConfiguration i o opt = Either TctError (TctConfig i o, TctMode i o opt)
 
-tctl :: ProofData prob => TctConfiguration prob opt -> IO ()
+tctl :: (ProofData i, ProofData o) => TctConfiguration i o opt -> IO ()
 tctl conf = Dyre.wrapMain params conf
   where
     params = Dyre.defaultParams
@@ -118,13 +118,13 @@ tctl conf = Dyre.wrapMain params conf
 -- | Construct a customised Tct. Example usage:
 --
 -- > main = tctl $ setModeWith defaultTctConfig trsMode
-setModeWith :: ProofData i => TctConfig i -> TctMode i i opt -> IO ()
+setModeWith :: (ProofData i, ProofData o) => TctConfig i o -> TctMode i o opt -> IO ()
 setModeWith c m = tctl $ Right (c,m)
 
 -- | Construct a customised Tct with default configuration.
 --
 -- > setMode m = setModeWith defaultTctConfig m
-setMode :: ProofData i => TctMode i i opt -> IO ()
+setMode :: (ProofData i, ProofData o) => TctMode i o opt -> IO ()
 setMode = setModeWith defaultTctConfig
 
 
@@ -138,7 +138,7 @@ data TctOptions m = TctOptions
   , strategyName_ :: Maybe String
   , problemFile_  :: FilePath }
 
-updateTctConfig :: TctConfig prob -> TctOptions m -> TctConfig prob
+updateTctConfig :: TctConfig i o -> TctOptions m -> TctConfig i o
 updateTctConfig cfg opt = cfg { outputMode = outputMode cfg `fromMaybe` outputMode_ opt }
 
 
@@ -146,7 +146,7 @@ data TctAction m
   = Run (TctOptions m)
   | RunInteractive
 
-mkParser :: [StrategyDeclaration i i] -> O.Parser m -> O.ParserInfo (TctAction m)
+mkParser :: [StrategyDeclaration i o] -> O.Parser m -> O.ParserInfo (TctAction m)
 mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive <|> tctp) desc
   where
     listed = O.infoOption (PP.display . PP.vcat $ map PP.pretty ps) $ mconcat
@@ -208,7 +208,7 @@ runInteractive theModeId = do
   either print return ret
 
 
-realMain :: ProofData prob => TctConfiguration prob opt -> IO ()
+realMain :: (ProofData i, ProofData o) => TctConfiguration i o opt -> IO ()
 realMain dcfg = do
   r <- runErroneousIO $ do
     (cfg, mode) <- liftEither dcfg
