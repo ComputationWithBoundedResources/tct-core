@@ -48,7 +48,7 @@ selectLeafs ns pt = S.evalState (F.mapM k pt) 0
 unselectLeafs :: ProofTree (Selected l) -> ProofTree (Selected l)
 unselectLeafs = fmap (either Right Right) where
 
-evaluateSelected :: Strategy prob -> ProofTree (Selected prob) -> TctM (Return (ProofTree (Selected prob)))
+evaluateSelected :: Strategy i i -> ProofTree (Selected i) -> TctM (Return (ProofTree (Selected i)))
 evaluateSelected _ pt@(Open (Left _))           = return (Continue pt)
 evaluateSelected s (Open (Right p))             = (fmap . fmap) Right `fmap` evaluate s p
 evaluateSelected s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateSelected s subtree
@@ -108,7 +108,7 @@ printState = onSt (PP.putPretty . pp)
 
 --- * interface ------------------------------------------------------------------------------------------------------
 
-load :: ProofData l => TctMode l o -> FilePath -> IO ()
+load :: ProofData l => TctMode l l o -> FilePath -> IO ()
 load m fp = do
   ret <- runErroneousIO $ do
     p  <- tryIO $ readFile fp
@@ -127,13 +127,14 @@ select is = onSt $ \(St l) -> putSt (St (selectLeafs is l)) >> printState
 unselect :: IO ()
 unselect = onSt $ \(St l) -> putSt (St (unselectLeafs l)) >> printState
 
-apply :: ProofData prob => Strategy prob -> IO ()
+apply :: ProofData i => Strategy i i -> IO ()
 apply str = onSt $ \st -> do
   ret <- run $ evaluateSelected str (unSt st)
   -- MS: FIXME should be isProgressing and som more informative output
   returning
     (\s -> putSt (St s) >> printState)
     (const $ print "no progress :/")
+    (print "no progress :/")
     ret
 
 proof :: IO ()

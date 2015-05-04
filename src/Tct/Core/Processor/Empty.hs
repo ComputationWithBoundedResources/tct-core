@@ -31,7 +31,8 @@ instance Xml.Xml EmptyProof where
 
 instance T.ProofData prob => T.Processor (Empty prob) where
   type ProofObject (Empty prob) = EmptyProof
-  type Problem (Empty prob)     = prob
+  type I (Empty prob)     = prob
+  type O (Empty prob)     = prob
   type Forking (Empty prob)     = T.Judgement
 
   solve p@(Empty f) prob = return . T.resultToTree p prob $
@@ -39,6 +40,6 @@ instance T.ProofData prob => T.Processor (Empty prob) where
       then T.Success T.Judgement EmptyProblem (T.judgement zero)
       else T.Fail OpenProblem
 
-empty :: T.ProofData prob => (prob -> Bool) -> T.Strategy prob
+empty :: T.ProofData i => (i -> Bool) -> T.Strategy i i 
 empty = T.Proc . Empty
 

@@ -1,5 +1,5 @@
 -- | This module provides the /Wait Processor/.
-module Tct.Core.Processor.Wait 
+module Tct.Core.Processor.Wait
   ( waitDeclaration
   , wait
   ) where
@@ -11,19 +11,20 @@ import           Tct.Core.Data          hiding (wait)
 
 
 -- | Wraps the application of a processor in a timeout.
-data Wait prob = Wait
+data Wait i o = Wait
   { inW    :: Int
-  , stratW :: Strategy prob }
+  , stratW :: Strategy i o }
 
-instance Show (Wait prob) where
+instance Show (Wait i o) where
   show p = show (stratW p)
 
 type WaitProof = ()
 
 
-instance ProofData prob => Processor (Wait prob) where
-  type ProofObject (Wait prob)   = WaitProof
-  type Problem (Wait prob)       = prob
+instance ProofData i => Processor (Wait i o) where
+  type ProofObject (Wait i o)   = WaitProof
+  type I (Wait i o)       = i
+  type O (Wait i o)       = o
 
   solve p prob = do
     remainingM <- remainingTime `fmap` askStatus prob
@@ -32,19 +33,19 @@ instance ProofData prob => Processor (Wait prob) where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-waitStrategy :: ProofData prob => Int -> Strategy prob -> Strategy prob
+waitStrategy :: ProofData i => Int -> Strategy i o -> Strategy i o
 waitStrategy n st = Proc $ Wait { inW=n, stratW=st }
 
-waitDeclaration :: ProofData prob => Declaration(
+waitDeclaration :: (ProofData i) => Declaration(
   '[ Argument 'Required Nat
-   , Argument 'Required (Strategy prob) ]
-  :-> Strategy prob)
+   , Argument 'Required (Strategy i o) ]
+  :-> Strategy i o)
 waitDeclaration = declare "wait" help args waitStrategy
   where
     help = ["Pauses for <nat> seconds."]
     args = (waitForArg, strat)
     waitForArg = nat `withName` "for" `withHelp` [ "Pauses the computation <nat> seconds." ]
 
-wait :: ProofData prob => Nat -> Strategy prob -> Strategy prob
+wait :: ProofData i => Nat -> Strategy i o -> Strategy i o
 wait = declFun waitDeclaration
 

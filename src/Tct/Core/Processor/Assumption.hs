@@ -7,13 +7,14 @@ import Tct.Core.Common.SemiRing
 import Tct.Core.Data
 
 
-data Assumption prob = Assumption
+data Assumption i = Assumption
   deriving Show
 
-instance ProofData prob => Processor (Assumption prob) where
-  type ProofObject (Assumption prob) = ()
-  type Problem (Assumption prob)     = prob
-  type Forking (Assumption prob)     = Judgement
+instance ProofData i => Processor (Assumption i) where
+  type ProofObject (Assumption i) = ()
+  type I (Assumption i)           = i
+  type O (Assumption i)           = i
+  type Forking (Assumption i)     = Judgement
 
   solve p prob = return . resultToTree p prob $ Success Judgement () (judgement zero)
 

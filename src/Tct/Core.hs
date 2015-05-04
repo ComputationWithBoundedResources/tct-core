@@ -51,10 +51,10 @@ import Tct.Core.Main
 
 
 -- | Adds a list of 'StrategyDeclaraton' to the existing ones.
-withStrategies :: TctMode prob opt -> [StrategyDeclaration prob] -> TctMode prob opt
+withStrategies :: TctMode i o opt -> [StrategyDeclaration i o] -> TctMode i o opt
 withStrategies m sds = m { modeStrategies = modeStrategies m ++ sds }
 
 -- | Sets the default Strategy.
-withDefaultStrategy :: TctMode prob opt -> Strategy prob -> TctMode prob opt
+withDefaultStrategy :: TctMode i o opt -> Strategy i o -> TctMode i o opt
 withDefaultStrategy m st = m { modeDefaultStrategy = st }
 

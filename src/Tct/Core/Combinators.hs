@@ -3,7 +3,7 @@ module Tct.Core.Combinators
   (
   -- * Strategy Combinators
   -- | We define right-associative infix versions of 'Strategy' constructors.
-  -- Following precedence holds: optionally,stateful > alternative > sequential.
+  -- Following precedence holds: optionally,stateful > alternative > sequential > transformations.
   -- For example,
   --
   -- prop> try s1 >>> s2 >||> s3 <> s4 >>> s5 = (try s1) >>> (s2 >||> ((s3 <> s4) >>> s5))
@@ -19,6 +19,8 @@ module Tct.Core.Combinators
   , (>>>), (>||>)
   , chain
   , chainWith
+  -- ** Transformation
+  , (>=>)
   -- ** Alternative
   , (<>), (<||>), (<?>)
   , alternative
@@ -42,13 +44,18 @@ module Tct.Core.Combinators
 
 
 import Tct.Core.Data
-import Tct.Core.Processor.Timeout as M
-import Tct.Core.Processor.Simple  as M
-import Tct.Core.Processor.Wait    as M
+import Tct.Core.Processor.Failing    as M
+import Tct.Core.Processor.Identity   as M
+import Tct.Core.Processor.Succeeding as M
+import Tct.Core.Processor.Timeout    as M
+import Tct.Core.Processor.Wait       as M
 
-declarations :: ProofData prob  => [StrategyDeclaration prob]
+-- TODO: MS: processor combinators like identity currently need some type constraints (ie Show o) otherwise, type
+-- inference assumes it is a kind ther should be away to get rid of the constraint and tell ghc that it is not a kind
+
+declarations :: ProofData i => [StrategyDeclaration i i]
 declarations =
-  [ SD failingWithDeclaration
+  [ SD failingDeclaration
   , SD timeoutDeclaration
   , SD waitDeclaration
   ]
@@ -56,6 +63,7 @@ declarations =
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
 
+infixr 4 >=>
 infixr 5 >>>, >||>
 infixr 6 <>, <||>
 
@@ -64,13 +72,18 @@ infixr 6 <>, <||>
 -- Fails if @s1@ or @s2@ fails.
 --
 -- prop> s1 >>> (s2 >>> s3) = (s1 >>> s2) >>> s3 = s1 >>> s2 >>> s3
-(>>>) :: Strategy prob -> Strategy prob -> Strategy prob
+(>>>) :: Strategy i i -> Strategy i i -> Strategy i i
 (>>>)  = Then
 
 -- | Infix version of 'ThenPar'.
 -- Like ('>>>') but applies @s2@ on all problems in parallel.
-(>||>) :: Strategy prob -> Strategy prob -> Strategy prob
+(>||>) :: Strategy i i -> Strategy i i -> Strategy i i
 (>||>) = ThenPar
+
+-- | Infix version of 'Trans'.
+(>=>) :: Strategy i p -> Strategy p o -> Strategy i o
+(>=>) = Trans
+
 
 -- | Infix version of 'Alt'.
 -- @s1 '<>' s2@
@@ -81,7 +94,7 @@ infixr 6 <>, <||>
 -- * Fails if @s1@ and @s2@ fails.
 --
 -- prop> s1 <> (s2 <> s3) = (s1 <> s2) <> s3 = s1 <> s2 <> s3
-(<>) :: Strategy prob -> Strategy prob-> Strategy prob
+(<>) :: Strategy i o -> Strategy i o-> Strategy i o
 (<>) = Alt
 
 -- | Infix version of 'OrFaster'.
@@ -89,7 +102,7 @@ infixr 6 <>, <||>
 -- Suppose that @s2@ ends before @s1@ then:
 --
 -- prop> s1 <||> s2  = s2 <> s1
-(<||>) :: Strategy prob -> Strategy prob -> Strategy prob
+(<||>) :: Strategy i o -> Strategy i o -> Strategy i o
 (<||>) = OrFaster
 
 -- | Timed version of 'OrBetter'.
@@ -109,41 +122,41 @@ infixr 6 <>, <||>
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering)
-         -> Strategy prob -> Strategy prob -> Strategy prob
+(<?>) :: ProofData i => (ProofTree o -> ProofTree o -> Ordering)
+         -> Strategy i o -> Strategy i o -> Strategy i o
 (<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
   where  to = timeoutRemaining
 
 
-trying :: Bool -> Strategy prob -> Strategy prob
+trying :: Bool -> Strategy i i -> Strategy i i
 trying b s@(Trying _ _) = Trying b s
 trying _ (WithStatus f) = WithStatus (try . f)
 trying b s              = Trying b s
 
 -- | @'try' s@ is continuing even if @s@ is not.
-try :: Strategy prob -> Strategy prob
+try :: Strategy i i -> Strategy i i
 try = trying True
 
 -- | @'force' s@ fails if @s@ is not progressing.
-force :: Strategy prob -> Strategy prob
+force :: Strategy i i -> Strategy i i
 force = trying False
 
 -- | Applied strategy depends on run time status.
-withState :: (TctStatus prob -> Strategy prob) -> Strategy prob
+withState :: (TctStatus i -> Strategy i o) -> Strategy i o
 withState = WithStatus
 
 -- | Specialised version of 'withState'.
-withProblem :: (prob -> Strategy prob) -> Strategy prob
+withProblem :: (i -> Strategy i o) -> Strategy i o
 withProblem g = WithStatus (g . currentProblem)
 
 
-emptyList :: ProofData prob => Strategy prob
+emptyList :: (ProofData i, Show o) => Strategy i o
 emptyList = identity
 
 -- | List version of ('>>>').
 --
 -- prop> chain [] = failWith "empty list"
-chain :: ProofData prob => [Strategy prob] -> Strategy prob
+chain :: ProofData i => [Strategy i i] -> Strategy i i
 chain [] = emptyList
 chain ss = foldr1 (>>>) ss
 
@@ -151,59 +164,59 @@ chain ss = foldr1 (>>>) ss
 --
 -- > chainWith [] (try empty)      == try empty
 -- > chainWith [s1,s2] (try empty) == s1 >>> try empty >>> s2 >>> try empty
-chainWith :: ProofData prob => Strategy prob -> [Strategy prob] -> Strategy prob
+chainWith :: ProofData i => Strategy i i -> [Strategy i i] -> Strategy i i
 chainWith s [] = s
 chainWith s ss = foldr1 (\t ts -> t >>> s >>> ts) ss >>> s
 
 -- | List version of ('<>').
-alternative :: ProofData prob => [Strategy prob] -> Strategy prob
+alternative :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
 alternative [] = emptyList
 alternative ss = foldr1 (<>) ss
 
 -- | List version of ('<||>').
-fastest :: ProofData prob => [Strategy prob] -> Strategy prob
+fastest :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
 fastest [] = emptyList
 fastest ss = foldr1 (<||>) ss
 
 -- | Like 'fastest'. But only runs @n@ strategies in parallel.
-fastestN :: ProofData prob => Int -> [Strategy prob] -> Strategy prob
-fastestN _ [] = identity
+fastestN :: (ProofData i, Show o) => Int -> [Strategy i o] -> Strategy i o
+fastestN _ [] = emptyList
 fastestN n ss = fastest ss1 <> fastestN n ss2
   where (ss1,ss2) = splitAt n ss
 
 -- | List version of ('<?>').
-best :: ProofData prob => (ProofTree prob -> ProofTree prob -> Ordering) -> [Strategy prob] -> Strategy prob
+best :: (ProofData i, Show o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
 best _   [] = emptyList
 best cmp ss = foldr1 (cmp <?>) ss
 
 -- | Compares time upperbounds. Useful with 'best'.
-cmpTimeUB :: ProofTree prob -> ProofTree prob -> Ordering
+cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering
 cmpTimeUB pt1 pt2 = compare (tu pt1) (tu pt2)
   where tu = timeUB . certificate
 
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
-exhaustively :: Strategy prob -> Strategy prob
+exhaustively :: Strategy i i -> Strategy i i
 exhaustively s =  s >>> try (exhaustively s)
 
 -- | Like 'exhaustively'. But maximal @n@ times.
-exhaustivelyN :: ProofData prob => Int -> Strategy prob -> Strategy prob
+exhaustivelyN :: ProofData i => Int -> Strategy i i -> Strategy i i
 exhaustivelyN n s
   | n<0       = identity
   | otherwise = s >>> try (exhaustivelyN (n-1) s)
 
 -- | prop> te st = try (exhaustively st)
-te :: Strategy prob -> Strategy prob
+te :: Strategy i i -> Strategy i i
 te = try . exhaustively
 
 -- | @'when' b st@ applies @st@ if @b@ is true.
-when :: ProofData prob => Bool -> Strategy prob -> Strategy prob
+when :: (ProofData i, Show o) => Bool -> Strategy i o -> Strategy i o
 when b st = if b then st else identity
 --whenNot = try $ force s <> sthen
 
 -- | @'check' test msg@. Applies @test@ to the problem.
 -- Fails with @msg@ if the test fails. Succeeds otherwise.
-check :: ProofData prob => (prob -> Bool) -> String -> Strategy prob
-check f msg = withProblem $ \p -> if f p then succeeding else failingWith msg
+check :: ProofData i => (i -> Bool) -> String -> Strategy i i
+check f msg = withProblem $ \p -> if f p then succeeding else failing' msg
 

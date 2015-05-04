@@ -31,8 +31,9 @@ data TimeoutProof = TimeoutProof Int
 
 
 instance ProofData i => Processor (Timeout i o) where
-  type ProofObject (Timeout i o)   = TimeoutProof
-  type Problem (Timeout i o)       = i
+  type ProofObject (Timeout i o) = TimeoutProof
+  type I (Timeout i o)           = i
+  type O (Timeout i o)           = o
 
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
@@ -46,7 +47,7 @@ instance ProofData i => Processor (Timeout i o) where
     let actual = min to (cutoff remains delta)
     mr <- timed  actual (evaluate (stratT proc) prob)
     return $ case mr of
-      Nothing -> resultToTree proc prob (Fail (TimeoutProof to))
+      Nothing -> resultToTreeF proc prob $ Fail (TimeoutProof to)
       Just r  -> r
     where
       toNat n = case n of
@@ -71,7 +72,7 @@ timeoutDeclaration :: ProofData i => Declaration(
    , Argument 'Required (Maybe Nat)
    , Argument 'Required (Strategy i o) ]
   :-> Strategy i o)
-timeoutDeclaration = declare "timeout" help args timeoutStrategy
+timeoutDeclaration = sdeclare "timeout" help args timeoutStrategy
   where
     help = ["Wraps the computation in a timeout."]
     args = (some timeoutUntilArg `optional` Nothing, some timeoutInArg, strat)

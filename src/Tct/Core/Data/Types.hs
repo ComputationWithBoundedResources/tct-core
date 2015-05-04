@@ -4,14 +4,15 @@ module Tct.Core.Data.Types where
 
 
 import Data.Typeable
-import           Control.Applicative           (Applicative)
+import           Control.Applicative           
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
 import           Data.Foldable                 as F (Foldable)
 import           Data.Traversable              as T (Traversable)
 import qualified System.Time                   as Time
-import           Text.Parsec                   (alphaNum, letter, oneOf, (<|>))
+import           Text.Parsec                   (alphaNum, letter, oneOf)
+import qualified Text.Parsec as P              ((<|>))
 import qualified Text.Parsec.Language          as PL
 import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
@@ -30,9 +31,10 @@ data TctROState = TctROState
   , stopTime      :: Maybe Time.ClockTime
   , tempDirectory :: FilePath }
 
+
 -- | The Tct monad.
-newtype TctM r = TctM { runTct :: ReaderT TctROState IO r}
-    deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
+newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
+  deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
 -- | Defines the (dynamic) runtime status of 'TctROState'.
 data TctStatus prob = TctStatus
@@ -47,7 +49,7 @@ data TctStatus prob = TctStatus
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
   { processor :: p
-  , problem   :: Problem p
+  , problem   :: I p
   , proof     :: ProofObject p }
 
 -- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
@@ -79,15 +81,16 @@ data Result p
   = Fail
     { proofData :: ProofObject p }
   | Success
-    { subProblems   :: Forking p (Problem p)
+    { subProblems   :: Forking p (O p)
     , proofData     :: ProofObject p
     , certificateFn :: CertificateFn p }
 
-class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p)) => Processor p where
+class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
   type ProofObject p :: *
-  type Problem p     :: *
+  type I p           :: *
+  type O p           :: *
   type Forking p     :: * -> *
-  solve              :: p -> Problem p -> TctM (Return (ProofTree (Problem p)))
+  solve              :: p -> I p -> TctM (Return (ProofTree (O p)))
 
   type Forking p     =  Id
 
@@ -97,14 +100,16 @@ class (Show p, ProofData (ProofObject p), ProofData (Problem p), Fork (Forking p
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
-  Proc       :: (Processor p, Problem p ~ i) => p -> Strategy i i
+  -- Proc       :: (Processor p, I p ~ i, O p ~ o) => p -> Strategy i o
+  Proc       :: (Processor p) => p -> Strategy (I p) (O p) 
 
-  Trying     :: Bool -> Strategy i o -> Strategy i o
+  Trying     :: Bool -> Strategy i i -> Strategy i i
 
-  Trans      :: (o1 -> i2) -> Strategy i1 o1 -> Strategy i2 o2 -> Strategy i1 o2
+  Trans      :: Strategy i p -> Strategy p o -> Strategy i o
 
   Then       :: Strategy i i -> Strategy i i -> Strategy i i 
-  ThenPar    :: Strategy i i -> Strategy i i -> Strategy i i
+  ThenPar    :: Strategy i i -> Strategy i i -> Strategy i i 
+
 
   Alt        :: Strategy i o -> Strategy i o -> Strategy i o
   OrFaster   :: Strategy i o -> Strategy i o -> Strategy i o
@@ -114,12 +119,23 @@ data Strategy i o where
   deriving Typeable
 
 -- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
--- See "Combinators" fndor a detailed description.
+-- See "Combinators" for a detailed description.
 data Return l
   = Continue { fromReturn :: l }
   | Abort    { fromReturn :: l }
+  | Flop 
   deriving (Show, Functor)
 
+-- instance Monad Return where
+--   fail _           = Flop
+--   return           = Continue
+--   Continue l >>= f = f l
+--   Abort _    >>= _ = Flop
+--   Flop       >>= _ = Flop
+
+-- instance Applicative Return where
+--   pure  = return
+--   (<*>) = ap
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------
 
@@ -205,14 +221,20 @@ data Declaration :: * -> * where
           String -> [String] -> f -> HList args -> Declaration (args :-> Ret (ArgsType args) f)
 
 declare ::
-  (ToHList a, Uncurry (ArgsType (HListOf a) :-> Ret (ArgsType (HListOf a)) f) ~ f) =>
-    String -> [String] -> a -> f -> Declaration (HListOf a :-> Ret (ArgsType (HListOf a)) f)
+  (ToHList a, HListOf a ~ args, Uncurry (ArgsType args :-> Ret (ArgsType args) f) ~ f) =>
+    String -> [String] -> a -> f -> Declaration (args :-> Ret (ArgsType args) f)
 declare n desc as p = Decl n desc p (toHList as)
 
+sdeclare ::
+  (ToHList a, HListOf a ~ args, Uncurry (ArgsType args :-> Ret (ArgsType args) f) ~ f, Ret (ArgsType args) f ~ Strategy i o) =>
+    String -> [String] -> a -> f -> Declaration (args :-> Strategy i o)
+sdeclare n desc as p = Decl n desc p (toHList as)
+
+
 -- | Specifies the construction of a argument parser.
-class ParsableArgs prob ats where
-  mkOptParser :: HList ats -> [SParser prob (String,Dynamic)]
-  mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser prob (HList (ArgsType ats))
+class ParsableArgs i o ats where
+  mkOptParser :: HList ats -> [SParser i o (String,Dynamic)]
+  mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser i o (HList (ArgsType ats))
 
 -- | Collects the meta information of a list of arguments.
 class ArgsInfo as where
@@ -221,17 +243,17 @@ class ArgsInfo as where
     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
 
 -- | Existential type for declarations specifying a Strategy.
-data StrategyDeclaration prob where
-  SD :: (ParsableArgs prob args, ArgsInfo args) => Declaration (args :-> Strategy prob prob) -> StrategyDeclaration prob
+data StrategyDeclaration i o where
+  SD :: (ParsableArgs i o args, ArgsInfo args) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
 
 
 -- Parsing -----------------------------------------------------------------------------------------------------------
 
-type SPState prob = [StrategyDeclaration prob]
-type SParser prob = CharParser (SPState prob)
+type SPState i o = [StrategyDeclaration i o]
+type SParser i o  = CharParser (SPState i o)
 
-class SParsable prob a where
-  parseS :: SParser prob a
+class SParsable i o a where
+  parseS :: SParser i o a
 
 -- | Specified Tokenparser.
 strategyTP :: PT.TokenParser st
@@ -243,7 +265,7 @@ strategyTP = PT.makeTokenParser style
       , PT.commentLine    = "--"
       , PT.nestedComments = True
       , PT.identStart     = letter
-      , PT.identLetter    = alphaNum <|> oneOf "_'"
+      , PT.identLetter    = alphaNum P.<|> oneOf "_'"
       , PT.reservedOpNames= ["try", "force"]
       , PT.reservedNames  = [">>>", ">||", "<>", "<||>" ]
       , PT.caseSensitive  = True }

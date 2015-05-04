@@ -10,7 +10,8 @@ module Tct.Core.Data.Processor
   , ProofData
   , CertificateFn
   , resultToTree
-    
+  , resultToTreeF
+
   , ErroneousProcessor (..)
   , ErroneousProof (..)
   ) where
@@ -21,7 +22,7 @@ import qualified Tct.Core.Common.Xml       as Xml
 import           Tct.Core.Data.Types
 
 
-toStrategy :: Processor p => p -> Strategy (Problem p) (Problem p)
+toStrategy :: Processor p => p -> Strategy (I p) (O p)
 toStrategy = Proc
 
 -- Processor ---------------------------------------------------------------------------------------------------------
@@ -30,10 +31,16 @@ toStrategy = Proc
 --
 -- prop> 'Fail'    -> 'NoProgress'
 -- prop> 'Success' -> 'Progress'
-resultToTree :: Processor p => p -> Problem p -> Result p -> Return (ProofTree (Problem p))
-resultToTree p prob (Fail po)                 = Abort $ NoProgress (ProofNode p prob po) (Open prob)
+resultToTree :: (Processor p, I p ~ O p) => p -> I p -> Result p -> Return (ProofTree (O p))
 resultToTree p prob (Success probs po certfn) = Continue $ Progress (ProofNode p prob po) certfn (Open `fmap` probs)
-              
+resultToTree p prob (Fail po)                 = Abort $ NoProgress (ProofNode p prob po) (Open prob)
+
+-- prop> 'Fail'    -> 'NoProgress'
+-- prop> 'Success' -> 'Progress'
+resultToTreeF :: Processor p => p -> I p -> Result p -> Return (ProofTree (O p))
+resultToTreeF p prob (Success probs po certfn) = Continue $ Progress (ProofNode p prob po) certfn (Open `fmap` probs)
+resultToTreeF _ _ (Fail _)                     = Flop
+
 -- Error Processor ---------------------------------------------------------------------------------------------------
 
 data ErroneousProof p = ErroneousProof IOError p deriving Show
@@ -52,6 +59,8 @@ data ErroneousProcessor p = ErroneousProc IOError p deriving Show
 
 instance Processor p => Processor (ErroneousProcessor p) where
   type ProofObject (ErroneousProcessor p) = ErroneousProof p
-  type Problem (ErroneousProcessor p)     = Problem p
-  solve e@(ErroneousProc err p) prob      = return $ resultToTree e prob (Fail (ErroneousProof err p))
+  type I (ErroneousProcessor p)     = I p
+  type O (ErroneousProcessor p)     = O p
+
+  solve e@(ErroneousProc err p) prob      = return . resultToTreeF e prob $ Fail (ErroneousProof err p)
 

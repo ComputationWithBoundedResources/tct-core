@@ -26,21 +26,21 @@ curried :: f ~ Uncurry (args :-> Ret args f) => f -> HList args -> Ret args f
 curried f HNil         = f
 curried f (HCons a as) = curried (f a) as
 
-decl :: (ParsableArgs prob args) => Declaration (args :-> r) -> SParser prob r
+decl :: (ParsableArgs i o args) => Declaration (args :-> r) -> SParser i o r
 decl (Decl n _ f as) = do
   _    <- try (symbol n)
   opts <- many (choice (map try (mkOptParser as)))
   vs   <- mkArgParser as opts
   return (curried f vs)
 
-strategy :: SParser i (Strategy i i)
+strategy :: SParser i i (Strategy i i)
 strategy = PE.buildExpressionParser table strat <?> "stratgy"
   where
     strat =
       parens strategy
       <|> predefined
       <?> "expression"
-    predefined :: SParser prob (Strategy prob prob)
+    predefined :: SParser i o (Strategy i o)
     predefined = do
       decls <- getState
       -- MS: there is an issue when declarations have only optional arguments and a common prefix
@@ -55,34 +55,34 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
     binary name fun = PE.Infix (do{ reserved name; return fun })
     unary name fun = PE.Prefix (do{ reserved name; return fun })
 
-instance ParsableArgs prob '[] where
+instance ParsableArgs i o '[] where
   mkOptParser _   = []
   mkArgParser _ _ = return HNil
 
-instance (Typeable a, SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument Optional a ': as) where
+instance (Typeable a, SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument Optional a ': as) where
   mkOptParser (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParser as
     where
-      pa :: SParsable prob a => Argument Optional a -> SParser prob a
+      pa :: SParsable i o a => Argument Optional a -> SParser i o a
       pa _ = symbol (':' : argName a) >> parseS
   mkArgParser (HCons a as) ls = do
     let v = fromMaybe (argDefault a) (lookup (argName a) ls >>= fromDynamic)
     vs <- mkArgParser as ls
     return (HCons v  vs)
 
-instance (SParsable prob a, ParsableArgs prob as) => ParsableArgs prob (Argument Required a ': as) where
+instance (SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument Required a ': as) where
   mkOptParser (HCons ReqArg{} as) = mkOptParser as
   mkArgParser (HCons _ as) ls     = do
     v  <- lexeme parseS
     vs <- mkArgParser as ls
     return (HCons v vs)
 
-instance SParsable prob D.Nat           where parseS = nat
-instance SParsable prob Bool            where parseS = bool
-instance SParsable prob String          where parseS = identifier
-instance SParsable prob (Strategy prob prob) where parseS = strategy
-instance (Typeable a, SParsable prob a) => SParsable prob (Maybe a) where
+instance SParsable i o D.Nat          where parseS = nat
+instance SParsable i o Bool           where parseS = bool
+instance SParsable i o String         where parseS = identifier
+instance SParsable i i (Strategy i i) where parseS = strategy
+instance (Typeable a, SParsable i o a) => SParsable i o (Maybe a) where
   parseS = (try (symbol "none") >> return Nothing) <|> Just `fmap` parseS <?> "maybe"
 
-strategyFromString :: [StrategyDeclaration i] -> String -> Either ParseError (Strategy i i)
+strategyFromString :: [StrategyDeclaration i i] -> String -> Either ParseError (Strategy i i)
 strategyFromString ls = runParser (do {_ <- whiteSpace; p <- strategy; eof; return p}) ls "supplied string"
 

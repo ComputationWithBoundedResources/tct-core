@@ -116,7 +116,7 @@ string :: Argument Required String
 string = arg { argName = "string", argDomain = "<string>" }
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
-strat :: Argument Required (Strategy i i)
+strat :: Argument Required (Strategy i o)
 strat = arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
 
 withDomain :: Argument r a -> [String] -> Argument r a
@@ -129,7 +129,7 @@ instance WithHelp (Argument r a) where withHelp ar n = ar { argHelp = n }
 
 -- StrategyDeclaration
 
-instance PP.Pretty (StrategyDeclaration prob) where
+instance PP.Pretty (StrategyDeclaration i o) where
   pretty (SD s) = PP.pretty s
 
 instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where

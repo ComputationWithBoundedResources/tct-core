@@ -53,10 +53,10 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 
 -- | The Tct configuration defines global properties.
 --   It is updated by command-line arguments and 'TctMode'.
-data TctConfig prob = TctConfig
+data TctConfig i = TctConfig
   { outputMode :: OutputMode
   , recompile  :: Bool
-  , strategies :: [StrategyDeclaration prob] }
+  , strategies :: [StrategyDeclaration i i] }
 
 -- | Output mode.
 data OutputMode
@@ -95,7 +95,7 @@ configDir = getHomeDirectory >>= \home -> return (home </> ".tctl")
 {-configFile :: String -> IO FilePath-}
 {-configFile n = configDir >>= return . (</> n)-}
 
-type TctConfiguration prob opt = Either TctError (TctConfig prob, TctMode prob opt)
+type TctConfiguration i opt = Either TctError (TctConfig i, TctMode i i opt)
 
 tctl :: ProofData prob => TctConfiguration prob opt -> IO ()
 tctl conf = Dyre.wrapMain params conf
@@ -118,13 +118,13 @@ tctl conf = Dyre.wrapMain params conf
 -- | Construct a customised Tct. Example usage:
 --
 -- > main = tctl $ setModeWith defaultTctConfig trsMode
-setModeWith :: ProofData prob => TctConfig prob -> TctMode prob opt -> IO ()
+setModeWith :: ProofData i => TctConfig i -> TctMode i i opt -> IO ()
 setModeWith c m = tctl $ Right (c,m)
 
 -- | Construct a customised Tct with default configuration.
 --
 -- > setMode m = setModeWith defaultTctConfig m
-setMode :: ProofData prob => TctMode prob opt -> IO ()
+setMode :: ProofData i => TctMode i i opt -> IO ()
 setMode = setModeWith defaultTctConfig
 
 
@@ -146,7 +146,7 @@ data TctAction m
   = Run (TctOptions m)
   | RunInteractive
 
-mkParser :: [StrategyDeclaration proc] -> O.Parser m -> O.ParserInfo (TctAction m)
+mkParser :: [StrategyDeclaration i i] -> O.Parser m -> O.ParserInfo (TctAction m)
 mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive <|> tctp) desc
   where
     listed = O.infoOption (PP.display . PP.vcat $ map PP.pretty ps) $ mconcat
@@ -235,36 +235,33 @@ realMain dcfg = do
           ucfg = updateTctConfig cfg opts
           TctConfig
             { outputMode = theOutputMode } = ucfg
-        prob <- mkProblem theProblemFile theProblemParser theModifyer theOptions
-        st   <- mkStrategy theDefaultStrategy theStrategies theStrategyName
+
+        prob <- do
+          f <- tryIO $ readFile theProblemFile
+          liftEither $ theModifyer theOptions `fmap` theProblemParser f
+
+        st   <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
+
         let stt = maybe st (`timeoutIn` st) theTimeout
-        r    <- runIt stt prob
-        output theOutputMode theAnswer (fromReturn r)
+        r    <- liftIO $ run (evaluate stt prob)
+        output theOutputMode (theAnswer theOptions) r
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
 
   where
     mkOptions optParser strats = liftIO $ O.execParser (mkParser strats optParser)
-    mkStrategy :: Strategy prob -> [StrategyDeclaration prob] -> Maybe String -> ErrorT TctError IO (Strategy prob)
-    mkStrategy def strats = maybe
-      (return def)
-      (liftEither . parseStrategy strats)
-    mkProblem file parser modifyer opts = do
-      f <- tryIO $ readFile file
-      liftEither $ do
-        prob <- parser f
-        return $ modifyer prob opts
-    runIt st prob = liftIO $ run (evaluate st prob)
-    output v custom pt = liftIO $
-      case v of
-        OnlyAnswer        -> PP.putPretty (answer pt)
-        WithProof         -> PP.putPretty (answer pt) >> PP.putPretty (ppProofTree PP.pretty pt)
-        WithDetailedProof -> PP.putPretty (answer pt) >> PP.putPretty (ppDetailedProofTree PP.pretty pt)
-        AsXml             -> error "missing: toXml prooftree" -- FIXME
-        CustomAnswer      -> custom pt
+
+    output v custom ret = liftIO $
+      case (v,ret) of
+        (CustomAnswer, _) -> custom ret
+        (_, Flop)         -> putStr "Flop"
+
+        (OnlyAnswer, r)        -> PP.putPretty (answer $ fromReturn r)
+        (WithProof, r)         -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
+        (WithDetailedProof, r) -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
+        (AsXml, _)             -> error "missing: toXml prooftree" -- FIXME
     parseStrategy sds s = case strategyFromString sds s of
       Left err -> Left $ TctParseError (show err)
       Right st -> Right st
-
 
