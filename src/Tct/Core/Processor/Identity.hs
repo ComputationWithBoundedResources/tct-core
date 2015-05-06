@@ -12,24 +12,24 @@ import           Tct.Core.Data                   hiding (timed)
 import           Tct.Core.Data.Declaration.Parse as P ()
 
 
-data Identity i o = Identity deriving Show
+data Identity i = Identity deriving Show
 
 data IdentityProof = IdentityProof deriving Show
 
-instance (ProofData i, Show o) => Processor (Identity i o) where
-  type ProofObject (Identity i o) = IdentityProof
-  type I (Identity i o)           = i
-  type O (Identity i o)           = o
+instance ProofData i => Processor (Identity i) where
+  type ProofObject (Identity i) = IdentityProof
+  type I (Identity i)           = i
+  type O (Identity i)           = i
 
-  solve p prob = return . resultToTreeF p prob $ Fail IdentityProof
+  solve p prob = return . resultToTree p prob $ Fail IdentityProof
 
 
 -- | The identity strategy. Always Fails.
-identity :: (ProofData i, Show o) => Strategy i o
-identity = Proc (Identity :: (ProofData i, Show o) => Identity i o )
+identity :: ProofData i => Strategy i i
+identity = Proc (Identity :: (ProofData i) => Identity i)
 
 -- | The identity strategy declaration.
-identityDeclaration :: (ProofData i, Show o) => Declaration('[] :-> Strategy i o)
+identityDeclaration :: ProofData i => Declaration('[] :-> Strategy i i)
 identityDeclaration = declare "identity" help () identity
   where help = ["This strategy always fails."]
 

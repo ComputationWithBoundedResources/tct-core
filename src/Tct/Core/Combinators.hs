@@ -150,8 +150,12 @@ withProblem :: (i -> Strategy i o) -> Strategy i o
 withProblem g = WithStatus (g . currentProblem)
 
 
-emptyList :: (ProofData i, Show o) => Strategy i o
+emptyList :: ProofData i => Strategy i i
 emptyList = identity
+
+emptyList' :: (ProofData i, Show o) => Strategy i o
+emptyList' = failing
+
 
 -- | List version of ('>>>').
 --
@@ -170,23 +174,23 @@ chainWith s ss = foldr1 (\t ts -> t >>> s >>> ts) ss >>> s
 
 -- | List version of ('<>').
 alternative :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
-alternative [] = emptyList
+alternative [] = emptyList'
 alternative ss = foldr1 (<>) ss
 
 -- | List version of ('<||>').
 fastest :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
-fastest [] = emptyList
+fastest [] = emptyList'
 fastest ss = foldr1 (<||>) ss
 
 -- | Like 'fastest'. But only runs @n@ strategies in parallel.
 fastestN :: (ProofData i, Show o) => Int -> [Strategy i o] -> Strategy i o
-fastestN _ [] = emptyList
+fastestN _ [] = emptyList'
 fastestN n ss = fastest ss1 <> fastestN n ss2
   where (ss1,ss2) = splitAt n ss
 
 -- | List version of ('<?>').
 best :: (ProofData i, Show o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
-best _   [] = emptyList
+best _   [] = emptyList'
 best cmp ss = foldr1 (cmp <?>) ss
 
 -- | Compares time upperbounds. Useful with 'best'.
@@ -211,7 +215,7 @@ te :: Strategy i i -> Strategy i i
 te = try . exhaustively
 
 -- | @'when' b st@ applies @st@ if @b@ is true.
-when :: (ProofData i, Show o) => Bool -> Strategy i o -> Strategy i o
+when :: ProofData i => Bool -> Strategy i i -> Strategy i i
 when b st = if b then st else identity
 --whenNot = try $ force s <> sthen
 
