@@ -26,12 +26,14 @@ module Tct.Core.Data.Certificate
   ) where
 
 
-import Data.Monoid
-import qualified Tct.Core.Common.Pretty as PP
-import qualified Tct.Core.Common.Xml    as Xml
-import Tct.Core.Common.SemiRing
+import           Data.Monoid
+import qualified Tct.Core.Common.Pretty   as PP
+import           Tct.Core.Common.SemiRing
+import qualified Tct.Core.Common.Xml      as Xml
 
 
+-- | Type for asymptotic complexity.
+-- The 'Ord' and 'SemiRing' instances are the expected one for asymptotic complexity.
 data Complexity
   = Poly (Maybe Int) -- ^ Polynomial. If argument is @Just k@, then
                      --   @k@ gives the degree of the polynomial
@@ -173,10 +175,10 @@ updateTimeUBCert  cert f = cert { timeUB  = f $ timeUB  cert }
 updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
 
 
--- Proof Data --------------------------------------------------------------------------------------------------------
+--- * ProofData ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty Complexity where
-  pretty c = case c of 
+  pretty c = case c of
     (Poly (Just 0)) -> asym $ PP.text "1"
     (Poly (Just k)) -> asym $ PP.text "n" <> PP.char '^' <> PP.int k
     (Poly Nothing)  -> PP.text "POLY"
@@ -196,7 +198,7 @@ instance PP.Pretty Certificate where
     PP.text "SPACE(" <> PP.pretty sl <> PP.char ',' <> PP.pretty su <> PP.char ')'
 
 instance Xml.Xml Complexity where
-  toXml c = case c of 
+  toXml c = case c of
     (Poly Nothing)  -> Xml.elt "polynomial" []
     (Poly (Just k)) -> Xml.elt "polynomial" [Xml.int k]
     (Exp Nothing)   -> Xml.elt "exponential" []
@@ -208,6 +210,4 @@ instance Xml.Xml Complexity where
     Unknown         -> Xml.elt "unknown" []
   toCeTA (Poly (Just k)) = Xml.elt "polynomial" [Xml.int k]
   toCeTA _               = Xml.unsupported
-
-
 

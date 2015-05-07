@@ -1,4 +1,5 @@
 -- | This module provides the /Identity/ processors.
+-- Similar to 'Failing' but returns 'Abort'.
 module Tct.Core.Processor.Identity
   (
   identity
@@ -9,7 +10,6 @@ module Tct.Core.Processor.Identity
 import qualified Tct.Core.Common.Pretty          as PP
 import qualified Tct.Core.Common.Xml             as Xml
 import           Tct.Core.Data                   hiding (timed)
-import           Tct.Core.Data.Declaration.Parse as P ()
 
 
 data Identity i = Identity deriving Show

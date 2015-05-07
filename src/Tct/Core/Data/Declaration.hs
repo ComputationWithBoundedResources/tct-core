@@ -1,9 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverlappingInstances #-}
--- | 
+-- |
 
 module Tct.Core.Data.Declaration
-  ( 
+  (
   declName
   , declHelp
   , declFun
@@ -12,7 +12,7 @@ module Tct.Core.Data.Declaration
 
   -- * StrategyDeclaration
   , StrategyDeclaration
-  
+
 
   -- * Arguments
   , Argument (..)
@@ -23,8 +23,8 @@ module Tct.Core.Data.Declaration
   , some
   , withDomain
 
-  -- * Instances  
-  , Nat 
+  -- * Instances
+  , Nat
   , nat
   , bool
   , string
@@ -37,9 +37,6 @@ import           Data.List              (intercalate)
 import qualified Tct.Core.Common.Pretty as PP
 import           Tct.Core.Data.Types
 
-
-instance WithName (Declaration c) where withName (Decl _ h f as) n' = Decl n' h f as
-instance WithHelp (Declaration c) where withHelp (Decl n _ f as) h' = Decl n h' f as
 
 -- | Returns the name of a 'Declarationi'.
 declName :: Declaration c -> String
@@ -56,6 +53,9 @@ declFun (Decl _ _ f  _) = f
 -- | Returns the arguments of a 'Declarationi'.
 declArgs :: Declaration (args :-> r) -> HList args
 declArgs (Decl _ _ _ as) = as
+
+instance WithName (Declaration c) where withName (Decl _ h f as) n' = Decl n' h f as
+instance WithHelp (Declaration c) where withHelp (Decl n _ f as) h' = Decl n h' f as
 
 -- | Specifies the default function of a 'Declaration'.
 type family DeflFun c where
@@ -79,14 +79,12 @@ instance DefF (as :-> r) => DefF (Argument Required a ': as :-> r) where
   deflFun (Decl n h f (HCons _ as)) = \ a' -> deflFun (Decl n h (f a') as)
   deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
--- liftD :: (r -> s) -> Declaration('[] :-> r) -> Declaration('[] :-> s)
--- liftD g (Decl n h f as) = Decl n h (g $ f) as
 
--- arguments ---------------------------------------------------------------------------------------------------------
+--- * arguments ------------------------------------------------------------------------------------------------------
 instance Functor (Argument r) where
-  _ `fmap` ar@ReqArg{} = 
+  _ `fmap` ar@ReqArg{} =
     ReqArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar }
-  f `fmap` ar@OptArg{} = 
+  f `fmap` ar@OptArg{} =
     OptArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = f (argDefault ar) }
 
 -- | Generic argument with name "arg" and domain "<arg>".
@@ -137,14 +135,14 @@ instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where
     [ theName
     , theLine
     , if null h then PP.empty else PP.indent 4 theHelp PP.<$$> PP.empty
-    , PP.indent 4 theSynopsis 
+    , PP.indent 4 theSynopsis
     , PP.empty ]
     ++ (if null opts then [] else [PP.indent 2 theOptArgs])
     ++ (if null reqs then [] else [PP.indent 2 theReqArgs])
     ++ [PP.empty]
 
     where
-      theName = PP.text "Strategy" PP.<+> PP.text n 
+      theName = PP.text "Strategy" PP.<+> PP.text n
       theLine = PP.text $ replicate (length $ "Strategy " ++ n) '-'
       theHelp = PP.paragraph (unlines h)
       theSynopsis = PP.text "Synopsis: " PP.<+> PP.text n PP.<+> PP.hsep (map mkSynopsis info)

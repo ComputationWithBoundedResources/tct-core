@@ -40,13 +40,14 @@ Library
     Tct.Core.Data.Answer
     Tct.Core.Data.Certificate
     Tct.Core.Data.Declaration
-    Tct.Core.Data.Declaration.Parse
     Tct.Core.Data.Forks
     Tct.Core.Data.Processor
     Tct.Core.Data.ProofTree
     Tct.Core.Data.Strategy
     Tct.Core.Data.TctM
     Tct.Core.Data.Types
+    Tct.Core.Declarations
+    Tct.Core.Parse
     Tct.Core.Interactive
     Tct.Core.Main
     Tct.Core.Main.Mode
@@ -60,6 +61,7 @@ Library
     Tct.Core.Processor.Succeeding
     Tct.Core.Processor.Timeout
     Tct.Core.Processor.Transform
+    Tct.Core.Processor.TransformWith
     Tct.Core.Processor.Wait
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,

@@ -1,10 +1,10 @@
--- | This module provides a simple /Transform/ processor with a standard proof output.
+-- | This module provides a simple /Transform/ processor with a minimal proof output.
 module Tct.Core.Processor.Transform (transform) where
+
 
 import qualified Tct.Core.Common.Pretty          as PP
 import qualified Tct.Core.Common.Xml             as Xml
-import           Tct.Core.Data                   hiding (timed)
-import           Tct.Core.Data.Declaration.Parse as P ()
+import           Tct.Core.Data
 
 
 data Transform i o = Transform (i -> Return o)
@@ -22,14 +22,19 @@ instance (ProofData i, ProofData o) => Processor (Transform i o) where
   type I (Transform i o)           = i
   type O (Transform i o)           = o
 
-  solve p@(Transform t) prob = t prob `seq` return . resultToTreeF p prob $ case t prob of
-    Flop           -> Fail TransformFail
+  solve p@(Transform t) prob = t prob `seq` return . resultToTree' p prob $ case t prob of
+    Halt _         -> Fail TransformFail
     Abort _        -> Fail TransformFail
     Continue nprob -> Success (toId nprob) (TransformProof prob nprob) fromId
 
 
+-- | A Wrapper for a transfromation. With minimal proof output.
+transform :: (ProofData i, ProofData o) => (i -> Return o) -> Strategy i o
+transform = Proc . Transform
+
+
 instance (PP.Pretty i, PP.Pretty o) => PP.Pretty (TransformProof i o) where
-  pretty TransformFail  = PP.text "The transformation failed."
+  pretty TransformFail        = PP.text "The transformation failed."
   pretty (TransformProof i o) = PP.vcat
     [ PP.text "We transform the problem"
     , PP.indent 2 $ PP.pretty i
@@ -37,12 +42,9 @@ instance (PP.Pretty i, PP.Pretty o) => PP.Pretty (TransformProof i o) where
     , PP.indent 2 $ PP.pretty o ]
 
 instance (Xml.Xml i, Xml.Xml o) => Xml.Xml (TransformProof i o) where
-  toXml TransformFail  = Xml.elt "transformation" [ Xml.elt "failed" []]
+  toXml TransformFail        = Xml.elt "transformation" [ Xml.elt "failed" []]
   toXml (TransformProof i o) =
     Xml.elt "transformation"
       [ Xml.toXml i
       , Xml.toXml o ]
-
-transform :: (ProofData i, ProofData o) => (i -> Return o) -> Strategy i o
-transform = Proc . Transform
 

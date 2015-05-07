@@ -47,7 +47,7 @@ instance ProofData i => Processor (Timeout i o) where
     let actual = min to (cutoff remains delta)
     mr <- timed  actual (evaluate (stratT proc) prob)
     return $ case mr of
-      Nothing -> resultToTreeF proc prob $ Fail (TimeoutProof to)
+      Nothing -> resultToTree' proc prob $ Fail (TimeoutProof to)
       Just r  -> r
     where
       toNat n = case n of
@@ -72,7 +72,7 @@ timeoutDeclaration :: ProofData i => Declaration(
    , Argument 'Required (Maybe Nat)
    , Argument 'Required (Strategy i o) ]
   :-> Strategy i o)
-timeoutDeclaration = sdeclare "timeout" help args timeoutStrategy
+timeoutDeclaration = declare "timeout" help args timeoutStrategy
   where
     help = ["Wraps the computation in a timeout."]
     args = (some timeoutUntilArg `optional` Nothing, some timeoutInArg, strat)
@@ -83,13 +83,13 @@ timeoutDeclaration = sdeclare "timeout" help args timeoutStrategy
       `withName` "until" 
       `withHelp` ["Aborts the comutation after <nat> seconds wrt. the starting time."]
 
--- | prop> timeout m n st = timeoutUntil m (timoutIn n st) = timeoutIn n (timeoutUntil m st)
-timeout :: ProofData i => Maybe Int -> Maybe Int -> Strategy i o -> Strategy i o
-timeout = declFun timeoutDeclaration
 
-timeout' :: ProofData i => Maybe Int -> Strategy i o -> Strategy i o
-timeout' = deflFun timeoutDeclaration
+timeout :: ProofData i => Maybe Int -> Strategy i o -> Strategy i o
+timeout = deflFun timeoutDeclaration
 
+-- | prop> timeout' m n st = timeoutUntil m (timoutIn n st) = timeoutIn n (timeoutUntil m st)
+timeout' :: ProofData i => Maybe Int -> Maybe Int -> Strategy i o -> Strategy i o
+timeout' = declFun timeoutDeclaration
 
 -- | @'timoutIn' i st@ aborts the application of @st@ after @min i 'remainingTime'@ seconds;
 --

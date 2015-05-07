@@ -1,9 +1,7 @@
--- | This module re-exports "Text.PrettyPrint.ANSI.Leijen"
--- (<http://hackage.haskell.org/package/ansi-wl-pprint>)
--- and provides supplementary pretty-printing functions.
+-- | This module re-exports "Text.PrettyPrint.ANSI.Leijen" (<http://hackage.haskell.org/package/ansi-wl-pprint>) and
+-- provides some additional pretty-printing functions.
 module Tct.Core.Common.Pretty
-  (
-  module Text.PrettyPrint.ANSI.Leijen
+  ( module Text.PrettyPrint.ANSI.Leijen
   , Align (..)
   , table
 
@@ -20,13 +18,13 @@ module Tct.Core.Common.Pretty
   ) where
 
 
-import Control.Arrow ((***))
-import qualified Data.Foldable as F
-import qualified Data.Set as S
-import Data.List                    (transpose)
-import Text.PrettyPrint.ANSI.Leijen hiding (list,tupled)
+import           Control.Arrow                ((***))
+import qualified Data.Foldable                as F
+import           Data.List                    (transpose)
+import qualified Data.Set                     as S
+import           Text.PrettyPrint.ANSI.Leijen hiding (list, tupled)
 
- 
+
 -- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
@@ -82,7 +80,7 @@ set = encloseSep lbrace rbrace comma . F.toList
 set' :: (F.Foldable f, Pretty a, Ord a) =>  f a -> Doc
 set' = set . fmap pretty . F.toList . F.foldr S.insert S.empty
 
--- | Provides an itemise environment. @itemise d ds@ with bullet @d@.
+-- | @itemise bullet docs@. Provides an itemise environment.
 itemise :: F.Foldable f => Doc -> f Doc -> Doc
 itemise d ds = table [( AlignRight, replicate (length ds') d), (AlignLeft, ds')]
   where ds' = F.toList ds
@@ -103,7 +101,7 @@ listing' = listing . map (pretty *** pretty) . F.toList
 -- | Provides an enumerate environment.
 enumerate :: F.Foldable f => f Doc -> Doc
 enumerate ds = table [(AlignRight, enumeration), (AlignLeft, ds')]
-  where 
+  where
     ds'         = F.toList ds
     enumeration = take (length ds') [ int i <> text ".) " | i <- [1..]]
 

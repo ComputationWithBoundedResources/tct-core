@@ -1,4 +1,7 @@
 -- | This module provides the main function and the command-line interface.
+-- We use 'Config.Dyre' to define configurations and extend the declarations list. The configuration directory is
+-- currently fixed @~/.tct3@. The 'modeId' defines the configuration file. For example @~/.tct3/trs.hs@
+-- The interactive mode also has to be started withing @~/.tct3@.
 module Tct.Core.Main
   (
   version
@@ -33,12 +36,12 @@ import           Tct.Core.Data              as M (ProofTree, answer)
 import           Tct.Core.Main.Mode         as M
 import           Tct.Core.Main.Options      as M
 
-import           Tct.Core.Combinators       (declarations)
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import           Tct.Core.Data
+import           Tct.Core.Declarations      (declarations)
+import           Tct.Core.Parse             (strategyFromString)
 import           Tct.Core.Processor.Timeout (timeoutIn)
-
 
 
 -- | Current version.
@@ -90,15 +93,15 @@ defaultTctConfig = TctConfig
   , strategies = declarations }
 
 configDir :: IO FilePath
-configDir = getHomeDirectory >>= \home -> return (home </> ".tctl")
+configDir = getHomeDirectory >>= \home -> return (home </> ".tct3")
 
 {-configFile :: String -> IO FilePath-}
 {-configFile n = configDir >>= return . (</> n)-}
 
 type TctConfiguration i opt = Either TctError (TctConfig i,  TctMode i i opt)
 
-tctl :: ProofData i => TctConfiguration i opt -> IO ()
-tctl conf = Dyre.wrapMain params conf
+tct3 :: ProofData i => TctConfiguration i opt -> IO ()
+tct3 conf = Dyre.wrapMain params conf
   where
     params = Dyre.defaultParams
       { Dyre.projectName = name
@@ -113,13 +116,13 @@ tctl conf = Dyre.wrapMain params conf
     ghcOpts =
       ["-threaded", "-O","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"]
 
--- Mode Application --------------------------------------------------------------------------------------------------
+--- * Mode Application -----------------------------------------------------------------------------------------------
 
 -- | Construct a customised Tct. Example usage:
 --
--- > main = tctl $ setModeWith defaultTctConfig trsMode
+-- > main = tct3 $ setModeWith defaultTctConfig trsMode
 setModeWith :: ProofData i => TctConfig i -> TctMode i i opt -> IO ()
-setModeWith c m = tctl $ Right (c,m)
+setModeWith c m = tct3 $ Right (c,m)
 
 -- | Construct a customised Tct with default configuration.
 --
@@ -128,7 +131,7 @@ setMode :: ProofData i => TctMode i i opt -> IO ()
 setMode = setModeWith defaultTctConfig
 
 
--- Command-Line Options ----------------------------------------------------------------------------------------------
+--- * Command-Line Options -------------------------------------------------------------------------------------------
 
 -- | Tct command line options.
 data TctOptions m = TctOptions
@@ -160,7 +163,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive 
     interactive = O.flag' RunInteractive  $ mconcat
       [ O.long "interactive"
       , O.short 'i'
-      , O.help "Interactive mode." ]
+      , O.help "Interactive mode (experimental)." ]
     tctp = fmap Run $ TctOptions
       <$> O.optional (O.option (O.str >>= readOutputMode) (mconcat
         [ O.short 'a'
@@ -187,7 +190,7 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive 
       , O.progDescDoc . Just $ PP.string synopsis ]
 
 
--- Main --------------------------------------------------------------------------------------------------------------
+--- * Main -----------------------------------------------------------------------------------------------------------
 
 run :: TctM a -> IO a
 run m = do
@@ -254,13 +257,13 @@ realMain dcfg = do
 
     output v custom ret = liftIO $
       case (v,ret) of
-        (CustomAnswer, _) -> custom ret
-        (_, Flop)         -> putStr "Flop"
+        (CustomAnswer, _)      -> custom ret
 
+        (_, Halt pt)           -> PP.putPretty MaybeAnswer >> PP.putPretty (ppProofTree PP.pretty pt)
         (OnlyAnswer, r)        -> PP.putPretty (answer $ fromReturn r)
         (WithProof, r)         -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
         (WithDetailedProof, r) -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
-        (AsXml, _)             -> error "missing: toXml prooftree" -- FIXME
+        (AsXml, _)             -> error "missing: toXml prooftree" -- TODO:
     parseStrategy sds s = case strategyFromString sds s of
       Left err -> Left $ TctParseError (show err)
       Right st -> Right st

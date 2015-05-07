@@ -12,9 +12,9 @@ module Tct.Core.Combinators
   --
   --  * is continuing if the evaluation returns @'Continue' pt@,
   --  * is progressing if additionally @'progress' pt = 'True'@,
-  --  * is failing if it is not continuing.
+  --  * is aborting if the evaluation returns @'Abort' pt@
+  --  * is halting otherwise.
   module M
-  , declarations
   -- ** Sequential
   , (>>>), (>||>)
   , chain
@@ -22,7 +22,7 @@ module Tct.Core.Combinators
   -- ** Transformation
   , (>=>)
   -- ** Alternative
-  , (<>), (<||>), (<?>)
+  , (<|>), (<||>), (<?>)
   , alternative
   , fastest
   , fastestN
@@ -35,43 +35,34 @@ module Tct.Core.Combinators
   , withProblem
 
   -- ** Combinators
-  , when
   , exhaustively
   , exhaustivelyN
+  , es
   , te
+  , when
   , check
   ) where
 
 
 import Tct.Core.Data
-import Tct.Core.Processor.Failing    as M
-import Tct.Core.Processor.Identity   as M
-import Tct.Core.Processor.Succeeding as M
-import Tct.Core.Processor.Timeout    as M
-import Tct.Core.Processor.Wait       as M
-
--- TODO: MS: processor combinators like identity currently need some type constraints (ie Show o) otherwise, type
--- inference assumes it is a kind ther should be away to get rid of the constraint and tell ghc that it is not a kind
-
-declarations :: ProofData i => [StrategyDeclaration i i]
-declarations =
-  [ SD failingDeclaration
-  , SD timeoutDeclaration
-  , SD waitDeclaration
-  ]
+import Tct.Core.Processor.Empty         as M
+import Tct.Core.Processor.Failing       as M
+import Tct.Core.Processor.Identity      as M
+import Tct.Core.Processor.Succeeding    as M
+import Tct.Core.Processor.Timeout       as M
+import Tct.Core.Processor.Transform     as M
+import Tct.Core.Processor.TransformWith as M
+import Tct.Core.Processor.Wait          as M
 
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
 
 infixr 4 >=>
 infixr 5 >>>, >||>
-infixr 6 <>, <||>
+infixr 6 <|>, <||>
 
 -- | Infix version of 'Then'.
 -- @s1 '>>>' s2@ applies @s1@ before @s2@.
--- Fails if @s1@ or @s2@ fails.
---
--- prop> s1 >>> (s2 >>> s3) = (s1 >>> s2) >>> s3 = s1 >>> s2 >>> s3
 (>>>) :: Strategy i i -> Strategy i i -> Strategy i i
 (>>>)  = Then
 
@@ -86,19 +77,12 @@ infixr 6 <>, <||>
 
 
 -- | Infix version of 'Alt'.
--- @s1 '<>' s2@
---
--- * returns the result of @s1@ if @s1@ is progressing,
--- * returns the result of @s1@ if @s1@ is continuing and @s2@ is failing
--- * returns the result of @s2@ otherwise.
--- * Fails if @s1@ and @s2@ fails.
---
--- prop> s1 <> (s2 <> s3) = (s1 <> s2) <> s3 = s1 <> s2 <> s3
-(<>) :: Strategy i o -> Strategy i o-> Strategy i o
-(<>) = Alt
+-- @s1 '<|>' s2@
+(<|>) :: Strategy i o -> Strategy i o-> Strategy i o
+(<|>) = Alt
 
 -- | Infix version of 'OrFaster'.
--- Behaves like ('<>') but applies the strategies in parallel.
+-- Behaves like ('<|>') but applies the strategies in parallel.
 -- Suppose that @s2@ ends before @s1@ then:
 --
 -- prop> s1 <||> s2  = s2 <> s1
@@ -108,22 +92,11 @@ infixr 6 <>, <||>
 -- | Timed version of 'OrBetter'.
 --
 -- @('<?>') cmp s1 s2@ applies @'timeoutIn' n s1@ and @'timeoutIn' n s2@ in parallel and waits until both strategies have
--- finished. Here @n@ depends on 'remainingTime'. We consider the following cases:
---
---  * Both strategies end before the timeout
---
---     * and both strategies are progressing: we return @pt2@ only if @pt2 > pt1@ wrt to @cmp@, where @pt1@ and @pt2@
---       are the results of @s1@ and @s2@.
---     * otherwise it behaves like @s1 '<>' s2@.
---
---  * Only one strategy ends before the timeout, its result is returned.
---  * None of the stratgies end before the timeout, it fails.
---
+-- finished. Here @n@ depends on 'remainingTime'.
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: ProofData i => (ProofTree o -> ProofTree o -> Ordering)
-         -> Strategy i o -> Strategy i o -> Strategy i o
+(<?>) :: ProofData i => (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
 (<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
   where  to = timeoutRemaining
 
@@ -150,18 +123,11 @@ withProblem :: (i -> Strategy i o) -> Strategy i o
 withProblem g = WithStatus (g . currentProblem)
 
 
-emptyList :: ProofData i => Strategy i i
-emptyList = identity
-
-emptyList' :: (ProofData i, Show o) => Strategy i o
-emptyList' = failing
-
-
 -- | List version of ('>>>').
 --
--- prop> chain [] = failWith "empty list"
+-- prop> chain [] = identity
 chain :: ProofData i => [Strategy i i] -> Strategy i i
-chain [] = emptyList
+chain [] = identity
 chain ss = foldr1 (>>>) ss
 
 -- | Like 'chain' but additionally executes the provided strategy after each strategy of the list.
@@ -172,25 +138,27 @@ chainWith :: ProofData i => Strategy i i -> [Strategy i i] -> Strategy i i
 chainWith s [] = s
 chainWith s ss = foldr1 (\t ts -> t >>> s >>> ts) ss >>> s
 
--- | List version of ('<>').
+-- | List version of ('<|>').
+--
+-- prop> alternative [] = failing
 alternative :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
-alternative [] = emptyList'
-alternative ss = foldr1 (<>) ss
+alternative [] = failing
+alternative ss = foldr1 (<|>) ss
 
 -- | List version of ('<||>').
 fastest :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
-fastest [] = emptyList'
+fastest [] = failing
 fastest ss = foldr1 (<||>) ss
 
 -- | Like 'fastest'. But only runs @n@ strategies in parallel.
 fastestN :: (ProofData i, Show o) => Int -> [Strategy i o] -> Strategy i o
-fastestN _ [] = emptyList'
-fastestN n ss = fastest ss1 <> fastestN n ss2
+fastestN _ [] = failing
+fastestN n ss = fastest ss1 <|> fastestN n ss2
   where (ss1,ss2) = splitAt n ss
 
 -- | List version of ('<?>').
 best :: (ProofData i, Show o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
-best _   [] = emptyList'
+best _   [] = failing
 best cmp ss = foldr1 (cmp <?>) ss
 
 -- | Compares time upperbounds. Useful with 'best'.
@@ -207,8 +175,13 @@ exhaustively s =  s >>> try (exhaustively s)
 -- | Like 'exhaustively'. But maximal @n@ times.
 exhaustivelyN :: ProofData i => Int -> Strategy i i -> Strategy i i
 exhaustivelyN n s
-  | n<0       = identity
-  | otherwise = s >>> try (exhaustivelyN (n-1) s)
+  | n > 1     = s >>> try (exhaustivelyN (n-1) s)
+  | n == 1    = s
+  | otherwise = identity
+
+-- | Short for 'exhaustively'.
+es :: Strategy i i -> Strategy i i
+es = exhaustively
 
 -- | prop> te st = try (exhaustively st)
 te :: Strategy i i -> Strategy i i

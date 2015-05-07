@@ -24,6 +24,7 @@ data TctMode i o opt = TctMode
   , modeAnswer          :: opt -> Return (ProofTree o) -> IO ()  -- ^ Custom Answer.
   }
 
+-- | A default mode. Minimum requirement @modId@ and @modeParser@.
 defaultMode :: (ProofData i, ProofData o) => String -> (String -> Either TctError i) -> TctMode i o ()
 defaultMode mid mparser = TctMode
   { modeId     = mid

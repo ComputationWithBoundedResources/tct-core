@@ -5,16 +5,18 @@ module Tct.Core.Data.ProofTree
   -- * ProofTree
   ProofNode (..)
   , ProofTree (..)
+  , open
+  , flatten
+
   -- * Certification
   , collectCertificate
   , certificate
   , certificateWith
+
   -- * Properites
   , progress
-  , open
   , isOpen
   , isClosed
-  , flatten
 
   -- * Output
   , ppProofTree
@@ -30,6 +32,17 @@ import           Data.Traversable          as T (Traversable, traverse)
 import qualified Tct.Core.Common.Pretty    as PP
 import           Tct.Core.Data.Certificate (Certificate, unbounded)
 import           Tct.Core.Data.Types
+
+
+-- | Returns the 'Open' nodes of a 'ProofTree'.
+open :: ProofTree l -> [l]
+open = F.foldr (:) []
+
+-- | Flattens a nested prooftree.
+flatten :: ProofTree (ProofTree l) -> ProofTree l
+flatten (Open pt)             = pt
+flatten (NoProgress pn pt)    = NoProgress pn (flatten pt)
+flatten (Progress pn cns pts) = Progress pn cns (flatten `fmap` pts)
 
 
 -- | Computes the 'Certificate' of 'ProofTree'.
@@ -52,15 +65,12 @@ certificate pt = collectCertificate $ const unbounded `fmap` pt
 certificateWith :: ProofTree l -> Certificate -> Certificate
 certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 
+
 -- | Checks if the 'ProofTree' contains a 'Progress' node.
 progress :: ProofTree l -> Bool
 progress (Open _)          = False
 progress (NoProgress _ pt) = progress pt
 progress (Progress {})     = True
-
--- | Returns the 'Open' nodes of a 'ProofTree'.
-open :: ProofTree l -> [l]
-open = F.foldr (:) []
 
 -- | Checks if there exists 'Open' nodes in the 'ProofTree'.
 isOpen :: ProofTree l -> Bool
@@ -72,10 +82,6 @@ isOpen = not . isClosed
 isClosed :: ProofTree l -> Bool
 isClosed = null . open
 
-flatten :: ProofTree (ProofTree l) -> ProofTree l
-flatten (Open pt)             = pt
-flatten (NoProgress pn pt)    = NoProgress pn (flatten pt)
-flatten (Progress pn cns pts) = Progress pn cns (flatten `fmap` pts)
 
 instance Functor ProofTree where
   f `fmap` Open l              = Open (f l)
@@ -96,7 +102,7 @@ instance Show (ProofTree l) where
   show _ = "showTree"
 
 
--- Pretty Printing ---------------------------------------------------------------------------------------------------
+--- * Pretty Printing ------------------------------------------------------------------------------------------------
 
 ppProofNode :: Processor p => ProofNode p -> PP.Doc
 ppProofNode (ProofNode p prob po) = PP.vcat

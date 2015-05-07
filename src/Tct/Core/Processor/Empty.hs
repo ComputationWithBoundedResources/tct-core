@@ -1,6 +1,7 @@
-module Tct.Core.Processor.Empty 
-  ( empty )
-  where
+-- | This module provides the /Empty Processor/.
+-- If the given condition is fulfilled, the tree is closed with a constant certificate.
+module Tct.Core.Processor.Empty (empty) where
+
 
 import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing (zero)

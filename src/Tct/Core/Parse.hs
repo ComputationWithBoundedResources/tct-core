@@ -1,11 +1,12 @@
--- |
-
-module Tct.Core.Data.Declaration.Parse
+-- | This module provides common 'SParsable' instances and the strategy parser.
+module Tct.Core.Parse
   (
   SParsable
   , ParsableArgs
+  , declaration
+  , strategy
+  , strategyDeclarations
   , strategyFromString
-  , decl -- TODO: MS: rename
   ) where
 
 
@@ -14,24 +15,31 @@ import           Data.Data                 (Typeable)
 import           Data.Dynamic              (fromDynamic, toDyn)
 import           Data.List                 (sortBy)
 import           Data.Maybe                (fromMaybe)
-import           Tct.Core.Common.Parser
+import qualified Text.Parsec.Expr          as PE
+
 import qualified Tct.Core.Data.Declaration as D
 import qualified Tct.Core.Data.Strategy    as S
 import           Tct.Core.Data.Types
-import qualified Text.Parsec.Expr          as PE
 
--- FIXME: MS: resolve cyclic dependencies; combinators dependes on this module; but we also want; exhaustively and co
+import qualified Tct.Core.Combinators      as C
+import           Tct.Core.Common.Parser
+
 
 curried :: f ~ Uncurry (args :-> Ret args f) => f -> HList args -> Ret args f
 curried f HNil         = f
 curried f (HCons a as) = curried (f a) as
 
-decl :: (ParsableArgs i o args) => Declaration (args :-> r) -> SParser i o r
-decl (Decl n _ f as) = do
+declaration :: (ParsableArgs i o args) => Declaration (args :-> r) -> SParser i o r
+declaration (Decl n _ f as) = do
   _    <- try (symbol n)
   opts <- many (choice (map try (mkOptParser as)))
   vs   <- mkArgParser as opts
   return (curried f vs)
+
+strategyDeclarations :: [StrategyDeclaration i o] -> SParser i o (Strategy i o)
+strategyDeclarations decls =
+  choice [ declaration d | SD d <- sortBy k decls ]
+    where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
 
 strategy :: SParser i i (Strategy i i)
 strategy = PE.buildExpressionParser table strat <?> "stratgy"
@@ -45,12 +53,12 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
       decls <- getState
       -- MS: there is an issue when declarations have only optional arguments and a common prefix
       -- as decl will always be successfull; so we sort the list in rev. lex order
-      choice [ decl d | SD d <- sortBy k decls ]
+      choice [ declaration d | SD d <- sortBy k decls ]
         where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
 
-    table = [ [unary "try" (S.Trying True) ,      unary "force" (S.Trying False) ]
-            , [unary "es" (\s1 -> s1 `S.Then` S.Trying True s1) ]
-            , [binary "<>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
+    table = [ [unary "try" C.try ,      unary "force" C.force ]
+            , [unary "es"  C.es ]
+            , [binary "<|>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
             , [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
     unary name fun = PE.Prefix (do{ reserved name; return fun })

@@ -1,4 +1,5 @@
 -- | This module provides the /Failing/ processors.
+-- Always returns 'Stop'. In Combination with 'try' computation does not stop.
 module Tct.Core.Processor.Failing
   (
   failing
@@ -10,7 +11,6 @@ module Tct.Core.Processor.Failing
 import qualified Tct.Core.Common.Pretty          as PP
 import qualified Tct.Core.Common.Xml             as Xml
 import           Tct.Core.Data                   hiding (timed)
-import           Tct.Core.Data.Declaration.Parse as P ()
 
 
 data Failing i o = Failing String deriving Show
@@ -22,7 +22,7 @@ instance (ProofData i, Show o) => Processor (Failing i o) where
   type I (Failing i o)           = i
   type O (Failing i o)           = o
 
-  solve p@(Failing t) prob = return . resultToTreeF p prob $ Fail (FailingProof t)
+  solve p@(Failing t) prob = return . resultToTree' p prob $ Fail (FailingProof t)
 
 instance PP.Pretty FailingProof where
   pretty (FailingProof []) = PP.text "Fail."
@@ -36,7 +36,7 @@ instance Xml.Xml FailingProof where
 failing :: (ProofData i, Show o) => Strategy i o
 failing = deflFun failingDeclaration
 
--- | The failing Strategy.
+-- | The failing Strategy. Adds given string to the proof output.
 failing' :: (ProofData i, Show o) => String -> Strategy i o
 failing' = declFun failingDeclaration
 

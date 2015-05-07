@@ -1,7 +1,6 @@
 -- | This module provides functions for generating XML content.
 module Tct.Core.Common.Xml
-  (
-  Xml (..)
+  ( Xml (..)
   , XmlContent
   , XmlAttribute
   , XmlDocument
@@ -26,15 +25,15 @@ module Tct.Core.Common.Xml
   ) where
 
 
-import GHC.IO.Handle
 import qualified Data.ByteString.Lazy  as BS
+import           Data.Maybe            (fromMaybe)
 import           Data.Monoid
-import           Data.Maybe (fromMaybe)
 import qualified Data.Text             as Txt
-import qualified Data.Text.IO          as Txt (putStr, hPutStr)
+import qualified Data.Text.IO          as Txt (hPutStr, putStr)
+import           GHC.IO.Handle
 import qualified Text.XML.Expat.Format as Xml (formatNode)
-import qualified Text.XML.Expat.Tree   as Xml
 import qualified Text.XML.Expat.Proc   as Xml
+import qualified Text.XML.Expat.Tree   as Xml
 
 
 type XmlContent   = Xml.UNode Txt.Text
@@ -71,10 +70,11 @@ int i = Xml.Text . Txt.pack . show $ toInteger i
 text :: String -> XmlContent
 text = Xml.Text . Txt.pack
 
+
 toDocument :: Maybe String -> XmlContent -> XmlDocument
 toDocument Nothing c  = (mempty, c)
 toDocument (Just s) c = (Txt.pack $ header ++ s ++ "\n", c)
-  where header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" 
+  where header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 
 putXml :: XmlDocument -> IO ()
 putXml (header, content)= Txt.putStr header >> BS.putStr (Xml.formatNode content)
@@ -82,7 +82,7 @@ putXml (header, content)= Txt.putStr header >> BS.putStr (Xml.formatNode content
 putXmlHandle :: XmlDocument -> Handle -> IO ()
 putXmlHandle (header, content) h = Txt.hPutStr h header >> BS.hPutStr h (Xml.formatNode content)
 
--- TODO: we actually do not use all; to be deleted
+
 search :: String -> XmlContent -> Maybe XmlContent
 search s = Xml.findElement (Txt.pack s)
 

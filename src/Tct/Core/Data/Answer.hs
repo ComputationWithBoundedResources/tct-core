@@ -4,10 +4,12 @@ module Tct.Core.Data.Answer
   , answer
   ) where
 
-import           Tct.Core.Data.ProofTree
-import qualified Tct.Core.Data.Certificate as T
+
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml as Xml
+
+import           Tct.Core.Data.ProofTree
+import qualified Tct.Core.Data.Certificate as T
 
 
 -- | Standard answer type.

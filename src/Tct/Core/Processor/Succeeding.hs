@@ -7,7 +7,6 @@ module Tct.Core.Processor.Succeeding
 
 
 import           Tct.Core.Data
-import           Tct.Core.Data.Declaration.Parse as P ()
 
 
 data Succeeding i = Succeeding deriving Show

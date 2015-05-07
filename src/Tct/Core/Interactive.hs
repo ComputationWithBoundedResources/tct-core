@@ -1,4 +1,4 @@
--- | This module provides a basic interactive functionality via ghci.
+-- | This module provides a basic interactive functionality via ghci (Experimental and Unsafe).
 module Tct.Core.Interactive
   (
   load
