@@ -91,7 +91,7 @@ itemise' d = itemise d . fmap pretty . F.toList
 
 -- | Provides a listing environment.
 listing :: F.Foldable f => f (Doc, Doc) -> Doc
-listing xs = table [( AlignLeft, is), (AlignLeft, ds)]
+listing xs = table [( AlignLeft, (<> colon <> space) `fmap` is), (AlignLeft, ds)]
   where (is,ds) = unzip (F.toList xs)
 
 -- | > listing' ds == listing (fmap (pretty *** pretty) ds)

@@ -259,7 +259,7 @@ realMain dcfg = do
       case (v,ret) of
         (CustomAnswer, _)      -> custom ret
 
-        (_, Halt pt)           -> PP.putPretty MaybeAnswer >> PP.putPretty (ppProofTree PP.pretty pt)
+        (_, Halt pt)           -> PP.putPretty MaybeAnswer >> PP.putPretty (ppDetailedProofTree PP.pretty pt)
         (OnlyAnswer, r)        -> PP.putPretty (answer $ fromReturn r)
         (WithProof, r)         -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
         (WithDetailedProof, r) -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)

@@ -45,10 +45,12 @@ module Tct.Core.Combinators
 
 
 import Tct.Core.Data
-import Tct.Core.Processor.Empty         as M
+
+import Tct.Core.Processor.Succeeding
+
+import Tct.Core.Processor.Annotated     as M
 import Tct.Core.Processor.Failing       as M
-import Tct.Core.Processor.Identity      as M
-import Tct.Core.Processor.Succeeding    as M
+import Tct.Core.Processor.Identity       as M
 import Tct.Core.Processor.Timeout       as M
 import Tct.Core.Processor.Transform     as M
 import Tct.Core.Processor.TransformWith as M

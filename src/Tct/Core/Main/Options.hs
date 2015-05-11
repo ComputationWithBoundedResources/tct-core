@@ -1,37 +1,4 @@
-{- | This module provides a wrapper for "OptParse.Applicative"
-(<http://hackage.haskell.org/package/optparse-applicative>)
-to construct custom argument parsers.
-For example, the parser for 'Tct.Combinators.TimeoutProcessor' is defined as follows:
-
-== Example
->
->TimeoutProc
->  <$> optional (option $ eopt
->      `withArgLong` "untilT"
->      `withMetavar` "iSec"
->      `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from the startint time.")
->  <*> optional (option $ eopt
->      `withArgLong` "inT"
->      `withMetavar` "iSec"
->      `withHelpDoc` PP.paragraph "Aborts the computation after 'iSec' from starting the sub processor.")
->  <*> argument  (parseSomeProcessorMaybe ps) (eopt
->      `withMetavar` "proc"
->      `withHelpDoc` PP.string "The applied subprocessor.")
->
-
-Example strings that are successfully parsed:
-    "processor",
-    "--inT 60 processor",
-    "--untilT 320 --inT 60 processor".
-
-Option @'Parser' a@ can be lifted to @'Parser' ('Maybe' a)@ using
-'Control.Applicative.optional'.
-
-  * Option @'Parser' ('Maybe' a)@ is optional during parsing.
-  * If an option @'Parser' a@ is constructed using 'withDefault' the option is also optional.
-  * If an option @'Parser' ('Maybe' a)@ is constructed using @'withDefault' val@ then the option returns @'Just' val@ if
-    no other value is provided.
--}
+-- | This module provides a wrapper for "OptParse.Applicative" (<http://hackage.haskell.org/package/optparse-applicative>).
 module Tct.Core.Main.Options
   (
   Options
@@ -44,10 +11,12 @@ module Tct.Core.Main.Options
   , withMetavar
   -- * Option Types
   , option
+  , option'
   , unit
   , switch
   , flag
   , argument
+  , argument'
     -- * Finisher
   , mkArgParser
   ) where
@@ -90,6 +59,10 @@ opt `withMetavar` str = opt <> O.metavar str
 option :: Read a => O.Mod O.OptionFields a -> O.Parser a
 option = O.option O.auto
 
+-- | Constructs and Option given the empty option together with its modifiers.
+option' :: (String -> O.ReadM a) -> O.Mod O.OptionFields a -> O.Parser a
+option' f = O.option (O.str >>= f)
+
 -- | Constructs a hidden unit option. This option is ignored during parsing.
 unit :: O.Parser ()
 unit = O.option O.auto $ O.idm `withDefault` () <> O.internal <> O.hidden
@@ -102,9 +75,13 @@ flag = O.flag
 switch :: O.Mod O.FlagFields Bool -> O.Parser Bool
 switch = O.switch
 
--- | An argument opton without any id.
-argument :: O.ReadM a -> O.Mod O.ArgumentFields a -> O.Parser a
-argument = O.argument
+-- | An argument option without any id.
+argument :: Read a => O.Mod O.ArgumentFields a -> O.Parser a
+argument = O.argument O.auto
+
+-- | An argument option without any id.
+argument' :: (String -> O.ReadM a) -> O.Mod O.ArgumentFields a -> O.Parser a
+argument' f = O.argument (O.str >>= f)
 
 -- | Given a parser and a description this function constructs the actual parser.
 mkArgParser :: Show a => O.Parser a -> Doc -> O.ParserInfo a
