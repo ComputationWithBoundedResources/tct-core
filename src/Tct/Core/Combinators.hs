@@ -41,6 +41,7 @@ module Tct.Core.Combinators
   , te
   , when
   , check
+  , iteProgress
   ) where
 
 
@@ -198,4 +199,9 @@ when b st = if b then st else identity
 -- Fails with @msg@ if the test fails. Succeeds otherwise.
 check :: ProofData i => (i -> Bool) -> String -> Strategy i i
 check f msg = withProblem $ \p -> if f p then succeeding else failing' msg
+
+-- | prop> iteProgress test s1 s2 == test >>> s1, if we have a progress after applying test
+-- | prop> iteProgress test s1 s2 == s1, otherwise
+iteProgress :: Strategy i i -> Strategy i i -> Strategy i i -> Strategy i i
+iteProgress b s1 s2 = force (try b) >>> s1 <|> s2
 

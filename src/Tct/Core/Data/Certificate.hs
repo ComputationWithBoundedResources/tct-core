@@ -194,7 +194,7 @@ instance PP.Pretty Complexity where
 
 instance PP.Pretty Certificate where
   pretty (Certificate su sl tu tl) =
-    PP.text "TIME (" <> PP.pretty tu <> PP.char ',' <> PP.pretty tl <> PP.char ')' PP.<$$>
+    PP.text "TIME (" <> PP.pretty tl <> PP.char ',' <> PP.pretty tu <> PP.char ')' PP.<$$>
     PP.text "SPACE(" <> PP.pretty sl <> PP.char ',' <> PP.pretty su <> PP.char ')'
 
 instance Xml.Xml Complexity where

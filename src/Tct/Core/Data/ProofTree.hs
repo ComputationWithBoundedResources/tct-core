@@ -25,6 +25,7 @@ module Tct.Core.Data.ProofTree
   ) where
 
 
+import           Data.Monoid ((<>))
 import           Control.Applicative       as A ((<$>))
 import           Data.Foldable             as F (Foldable, foldMap, foldr, toList)
 import           Data.Traversable          as T (Traversable, traverse)
@@ -117,27 +118,30 @@ ppNodeShort (ProofNode p _ po) = PP.vcat
   , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
   where ind = PP.indent 2
 
-ppProofTree' :: (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
-ppProofTree' ppProb _ (Open l) = PP.vcat
-  [ PP.text "*** Open ***"
+ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
+ppProofTree' is ppProb _ (Open l) = PP.vcat
+  [ ppHeader is "Open"
   , PP.indent 4 (ppProb l) ]
-ppProofTree' ppProb detailed (NoProgress pn pt)
+ppProofTree' (i,is) ppProb detailed (NoProgress pn pt)
   | detailed = PP.vcat
-    [ PP.text "*** NoProgress ***"
+    [ ppHeader (i,is) "NoProgress"
     , PP.indent 4 (ppNodeShort pn)
-    , ppProofTree' ppProb detailed pt]
-  | otherwise   = ppProofTree' ppProb detailed pt
-ppProofTree' ppProb detailed (Progress pn _ pts) = PP.vcat
-  [ PP.text "*** Progress ***"
+    , ppProofTree' (i+1,is) ppProb detailed pt]
+  | otherwise   = ppProofTree' (i,is) ppProb detailed pt
+ppProofTree' (i,is) ppProb detailed (Progress pn _ pts) = PP.vcat
+  [ ppHeader (i,is) "Progress"
   , PP.indent 4 (ppProofNode pn)
   , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
-    where ppts = map (ppProofTree' ppProb detailed) (F.toList pts)
+    where ppts = (\(j,pt) -> ppProofTree' (j, is++[i]) ppProb detailed pt) `fmap` zip [1..] (F.toList pts)
+
+ppHeader :: (Int, [Int]) -> String -> PP.Doc
+ppHeader (i,is) s = PP.cat (PP.punctuate PP.dot $ PP.int `fmap` (is++[i])) <> PP.text " *** " <> PP.text s <> PP.text " ***"
 
 ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
-ppProofTree pp = ppProofTree' pp False
+ppProofTree pp = ppProofTree' (1,[]) pp False
 
 ppDetailedProofTree :: (l -> PP.Doc ) -> ProofTree l -> PP.Doc
-ppDetailedProofTree pp = ppProofTree' pp True
+ppDetailedProofTree pp = ppProofTree' (1,[]) pp True
 
 ppProofTreeLeafes :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
 ppProofTreeLeafes pp = PP.enumerate . map pp . F.toList
