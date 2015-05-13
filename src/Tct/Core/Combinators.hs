@@ -51,7 +51,7 @@ import Tct.Core.Processor.Succeeding
 
 import Tct.Core.Processor.Annotated     as M
 import Tct.Core.Processor.Failing       as M
-import Tct.Core.Processor.Identity       as M
+import Tct.Core.Processor.Identity      as M
 import Tct.Core.Processor.Timeout       as M
 import Tct.Core.Processor.Transform     as M
 import Tct.Core.Processor.TransformWith as M
@@ -98,7 +98,7 @@ infixr 6 <|>, <||>
 -- finished. Here @n@ depends on 'remainingTime'.
 -- An example implementation of cmp is:
 --
--- > cmp pt1 pt2 = compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
+-- > cmp pt1 pt2 = flip compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
 (<?>) :: ProofData i => (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
 (<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
   where  to = timeoutRemaining
@@ -166,7 +166,7 @@ best cmp ss = foldr1 (cmp <?>) ss
 
 -- | Compares time upperbounds. Useful with 'best'.
 cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering
-cmpTimeUB pt1 pt2 = compare (tu pt1) (tu pt2)
+cmpTimeUB pt1 pt2 = compare (tu pt2) (tu pt1)
   where tu = timeUB . certificate
 
 

@@ -63,7 +63,7 @@ isHalting (Halt _) = True
 isHalting _        = False
 
 -- | Given two results returns the "better" one.
--- In order isProgressing > isContinuing > isAborting > isHaltping, where the first argument is checked first.
+-- In order isProgressing > isContinuing > isAborting > isHalting, where the first argument is checked first.
 better :: Return (ProofTree l) -> Return (ProofTree l) -> Return (ProofTree l)
 better r1 r2
   | isProgressing r1 = r1

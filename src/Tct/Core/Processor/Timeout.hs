@@ -1,11 +1,11 @@
 -- | This module provides the /Timeout Processor/.
 module Tct.Core.Processor.Timeout
-  ( timeoutDeclaration
-  , timeout
-  , timeout'
-
+  ( timeoutInDeclaration
   , timeoutIn
+
+  , timeoutUntilDeclaration
   , timeoutUntil
+
   , timeoutRemaining
   ) where
 
@@ -17,18 +17,16 @@ import qualified Tct.Core.Common.Xml    as Xml
 import           Tct.Core.Data          hiding (wait)
 
 
--- | Wraps the application of a processor in a timeout.
-data Timeout i o = Timeout
-  { untilT :: Maybe Int
-  , inT    :: Maybe Int
-  , stratT :: Strategy i o }
-
-instance Show i => Show (Timeout i o) where
-  show (Timeout mi mj p) = "timeout " ++ k mi ++ k mj ++ show p
-    where k = maybe "" (\m -> show m ++ " ")
+data Timeout i o
+  = TimeoutIn
+    { time_       :: Int
+    , onStrategy_ :: Strategy i o }
+  | TimeoutUntil
+    { time_       :: Int
+    , onStrategy_ :: Strategy i o }
+  deriving Show
 
 data TimeoutProof = TimeoutProof Int
-
 
 instance ProofData i => Processor (Timeout i o) where
   type ProofObject (Timeout i o) = TimeoutProof
@@ -38,77 +36,61 @@ instance ProofData i => Processor (Timeout i o) where
   solve proc prob = do
     running <- runningTime `fmap` askStatus prob
     let
-      to = case (toNat (inT proc), toNat (untilT proc)) of
-        (Nothing, Just u ) -> max 0 (u - running)
-        (Just i , Nothing) -> i
-        (Just i , Just u ) -> min i (max 0 (u - running))
-        _                  -> -1
-    remains <- (fromMaybe to . toNat . remainingTime) `fmap` askStatus prob
+      to = case proc of
+        TimeoutIn{}    -> max 0 (time_ proc)
+        TimeoutUntil{} -> max 0 $ (time_ proc) - running
+
+    remains <- (fromMaybe to . remainingTime) `fmap` askStatus prob
     let actual = min to (cutoff remains delta)
-    mr <- timed  actual (evaluate (stratT proc) prob)
+
+    mr <- timed actual (evaluate (onStrategy_ proc) prob)
     return $ case mr of
       Nothing -> resultToTree' proc prob $ Fail (TimeoutProof to)
       Just r  -> r
+
     where
-      toNat n = case n of
-        Just i | i >= 0 -> Just i
-        _               -> Nothing
       cutoff a b = max 0 (a -b)
       delta = 1 :: Int
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-timeoutStrategy :: ProofData i => Maybe Int -> Maybe Int -> Strategy i o -> Strategy i o
-timeoutStrategy ut it st = Proc $ Timeout { untilT=ut, inT=it, stratT=st }
+timeoutInStrategy, timeoutUntilStrategy :: ProofData i => Int -> Strategy i o -> Strategy i o
+timeoutInStrategy i st    = toStrategy $ TimeoutIn {time_ = i, onStrategy_ = st}
+timeoutUntilStrategy u st = toStrategy $ TimeoutUntil {time_ = u, onStrategy_ = st}
+
+description :: [String]
+description = ["Wraps the computation in a timeout."]
 
 -- | TimoutProcessor declaration.
--- 
---   * Each application of the timeout processor, sets 'remainingTime' for the sub-computation.
---   * A timeout is maximal 'remainingTime'.
---   * Nothing is treated as no timeout.
-timeoutDeclaration :: ProofData i => Declaration(
-  '[ Argument 'Optional (Maybe Nat)
-   , Argument 'Required (Maybe Nat)
+--
+--   * Each application of the timeout processor, sets 'remainingTime' for the sub-computation, via 'timed'.
+--   * A timeout is maximal the 'remainingTime'.
+timeoutInDeclaration, timeoutUntilDeclaration :: ProofData i => Declaration(
+  '[ Argument 'Required Nat
    , Argument 'Required (Strategy i o) ]
-  :-> Strategy i o)
-timeoutDeclaration = declare "timeout" help args timeoutStrategy
-  where
-    help = ["Wraps the computation in a timeout."]
-    args = (some timeoutUntilArg `optional` Nothing, some timeoutInArg, strat)
-    timeoutInArg = nat 
-      `withName` "in" 
-      `withHelp` ["Aborts the comutation in <nat> seconds."]
-    timeoutUntilArg = nat 
-      `withName` "until" 
-      `withHelp` ["Aborts the comutation after <nat> seconds wrt. the starting time."]
-
-
-timeout :: ProofData i => Maybe Int -> Strategy i o -> Strategy i o
-timeout = deflFun timeoutDeclaration
-
--- | prop> timeout' m n st = timeoutUntil m (timoutIn n st) = timeoutIn n (timeoutUntil m st)
-timeout' :: ProofData i => Maybe Int -> Maybe Int -> Strategy i o -> Strategy i o
-timeout' = declFun timeoutDeclaration
+  :-> Strategy i o )
+timeoutInDeclaration = declare "timeoutIn" description (timeArg, strat) timeoutInStrategy where
+  timeArg = nat
+    `withName` "in"
+    `withHelp` ["Aborts the comutation in <nat> seconds."]
+timeoutUntilDeclaration = declare "timeoutUntil" description (timeArg, strat) timeoutUntilStrategy where
+  timeArg = nat
+    `withName` "until"
+    `withHelp` ["Aborts the comutation after <nat> seconds."]
 
 -- | @'timoutIn' i st@ aborts the application of @st@ after @min i 'remainingTime'@ seconds;
---
--- prop> i < 0 => timeoutIn i = timeout Nothing Nothing
 timeoutIn :: ProofData i => Int -> Strategy i o -> Strategy i o
-timeoutIn n = Proc . Timeout Nothing (Just n)
+timeoutIn = declFun timeoutInDeclaration
 
 -- | @'timeoutUntil' i st@ aborts the application of @st@ after i seconds wrt.
 -- to the starting time, or if 'remainingTime' is expired.
---
--- prop> i < 0 => timeoutUntil i = timeout Nothing Nothing
 timeoutUntil :: ProofData i => Int -> Strategy i o -> Strategy i o
-timeoutUntil n = Proc . Timeout (Just n) Nothing
+timeoutUntil = declFun timeoutUntilDeclaration
 
 -- | @'timeoutRemaining' i p@ sets the timeout to the 'remainingtime'.
---
--- prop> timeoutRemaining = timeout Nothing Nothing
 timeoutRemaining :: ProofData i => Strategy i o -> Strategy i o
-timeoutRemaining = Proc . Timeout Nothing Nothing
+timeoutRemaining st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

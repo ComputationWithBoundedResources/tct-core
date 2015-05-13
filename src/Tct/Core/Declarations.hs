@@ -8,7 +8,8 @@ import Tct.Core.Data
 
 declarations :: ProofData i => [StrategyDeclaration i i]
 declarations =
-  [ SD failingDeclaration
-  , SD timeoutDeclaration
+  [ SD identityDeclaration
+  , SD failingDeclaration
+  , SD timeoutInDeclaration
   , SD waitDeclaration
   ]

@@ -40,7 +40,7 @@ askStatus prob = do
   return TctStatus
     { currentProblem = prob
     , runningTime    = Time.tdSec (Time.diffClockTimes now (startTime st))
-    , remainingTime  = (Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
+    , remainingTime  = (max 0 . Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
 
 
 toIO :: TctM a -> TctM (IO a)
