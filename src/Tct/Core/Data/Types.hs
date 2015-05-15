@@ -106,6 +106,7 @@ instance Show l => Show (Return l) where
   show (Abort l)    = "Abort " ++ show l
   show (Halt _)     = "Halt "
 
+-- | Everything that is necessary for defining a processor.
 class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
   type ProofObject p :: *                                           -- ^ The type of the proof.
   type I p           :: *                                           -- ^ The type of the input problem.

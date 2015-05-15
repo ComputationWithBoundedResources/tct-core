@@ -77,7 +77,9 @@ better r1 r2
 -- | @'evaluate' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
 evaluate :: Strategy i o -> i -> TctM (Return (ProofTree o))
-evaluate (Proc p) prob = solve p prob `catchError` errNode
+evaluate (Proc p) prob = do
+  res <- solve p prob `catchError` errNode
+  isContinuing res `seq` return res
   where errNode err = evaluate (Proc (ErroneousProc err p)) prob
 
 evaluate (Trans s1 s2) prob = do
