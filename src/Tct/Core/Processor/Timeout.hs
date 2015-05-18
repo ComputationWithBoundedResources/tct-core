@@ -7,6 +7,7 @@ module Tct.Core.Processor.Timeout
   , timeoutUntil
 
   , timeoutRemaining
+  , timeoutRelative
   ) where
 
 
@@ -93,6 +94,12 @@ timeoutRemaining :: ProofData i => Strategy i o -> Strategy i o
 timeoutRemaining st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 
 
+-- | Variant of 'timeoutRemainting' which sets timeout relative to the given percentage.
+-- So @timeoutRelative 50 st@ sets the timeout half to the remaining time.
+timeoutRelative :: ProofData i => Int -> Strategy i o -> Strategy i o
+timeoutRelative i st = WithStatus $ \ state -> maybe st timeout (remainingTime state)
+  where timeout j = timeoutIn (floor $ (fromIntegral (i*j :: Int) / 100 :: Double)) st
+ 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance Show TimeoutProof where
