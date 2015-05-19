@@ -107,7 +107,7 @@ infixr 6 <|>, <||>
 
 trying :: Bool -> Strategy i i -> Strategy i i
 trying b s@(Trying _ _) = Trying b s
-trying _ (WithStatus f) = WithStatus (trying . f)
+trying b (WithStatus f) = WithStatus (trying b . f)
 trying b s              = Trying b s
 
 -- | @'try' s@ is continuing even if @s@ is not.
