@@ -107,7 +107,7 @@ infixr 6 <|>, <||>
 
 trying :: Bool -> Strategy i i -> Strategy i i
 trying b s@(Trying _ _) = Trying b s
-trying _ (WithStatus f) = WithStatus (try . f)
+trying _ (WithStatus f) = WithStatus (trying . f)
 trying b s              = Trying b s
 
 -- | @'try' s@ is continuing even if @s@ is not.
@@ -174,12 +174,12 @@ cmpTimeUB pt1 pt2 = compare (tu pt2) (tu pt1)
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
 exhaustively :: Strategy i i -> Strategy i i
-exhaustively s =  s >>> try (exhaustively s)
+exhaustively s =  force s >>> try (exhaustively s)
 
 -- | Like 'exhaustively'. But maximal @n@ times.
 exhaustivelyN :: ProofData i => Int -> Strategy i i -> Strategy i i
 exhaustivelyN n s
-  | n > 1     = s >>> try (exhaustivelyN (n-1) s)
+  | n > 1     = force s >>> try (exhaustivelyN (n-1) s)
   | n == 1    = s
   | otherwise = identity
 
