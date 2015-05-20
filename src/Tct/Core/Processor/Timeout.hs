@@ -94,11 +94,14 @@ timeoutRemaining :: ProofData i => Strategy i o -> Strategy i o
 timeoutRemaining st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 
 
--- | Variant of 'timeoutRemainting' which sets timeout relative to the given percentage.
--- So @timeoutRelative 50 st@ sets the timeout half to the remaining time.
-timeoutRelative :: ProofData i => Int -> Strategy i o -> Strategy i o
-timeoutRelative i st = WithStatus $ \ state -> maybe st timeout (remainingTime state)
-  where timeout j = timeoutIn (floor $ (fromIntegral (i*j :: Int) / 100 :: Double)) st
+-- | Sets timeout relative to the given percentage.
+-- Useful together with total timeout.
+--
+-- > timeoutRelative (Just 60) 50 st = timeoutIn 30 st
+-- > timeoutRelative Nothing   50 st = st
+timeoutRelative :: ProofData i => Maybe Int -> Int -> Strategy i o -> Strategy i o
+timeoutRelative mtotal percent st = maybe st timeout mtotal
+  where timeout total = timeoutIn (floor $ (fromIntegral (total*percent :: Int) / 100 :: Double)) st
  
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
