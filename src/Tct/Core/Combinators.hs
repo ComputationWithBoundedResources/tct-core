@@ -47,8 +47,6 @@ module Tct.Core.Combinators
 
 import Tct.Core.Data
 
-import Tct.Core.Processor.Succeeding
-
 import Tct.Core.Processor.Annotated     as M
 import Tct.Core.Processor.Failing       as M
 import Tct.Core.Processor.Identity      as M
@@ -76,7 +74,7 @@ infixr 6 <|>, <||>
 (>||>) = ThenPar
 
 -- | Infix version of 'Trans'.
-(>=>) :: Strategy i p -> Strategy p o -> Strategy i o
+(>=>) :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
 (>=>) = Trans
 
 
@@ -100,7 +98,7 @@ infixr 6 <|>, <||>
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = flip compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: ProofData i => (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
+(<?>) :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
 (<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
   where  to = timeoutRemaining
 
@@ -161,7 +159,7 @@ fastestN n ss = fastest ss1 <|> fastestN n ss2
   where (ss1,ss2) = splitAt n ss
 
 -- | List version of ('<?>').
-best :: (ProofData i, Show o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
+best :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
 best _   [] = failing
 best cmp ss = foldr1 (cmp <?>) ss
 

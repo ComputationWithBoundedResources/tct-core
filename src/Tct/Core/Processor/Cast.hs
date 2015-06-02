@@ -8,7 +8,7 @@ import Tct.Core.Processor.Failing (failing)
 
 
 data Cast i o where
-  Cast :: Strategy i j -> Cast i o
+  Cast :: ProofData j => Strategy i j -> Cast i o
 
 instance Show (Cast i o) where
   show (Cast s) = "Cast " ++ show s
@@ -22,14 +22,14 @@ instance (ProofData i, Show o) => Processor (Cast i o) where
     ret <- evaluate st prob
     case ret of
       Halt pt  -> return $ Halt pt
-      Abort pt -> return $ Halt (const () `fmap` pt)
+      Abort pt -> return $ Halt (ProofBox `fmap` pt)
       Continue pt
-        | isOpen pt -> return $ Halt (const () `fmap` pt)
+        | isOpen pt -> return $ Halt (ProofBox `fmap` pt)
         | otherwise -> return $ Continue (undefined `fmap` pt)
 
-cast :: (ProofData i, Show o) => Strategy i j -> Strategy i o
+cast :: (ProofData i, ProofData j, Show o) => Strategy i j -> Strategy i o
 cast = Proc . castp where
-  castp :: (ProofData i, Show o) => Strategy i j -> Cast i o
+  castp :: (ProofData i, ProofData j, Show o) => Strategy i j -> Cast i o
   castp = Cast
 
 -- | Like 'cast' but is not a combinator. Example usage: Assume @s1 :: Strategy i o1@ and @s3 :: Strategy i o2@.

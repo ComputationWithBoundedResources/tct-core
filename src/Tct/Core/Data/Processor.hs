@@ -43,7 +43,7 @@ resultToTree p prob (Fail po)                 = Abort $ NoProgress (ProofNode p 
 -- prop> 'Success' -> Continue 'Progress'
 resultToTree' :: Processor p => p -> I p -> Result p -> Return (ProofTree (O p))
 resultToTree' p prob (Success probs po certfn) = Continue $ Progress (ProofNode p prob po) certfn (Open `fmap` probs)
-resultToTree' p prob (Fail po)                 = Halt $ NoProgress (ProofNode p prob po) (Open ())
+resultToTree' p prob (Fail po)                 = Halt $ NoProgress (ProofNode p prob po) (Open $ ProofBox prob)
 
 
 --- * Error Processor ------------------------------------------------------------------------------------------------

@@ -76,7 +76,7 @@ better r1 r2
 
 -- | @'evaluate' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
-evaluate :: Strategy i o -> i -> TctM (Return (ProofTree o))
+evaluate :: ProofData o => Strategy i o -> i -> TctM (Return (ProofTree o))
 evaluate (Proc p) prob = do
   res <- solve p prob `catchError` errNode
   isContinuing res `seq` return res
@@ -86,7 +86,7 @@ evaluate (Trans s1 s2) prob = do
   r1 <- evaluate s1 prob
   case r1 of
     Continue pt -> evaluateTree s2 pt
-    Abort pt    -> return (Halt $ const () `fmap` pt)
+    Abort pt    -> return (Halt $ ProofBox `fmap` pt)
     Halt pt     -> return (Halt pt)
 
 evaluate (Trying True s) prob = do
@@ -144,25 +144,26 @@ liftNoProgress n (Continue pt) = Continue (NoProgress n pt)
 liftNoProgress n (Abort pt)    = Abort (NoProgress n pt)
 liftNoProgress n (Halt pt)     = Halt (NoProgress n pt)
 
-liftProgress :: Processor p => ProofNode p -> CertificateFn p -> Forking p (Return (ProofTree l)) -> Return (ProofTree l)
+liftProgress :: (Processor p, ProofData l) => ProofNode p -> CertificateFn p -> Forking p (Return (ProofTree l)) -> Return (ProofTree l)
 liftProgress n certfn rs
-  | F.any isHalting rs  = Halt tree2
+  | F.any isHalting rs  = tree2
   | F.any isAborting rs = Abort tree1
   | otherwise           = Continue tree1
   where
     tree1 = Progress n certfn (fromReturn `fmap` rs)
-    tree2 = Progress n certfn (k `fmap` rs)
-    k (Halt pt) = pt
-    k r         = const () `fmap` fromReturn r
+    tree2 = Halt $ Progress n certfn (k `fmap` rs)
+      where
+        k (Halt pt) = pt
+        k r         = ProofBox `fmap` fromReturn r
 
 -- | 'evaluate' on a 'ProofTree'.
-evaluateTree :: Strategy i o -> ProofTree i -> TctM (Return (ProofTree o))
+evaluateTree :: ProofData o => Strategy i o -> ProofTree i -> TctM (Return (ProofTree o))
 evaluateTree s (Open p)                     = evaluate s p
 evaluateTree s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateTree s subtree
 evaluateTree s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateTree s `T.mapM` subtrees)
 
 -- | 'evaluate' on a 'ProofTree' in parallel.
-evaluateTreePar :: Strategy i o -> ProofTree i -> TctM (Return (ProofTree o))
+evaluateTreePar :: ProofData o => Strategy i o -> ProofTree i -> TctM (Return (ProofTree o))
 evaluateTreePar s t = spawnTree t >>= collect
   where
     spawnTree (Open p)                     = Open `fmap` async (evaluate s p)

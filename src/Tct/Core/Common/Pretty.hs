@@ -28,6 +28,9 @@ import           Text.PrettyPrint.ANSI.Leijen hiding (list, tupled)
 -- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
+-- FIXME: MS: sometimes we obtain unwanted linebreaks when using table (enumerate, listing, itemise)
+-- >ppProofTreeLeafs pp = PP.vcat . map pp . F.toList (works fine)
+-- >ppProofTreeLeafs pp = PP.enumerate . map pp . F.toList (not really)
 -- | Provides tabular pretty-printing.
 table :: [(Align, [Doc])] -> Doc
 table cols = vcat [ pprow row | row <- rows]
@@ -116,7 +119,7 @@ paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
 
 -- | Default 'Doc' rendering.
 display :: Doc -> String
-display d = displayS (renderPretty 0.9 1000 d) ""
+display d = displayS (renderPretty 0.9 100000 d) ""
 
 -- | Pretty print to stdout.
 putPretty :: Pretty a => a -> IO ()

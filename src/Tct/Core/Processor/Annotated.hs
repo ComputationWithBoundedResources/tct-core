@@ -31,7 +31,7 @@ instance Xml.Xml AnnotationProof where
   toXml (TimedProof d) = Xml.elt "timed" [Xml.text $ show d]
   toXml (NamedProof n) = Xml.elt "named" [Xml.text n]
 
-instance ProofData i => Processor (Annotation i o) where
+instance (ProofData i, ProofData o) => Processor (Annotation i o) where
   type ProofObject (Annotation i o) = AnnotationProof
   type I (Annotation i o)           = i
   type O (Annotation i o)           = o
@@ -51,10 +51,10 @@ instance ProofData i => Processor (Annotation i o) where
     return $  NoProgress pn `fmap` ret
 
 -- | Name the applied strategy.
-named :: ProofData i => String -> Strategy i o -> Strategy i o
+named :: (ProofData i, ProofData o) => String -> Strategy i o -> Strategy i o
 named n = Proc . Named n
 
 -- | Time the applied strategy.
-timed :: ProofData i => Strategy i o -> Strategy i o
+timed :: (ProofData i, ProofData o) => Strategy i o -> Strategy i o
 timed = Proc . Timed
 

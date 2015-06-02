@@ -21,7 +21,7 @@ instance Show (Wait i o) where
 type WaitProof = ()
 
 
-instance ProofData i => Processor (Wait i o) where
+instance (ProofData i, ProofData o) => Processor (Wait i o) where
   type ProofObject (Wait i o)   = WaitProof
   type I (Wait i o)       = i
   type O (Wait i o)       = o
@@ -33,10 +33,10 @@ instance ProofData i => Processor (Wait i o) where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-waitStrategy :: ProofData i => Int -> Strategy i o -> Strategy i o
+waitStrategy :: (ProofData i, ProofData o) => Int -> Strategy i o -> Strategy i o
 waitStrategy n st = Proc $ Wait { inW=n, stratW=st }
 
-waitDeclaration :: (ProofData i) => Declaration(
+waitDeclaration :: (ProofData i, ProofData o) => Declaration(
   '[ Argument 'Required Nat
    , Argument 'Required (Strategy i o) ]
   :-> Strategy i o)
@@ -46,6 +46,6 @@ waitDeclaration = declare "wait" help args waitStrategy
     args = (waitForArg, strat)
     waitForArg = nat `withName` "for" `withHelp` [ "Pauses the computation <nat> seconds." ]
 
-wait :: ProofData i => Nat -> Strategy i o -> Strategy i o
+wait :: (ProofData i, ProofData o) => Nat -> Strategy i o -> Strategy i o
 wait = declFun waitDeclaration
 

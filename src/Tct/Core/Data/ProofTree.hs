@@ -20,18 +20,17 @@ module Tct.Core.Data.ProofTree
 
   -- * Output
   , ppProofTree
-  , ppProofTreeLeafes
+  , ppProofTreeLeafs
   , ppDetailedProofTree
   ) where
 
 
-import           Data.Monoid ((<>))
 import           Control.Applicative       as A ((<$>))
 import           Data.Foldable             as F (Foldable, foldMap, foldr, toList)
 import           Data.Traversable          as T (Traversable, traverse)
 
 import qualified Tct.Core.Common.Pretty    as PP
-import           Tct.Core.Data.Certificate (Certificate, unbounded)
+import           Tct.Core.Data.Certificate (Certificate, timeLB, timeUB, unbounded)
 import           Tct.Core.Data.Types
 
 
@@ -119,32 +118,48 @@ ppNodeShort (ProofNode p _ po) = PP.vcat
   where ind = PP.indent 2
 
 ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
-ppProofTree' is ppProb _ (Open l) = PP.vcat
-  [ ppHeader is "Open"
+ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
+  [ ppHeader pt is "Open"
   , PP.indent 4 (ppProb l) ]
 ppProofTree' (i,is) ppProb detailed (NoProgress pn pt)
   | detailed = PP.vcat
-    [ ppHeader (i,is) "NoProgress"
+    [ ppHeader pt (i,is) "NoProgress"
     , PP.indent 4 (ppNodeShort pn)
     , ppProofTree' (i+1,is) ppProb detailed pt]
   | otherwise   = ppProofTree' (i,is) ppProb detailed pt
-ppProofTree' (i,is) ppProb detailed (Progress pn _ pts) = PP.vcat
-  [ ppHeader (i,is) "Progress"
+ppProofTree' (i,is) ppProb detailed pt@(Progress pn _ pts) = PP.vcat
+  [ ppHeader pt (i,is) "Progress"
   , PP.indent 4 (ppProofNode pn)
   , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
-    where ppts = (\(j,pt) -> ppProofTree' (j, is++[i]) ppProb detailed pt) `fmap` zip [1..] (F.toList pts)
+    where ppts = (\(j,t) -> ppProofTree' (j, is++[i]) ppProb detailed t) `fmap` zip [1..] (F.toList pts)
 
-ppHeader :: (Int, [Int]) -> String -> PP.Doc
-ppHeader (i,is) s = PP.cat (PP.punctuate PP.dot $ PP.int `fmap` (is++[i])) <> PP.text " *** " <> PP.text s <> PP.text " ***"
+ppHeader :: ProofTree l -> (Int, [Int]) -> String -> PP.Doc
+ppHeader pt (i,is) s =
+  PP.text "***"
+  PP.<+> PP.cat (PP.punctuate PP.dot $ PP.int `fmap` (is++[i]))
+  PP.<+> PP.text s
+  PP.<+> PP.brackets (PP.pretty (cert $ certificate pt))
+  PP.<+> PP.text " ***"
+  where cert c = (timeLB c, timeUB c)
 
 ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
-ppProofTree pp = ppProofTree' (1,[]) pp False
+ppProofTree pp pt =
+  ppProofTree' (1,[]) pp False pt
+  PP.<> if null (F.toList pt) then PP.empty else
+    PP.empty
+    PP.<$$> PP.text "Following problems could not be solved:"
+    PP.<$$> PP.indent 2 (ppProofTreeLeafs pp pt)
 
 ppDetailedProofTree :: (l -> PP.Doc ) -> ProofTree l -> PP.Doc
-ppDetailedProofTree pp = ppProofTree' (1,[]) pp True
+ppDetailedProofTree pp pt =
+  ppProofTree' (1,[]) pp True pt
+  PP.<> if null (F.toList pt) then PP.empty else
+    PP.empty
+    PP.<$$> PP.text "Following problems could not be solved:"
+    PP.<$$> PP.indent 2 (ppProofTreeLeafs pp pt)
 
-ppProofTreeLeafes :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
-ppProofTreeLeafes pp = PP.enumerate . map pp . F.toList
+ppProofTreeLeafs :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
+ppProofTreeLeafs pp = PP.vcat . map pp . F.toList
 
 instance PP.Pretty prob => PP.Pretty (ProofTree prob) where
   pretty = ppProofTree PP.pretty

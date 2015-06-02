@@ -29,7 +29,7 @@ data Timeout i o
 
 data TimeoutProof = TimeoutProof Int
 
-instance ProofData i => Processor (Timeout i o) where
+instance (ProofData i, ProofData o) => Processor (Timeout i o) where
   type ProofObject (Timeout i o) = TimeoutProof
   type I (Timeout i o)           = i
   type O (Timeout i o)           = o
@@ -56,7 +56,7 @@ instance ProofData i => Processor (Timeout i o) where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-timeoutInStrategy, timeoutUntilStrategy :: ProofData i => Int -> Strategy i o -> Strategy i o
+timeoutInStrategy, timeoutUntilStrategy :: (ProofData i, ProofData o) => Int -> Strategy i o -> Strategy i o
 timeoutInStrategy i st    = toStrategy $ TimeoutIn {time_ = i, onStrategy_ = st}
 timeoutUntilStrategy u st = toStrategy $ TimeoutUntil {time_ = u, onStrategy_ = st}
 
@@ -67,7 +67,7 @@ description = ["Wraps the computation in a timeout."]
 --
 --   * Each application of the timeout processor, sets 'remainingTime' for the sub-computation, via 'timed'.
 --   * A timeout is maximal the 'remainingTime'.
-timeoutInDeclaration, timeoutUntilDeclaration :: ProofData i => Declaration(
+timeoutInDeclaration, timeoutUntilDeclaration :: (ProofData i, ProofData o) => Declaration(
   '[ Argument 'Required Nat
    , Argument 'Required (Strategy i o) ]
   :-> Strategy i o )
@@ -81,16 +81,16 @@ timeoutUntilDeclaration = declare "timeoutUntil" description (timeArg, strat) ti
     `withHelp` ["Aborts the comutation after <nat> seconds."]
 
 -- | @'timoutIn' i st@ aborts the application of @st@ after @min i 'remainingTime'@ seconds;
-timeoutIn :: ProofData i => Int -> Strategy i o -> Strategy i o
+timeoutIn :: (ProofData i, ProofData o) => Int -> Strategy i o -> Strategy i o
 timeoutIn = declFun timeoutInDeclaration
 
 -- | @'timeoutUntil' i st@ aborts the application of @st@ after i seconds wrt.
 -- to the starting time, or if 'remainingTime' is expired.
-timeoutUntil :: ProofData i => Int -> Strategy i o -> Strategy i o
+timeoutUntil :: (ProofData i, ProofData o) => Int -> Strategy i o -> Strategy i o
 timeoutUntil = declFun timeoutUntilDeclaration
 
 -- | @'timeoutRemaining' i p@ sets the timeout to the 'remainingtime'.
-timeoutRemaining :: ProofData i => Strategy i o -> Strategy i o
+timeoutRemaining :: (ProofData i, ProofData o) => Strategy i o -> Strategy i o
 timeoutRemaining st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 
 
@@ -99,7 +99,7 @@ timeoutRemaining st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (rema
 --
 -- > timeoutRelative (Just 60) 50 st = timeoutIn 30 st
 -- > timeoutRelative Nothing   50 st = st
-timeoutRelative :: ProofData i => Maybe Int -> Int -> Strategy i o -> Strategy i o
+timeoutRelative :: (ProofData i, ProofData o) => Maybe Int -> Int -> Strategy i o -> Strategy i o
 timeoutRelative mtotal percent st = maybe st timeout mtotal
   where timeout total = timeoutIn (floor $ (fromIntegral (total*percent :: Int) / 100 :: Double)) st
  

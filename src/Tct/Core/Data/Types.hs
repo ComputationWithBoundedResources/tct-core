@@ -94,7 +94,14 @@ data Result p
 data Return l where
   Continue :: { fromReturn :: l } -> Return l
   Abort    :: { fromReturn :: l } -> Return l
-  Halt     :: ProofTree ()        -> Return l 
+  Halt     :: ProofTree ProofBox -> Return l
+
+-- | Existential type for ProofData.
+data ProofBox where
+  ProofBox :: ProofData l => l -> ProofBox
+
+instance PP.Pretty ProofBox where
+  pretty (ProofBox p) = PP.pretty p
 
 instance Functor Return where
   f `fmap` Continue l = Continue (f l)
@@ -125,7 +132,7 @@ data Strategy i o where
   Proc       :: (Processor p) => p -> Strategy (I p) (O p)
 
   -- | Problem type transformation
-  Trans      :: Strategy i p -> Strategy p o -> Strategy i o
+  Trans      :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
 
   -- | Sequentiel
   Then       :: Strategy i i -> Strategy i i -> Strategy i i
