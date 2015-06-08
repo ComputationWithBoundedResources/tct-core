@@ -33,6 +33,7 @@ module Tct.Core.Combinators
   -- ** Stateful
   , withState
   , withProblem
+  , withSolver
 
   -- ** Combinators
   , exhaustively
@@ -124,6 +125,8 @@ withState = WithStatus
 withProblem :: (i -> Strategy i o) -> Strategy i o
 withProblem g = WithStatus (g . currentProblem)
 
+withSolver :: String -> [String] -> Strategy i o -> Strategy i o
+withSolver cmd args = WithState (\st -> st { solver = Just (cmd,args) })
 
 -- | List version of ('>>>').
 --

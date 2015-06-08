@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
 -- | This module provides a basic interactive functionality via ghci (Experimental and Unsafe).
 module Tct.Core.Interactive
   (
@@ -133,13 +134,10 @@ unselect = onSt $ \(St l) -> putSt (St (unselectLeafs l)) >> printState
 
 apply :: ProofData i => Strategy i i -> IO ()
 apply str = onSt $ \st -> do
-  ret <- run $ evaluateSelected str (unSt st)
-  -- MS: FIXME should be isProgressing and som more informative output
-  returning
-    (\s -> putSt (St s) >> printState)
-    (const $ print "no progress :/")
-    (print "no progress :/")
-    ret
+  ret <- run defaultTctInteractiveConfig (evaluateSelected str $ unSt st)
+  if isProgressing ret 
+    then putSt (St (fromReturn ret)) >> printState >> print "progressed :)"
+    else print "no progress :/"
 
 proof :: IO ()
 proof = onSt (PP.putPretty . pp)

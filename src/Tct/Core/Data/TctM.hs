@@ -6,6 +6,7 @@ module Tct.Core.Data.TctM
   , TctROState (..)
   , TctStatus (..)
   , askState
+  , setState
   , askStatus
 
   -- * Lifted IO functions
@@ -31,6 +32,10 @@ import           Tct.Core.Data.Types
 -- | Returns the state of the Monad.
 askState :: TctM TctROState
 askState = ask
+
+-- | Sets (locally) the state of the Monad.
+setState :: (TctROState -> TctROState) -> TctM a -> TctM a
+setState = local
 
 -- | Returns 'TctStatus' which is obtained from 'TctROState' during runtime.
 askStatus :: prob -> TctM (TctStatus prob)

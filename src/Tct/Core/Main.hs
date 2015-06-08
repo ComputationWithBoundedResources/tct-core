@@ -8,6 +8,7 @@ module Tct.Core.Main
   -- * Tct Configuration
   , TctConfig (..)
   , defaultTctConfig
+  , defaultTctInteractiveConfig
   , OutputMode (..)
   -- * Tct Initialisation
   , setMode
@@ -57,9 +58,10 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 -- | The Tct configuration defines global properties.
 --   It is updated by command-line arguments and 'TctMode'.
 data TctConfig i = TctConfig
-  { outputMode :: OutputMode
-  , recompile  :: Bool
-  , strategies :: [StrategyDeclaration i i] }
+  { outputMode    :: OutputMode
+  , recompile     :: Bool
+  , strategies    :: [StrategyDeclaration i i]
+  , defaultSolver :: Maybe (FilePath, [String]) }
 
 -- | Output mode.
 data OutputMode
@@ -88,9 +90,19 @@ readOutputMode s
 -- | The default Tct configuration. A good starting point for custom configurations.
 defaultTctConfig :: ProofData i => TctConfig i
 defaultTctConfig = TctConfig
-  { outputMode = OnlyAnswer
-  , recompile  = True
-  , strategies = declarations }
+  { outputMode    = OnlyAnswer
+  , recompile     = True
+  , strategies    = declarations
+  , defaultSolver = Nothing }
+
+-- MS: in the interactive mode we can not ensure ProofData i; for some i
+-- | The default Tct configuration for the interactive mode.
+defaultTctInteractiveConfig :: TctConfig i
+defaultTctInteractiveConfig = TctConfig
+  { outputMode    = OnlyAnswer
+  , recompile     = True
+  , strategies    = []
+  , defaultSolver = Nothing }
 
 configDir :: IO FilePath
 configDir = getHomeDirectory >>= \home -> return (home </> ".tct3")
@@ -192,14 +204,15 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive 
 
 --- * Main -----------------------------------------------------------------------------------------------------------
 
-run :: TctM a -> IO a
-run m = do
+run :: TctConfig i -> TctM a -> IO a
+run cfg m = do
   time <- Time.getClockTime
   let
     state tmp = TctROState
       { startTime     = time
       , stopTime      = Nothing
-      , tempDirectory = tmp }
+      , tempDirectory = tmp 
+      , solver        = defaultSolver cfg }
   withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
 
 runInteractive :: String -> IO ()
@@ -246,7 +259,7 @@ realMain dcfg = do
         st   <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
 
         let stt = maybe st (`timeoutIn` st) theTimeout
-        r    <- liftIO $ run (evaluate stt prob)
+        r    <- liftIO $ run ucfg (evaluate stt prob)
         output theOutputMode (theAnswer theOptions) r
   case r of
     Left err -> hPrint stderr err >> exitFailure

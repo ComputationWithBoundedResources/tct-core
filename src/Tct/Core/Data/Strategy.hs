@@ -108,6 +108,9 @@ evaluate (WithStatus f) prob = do
   st <- askStatus prob
   evaluate (f st) prob
 
+evaluate (WithState f s) prob =
+  setState f (evaluate s prob)
+
 evaluate (s1 `Then` s2) prob = do
   r1 <- evaluate s1 prob
   case r1 of

@@ -28,18 +28,20 @@ import           Tct.Core.Data.Forks           (Id (..))
 data TctROState = TctROState
   { startTime     :: Time.ClockTime
   , stopTime      :: Maybe Time.ClockTime
-  , tempDirectory :: FilePath }
+  , tempDirectory :: FilePath
+  , solver        :: Maybe (FilePath, [String])
+  }
 
 
 -- | The Tct monad.
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
   deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
--- | Defines the (dynamic) runtime status of 'TctROState'.
+-- | Defines the (read-only) runtime status of 'TctROState'.
 data TctStatus prob = TctStatus
-  { currentProblem :: prob
+  { currentProblem :: prob      -- ^ Current Problem.
   , runningTime    :: Int       -- ^ Runing time in seconds.
-  , remainingTime  :: Maybe Int -- ^ Remaining time in seconds. Should be set when timeout is used.
+  , remainingTime  :: Maybe Int -- ^ Remaining time in seconds.
   }
 
 
@@ -149,6 +151,7 @@ data Strategy i o where
 
   -- | Stateful
   WithStatus :: (TctStatus i -> Strategy i o) -> Strategy i o
+  WithState  :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable
 
 
