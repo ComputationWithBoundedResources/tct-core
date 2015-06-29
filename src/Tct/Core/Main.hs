@@ -33,7 +33,7 @@ import           System.IO.Temp             (withTempDirectory)
 import           System.Process             (system)
 import qualified System.Time                as Time
 
-import           Tct.Core.Data              as M (ProofTree, answer)
+import           Tct.Core.Data              as M (ProofTree, competitionAnswer)
 import           Tct.Core.Main.Mode         as M
 import           Tct.Core.Main.Options      as M
 
@@ -63,6 +63,7 @@ data TctConfig i = TctConfig
   , strategies    :: [StrategyDeclaration i i]
   , defaultSolver :: Maybe (FilePath, [String]) }
 
+-- TODO: split answer and proof output; 
 -- | Output mode.
 data OutputMode
   = OnlyAnswer
@@ -272,10 +273,10 @@ realMain dcfg = do
       case (v,ret) of
         (CustomAnswer, _)      -> custom ret
 
-        (_, Halt pt)           -> PP.putPretty MaybeAnswer >> PP.putPretty (ppDetailedProofTree PP.pretty pt)
-        (OnlyAnswer, r)        -> PP.putPretty (answer $ fromReturn r)
-        (WithProof, r)         -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
-        (WithDetailedProof, r) -> PP.putPretty (answer $ fromReturn r) >> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
+        (_, Halt pt)           -> PP.putPretty MaybeDefaultAnswer >> PP.putPretty (ppDetailedProofTree PP.pretty pt)
+        (OnlyAnswer, r)        -> PP.putPretty (competitionAnswer $ fromReturn r)
+        (WithProof, r)         -> PP.putPretty (competitionAnswer $ fromReturn r) >> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
+        (WithDetailedProof, r) -> PP.putPretty (competitionAnswer $ fromReturn r) >> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
         (AsXml, _)             -> error "missing: toXml prooftree" -- TODO:
     parseStrategy sds s = case strategyFromString sds s of
       Left err -> Left $ TctParseError (show err)
