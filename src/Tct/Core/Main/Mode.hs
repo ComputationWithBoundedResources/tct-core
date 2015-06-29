@@ -22,6 +22,7 @@ data TctMode i o opt = TctMode
                                                                  --   These are added to the standard Tct options.
   , modeModifyer        :: opt -> i -> i                         -- ^ This function is applied to the initial problem,
   , modeAnswer          :: opt -> Return (ProofTree o) -> IO ()  -- ^ Custom Answer.
+  , modeProof           :: opt -> Return (ProofTree o) -> IO ()  -- ^ Custom Proof. Printed after Answer.
   }
 
 -- | A default mode. Minimum requirement @modId@ and @modeParser@.
@@ -34,5 +35,6 @@ defaultMode mid mparser = TctMode
   , modeDefaultStrategy = failing
   , modeOptions         = unit
   , modeModifyer        = flip const
-  , modeAnswer          = \_ _ -> return () }
+  , modeAnswer          = \_ _ -> return ()
+  , modeProof          = \_ _ -> return () }
 

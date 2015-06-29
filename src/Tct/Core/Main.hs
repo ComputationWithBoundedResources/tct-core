@@ -9,7 +9,8 @@ module Tct.Core.Main
   , TctConfig (..)
   , defaultTctConfig
   , defaultTctInteractiveConfig
-  , OutputMode (..)
+  , AnswerFormat (..)
+  , ProofFormat (..)
   -- * Tct Initialisation
   , setMode
   , setModeWith
@@ -58,52 +59,74 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 -- | The Tct configuration defines global properties.
 --   It is updated by command-line arguments and 'TctMode'.
 data TctConfig i = TctConfig
-  { outputMode    :: OutputMode
+  { answerFormat  :: AnswerFormat
+  , proofFormat   :: ProofFormat
   , recompile     :: Bool
   , strategies    :: [StrategyDeclaration i i]
   , defaultSolver :: Maybe (FilePath, [String]) }
 
--- TODO: split answer and proof output; 
--- | Output mode.
-data OutputMode
-  = OnlyAnswer
-  | WithProof
-  | WithDetailedProof
-  | AsXml
-  | CustomAnswer
+-- | Format of answer output.
+data AnswerFormat
+  = SilentAnswerFormat
+  | DefaultAnswerFormat
+  | CompetitionAnswerFormat
+  | CustomAnswerFormat
 
-instance Show OutputMode where
-  show OnlyAnswer        = "a"
-  show WithProof         = "p"
-  show WithDetailedProof = "d"
-  show AsXml             = "x"
-  show CustomAnswer      = "c"
+-- | Format of proof output. Printed after answer in main.
+data ProofFormat
+  = SilentProofFormat
+  | DefaultProofFormat
+  | VerboseProofFormat
+  | XmlProofFormat
+  | CustomProofFormat
 
-readOutputMode :: Monad m => String -> m OutputMode
-readOutputMode s
-  | s == show OnlyAnswer        = return OnlyAnswer
-  | s == show WithProof         = return WithProof
-  | s == show WithDetailedProof = return WithDetailedProof
-  | s == show AsXml             = return AsXml
-  | s == show CustomAnswer      = return CustomAnswer
+writeAnswerFormat :: AnswerFormat -> String
+writeAnswerFormat SilentAnswerFormat      = "s"
+writeAnswerFormat DefaultAnswerFormat     = "d"
+writeAnswerFormat CompetitionAnswerFormat = "c"
+writeAnswerFormat CustomAnswerFormat      = "c"
+
+readAnswerFormat :: Monad m => String -> m AnswerFormat
+readAnswerFormat s
+  | s == writeAnswerFormat SilentAnswerFormat      = return SilentAnswerFormat
+  | s == writeAnswerFormat DefaultAnswerFormat     = return DefaultAnswerFormat
+  | s == writeAnswerFormat CompetitionAnswerFormat = return CompetitionAnswerFormat
+  | s == writeAnswerFormat CompetitionAnswerFormat = return CompetitionAnswerFormat
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
+
+writeProofFormat :: ProofFormat -> String
+writeProofFormat SilentProofFormat  = "s"
+writeProofFormat DefaultProofFormat = "d"
+writeProofFormat VerboseProofFormat = "v"
+writeProofFormat XmlProofFormat     = "x"
+writeProofFormat CustomProofFormat  = "c"
+
+readProofFormat :: Monad m => String -> m ProofFormat
+readProofFormat s
+  | s == writeProofFormat SilentProofFormat  = return SilentProofFormat
+  | s == writeProofFormat DefaultProofFormat = return DefaultProofFormat
+  | s == writeProofFormat VerboseProofFormat = return VerboseProofFormat
+  | s == writeProofFormat XmlProofFormat     = return XmlProofFormat
+  | s == writeProofFormat CustomProofFormat  = return CustomProofFormat
+  | otherwise = fail $ "Tct.readOutputMode: " ++ s
+
+
+defaultTctConfig' :: TctConfig i
+defaultTctConfig' = TctConfig
+  { answerFormat  = DefaultAnswerFormat
+  , proofFormat   = DefaultProofFormat
+  , recompile     = True
+  , strategies    = []
+  , defaultSolver = Nothing }
 
 -- | The default Tct configuration. A good starting point for custom configurations.
 defaultTctConfig :: ProofData i => TctConfig i
-defaultTctConfig = TctConfig
-  { outputMode    = OnlyAnswer
-  , recompile     = True
-  , strategies    = declarations
-  , defaultSolver = Nothing }
+defaultTctConfig = defaultTctConfig' { strategies = declarations }
 
 -- MS: in the interactive mode we can not ensure ProofData i; for some i
 -- | The default Tct configuration for the interactive mode.
 defaultTctInteractiveConfig :: TctConfig i
-defaultTctInteractiveConfig = TctConfig
-  { outputMode    = OnlyAnswer
-  , recompile     = True
-  , strategies    = []
-  , defaultSolver = Nothing }
+defaultTctInteractiveConfig = defaultTctConfig'
 
 configDir :: IO FilePath
 configDir = getHomeDirectory >>= \home -> return (home </> ".tct3")
@@ -148,14 +171,17 @@ setMode = setModeWith defaultTctConfig
 
 -- | Tct command line options.
 data TctOptions m = TctOptions
-  { outputMode_   :: Maybe OutputMode
+  { answerFormat_ :: Maybe AnswerFormat
+  , proofFormat_  :: Maybe ProofFormat
   , timeout_      :: Maybe Int
   , modeOptions_  :: m
   , strategyName_ :: Maybe String
   , problemFile_  :: FilePath }
 
 updateTctConfig :: TctConfig i -> TctOptions m -> TctConfig i
-updateTctConfig cfg opt = cfg { outputMode = outputMode cfg `fromMaybe` outputMode_ opt }
+updateTctConfig cfg opt = cfg
+  { answerFormat = answerFormat cfg `fromMaybe` answerFormat_ opt
+  , proofFormat  = proofFormat cfg `fromMaybe` proofFormat_ opt }
 
 
 data TctAction m
@@ -178,15 +204,23 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive 
       , O.short 'i'
       , O.help "Interactive mode (experimental)." ]
     tctp = fmap Run $ TctOptions
-      <$> O.optional (O.option (O.str >>= readOutputMode) (mconcat
+      <$> O.optional (O.option (O.str >>= readAnswerFormat) (mconcat
         [ O.short 'a'
         , O.long "answer"
         , O.helpDoc . Just $ PP.vcat
-          [ PP.hsep [PP.text (show OnlyAnswer)        , PP.text "- only answer"]
-          , PP.hsep [PP.text (show WithProof)         , PP.text "- with proof"]
-          , PP.hsep [PP.text (show WithDetailedProof) , PP.text "- with detailed proof"]
-          , PP.hsep [PP.text (show AsXml)             , PP.text "- as xml"]
-          , PP.hsep [PP.text (show CustomAnswer)      , PP.text "- as custom answer"] ]]))
+          [ PP.hsep [PP.text (writeAnswerFormat SilentAnswerFormat)     , PP.text "- silent"]
+          , PP.hsep [PP.text (writeAnswerFormat DefaultAnswerFormat)    , PP.text "- default answer"]
+          , PP.hsep [PP.text (writeAnswerFormat CompetitionAnswerFormat), PP.text "- competition answer"]
+          , PP.hsep [PP.text (writeAnswerFormat CustomAnswerFormat)     , PP.text "- custom answer"] ]]))
+      <*> O.optional (O.option (O.str >>= readProofFormat) (mconcat
+        [ O.short 'p'
+        , O.long "proof"
+        , O.helpDoc . Just $ PP.vcat
+          [ PP.hsep [PP.text (writeProofFormat SilentProofFormat) , PP.text "- silent"]
+          , PP.hsep [PP.text (writeProofFormat DefaultProofFormat), PP.text "- default proof"]
+          , PP.hsep [PP.text (writeProofFormat VerboseProofFormat), PP.text "- verbose proof"]
+          , PP.hsep [PP.text (writeProofFormat XmlProofFormat)    , PP.text "- xml proof"]
+          , PP.hsep [PP.text (writeProofFormat CustomProofFormat) , PP.text "- custom proof"] ]]))
       <*> O.optional (O.option O.auto (mconcat
         [ O.short 't'
         , O.long "timeout"
@@ -212,7 +246,7 @@ run cfg m = do
     state tmp = TctROState
       { startTime     = time
       , stopTime      = Nothing
-      , tempDirectory = tmp 
+      , tempDirectory = tmp
       , solver        = defaultSolver cfg }
   withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
 
@@ -251,7 +285,8 @@ realMain dcfg = do
             } = opts
           ucfg = updateTctConfig cfg opts
           TctConfig
-            { outputMode = theOutputMode } = ucfg
+            { answerFormat = theAnswerFormat
+            , proofFormat  = theProofFormat } = ucfg
 
         prob <- do
           f <- tryIO $ readFile theProblemFile
@@ -261,7 +296,8 @@ realMain dcfg = do
 
         let stt = maybe st (`timeoutIn` st) theTimeout
         r    <- liftIO $ run ucfg (evaluate stt prob)
-        output theOutputMode (theAnswer theOptions) r
+        putAnswer theAnswerFormat (theAnswer theOptions) r
+        putProof  theProofFormat  (theAnswer theOptions) r
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
@@ -269,15 +305,24 @@ realMain dcfg = do
   where
     mkOptions optParser strats = liftIO $ O.execParser (mkParser strats optParser)
 
-    output v custom ret = liftIO $
+    putAnswer v custom ret = liftIO $
       case (v,ret) of
-        (CustomAnswer, _)      -> custom ret
+        (SilentAnswerFormat, _)      -> return ()
+        (CustomAnswerFormat, _)      -> custom ret
 
-        (_, Halt pt)           -> PP.putPretty MaybeDefaultAnswer >> PP.putPretty (ppDetailedProofTree PP.pretty pt)
-        (OnlyAnswer, r)        -> PP.putPretty (competitionAnswer $ fromReturn r)
-        (WithProof, r)         -> PP.putPretty (competitionAnswer $ fromReturn r) >> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
-        (WithDetailedProof, r) -> PP.putPretty (competitionAnswer $ fromReturn r) >> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
-        (AsXml, _)             -> error "missing: toXml prooftree" -- TODO:
+        (_, Halt _)                  -> PP.putPretty MaybeDefaultAnswer
+        (DefaultAnswerFormat, r)     -> PP.putPretty (defaultAnswer     $ fromReturn r)
+        (CompetitionAnswerFormat, r) -> PP.putPretty (competitionAnswer $ fromReturn r)
+    putProof v custom ret = liftIO $
+      case (v,ret) of
+        (SilentProofFormat, _)      -> return ()
+        (CustomProofFormat, _)      -> custom ret
+
+        (_, Halt pt)                -> PP.putPretty (ppDetailedProofTree PP.pretty pt)
+        (DefaultProofFormat, r)     -> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
+        (VerboseProofFormat, r)     -> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
+        (XmlProofFormat, _)         -> error "missing: toXml proofTree" --TODO
+
     parseStrategy sds s = case strategyFromString sds s of
       Left err -> Left $ TctParseError (show err)
       Right st -> Right st

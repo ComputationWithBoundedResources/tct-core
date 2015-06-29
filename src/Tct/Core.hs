@@ -12,7 +12,8 @@ module Tct.Core
   -- * Configuring Tct
   TctConfig (..)
   , defaultTctConfig
-  , OutputMode (..)
+  , AnswerFormat (..)
+  , ProofFormat (..)
   -- * Initialising Tct
   , TctMode
   , defaultMode
