@@ -115,9 +115,7 @@ printState = onSt (PP.putPretty . pp)
 
 load :: ProofData l => TctMode l l o -> FilePath -> IO ()
 load m fp = do
-  ret <- runErroneousIO $ do
-    p  <- tryIO $ readFile fp
-    liftEither (modeParser m p)
+  ret <- runErroneousIO $ tryIO (modeParser m fp) >>= liftEither . either (Left . TctParseError) Right
   either print (\prob -> initSt prob >> print "Problem loaded." >> printState) ret
 
 modifyProblem :: ProofData l => (l -> l) -> IO ()
@@ -135,7 +133,7 @@ unselect = onSt $ \(St l) -> putSt (St (unselectLeafs l)) >> printState
 apply :: ProofData i => Strategy i i -> IO ()
 apply str = onSt $ \st -> do
   ret <- run defaultTctInteractiveConfig (evaluateSelected str $ unSt st)
-  if isProgressing ret 
+  if isProgressing ret
     then putSt (St (fromReturn ret)) >> printState >> print "progressed :)"
     else print "no progress :/"
 

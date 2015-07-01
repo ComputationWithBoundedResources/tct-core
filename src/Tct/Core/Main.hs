@@ -156,15 +156,15 @@ tct3 conf = Dyre.wrapMain params conf
 
 -- | Construct a customised Tct. Example usage:
 --
--- > main = tct3 $ setModeWith defaultTctConfig trsMode
-setModeWith :: ProofData i => TctConfig i -> TctMode i i opt -> IO ()
-setModeWith c m = tct3 $ Right (c,m)
+-- > main = tct3 $ trsMode `setModeWith` defaultTctConfig
+setModeWith :: ProofData i => TctMode i i opt -> TctConfig i -> IO ()
+setModeWith m c = tct3 $ Right (c,m)
 
 -- | Construct a customised Tct with default configuration.
 --
--- > setMode m = setModeWith defaultTctConfig m
+-- > setMode m = m `setModeWith` defaultTctConfi
 setMode :: ProofData i => TctMode i i opt -> IO ()
-setMode = setModeWith defaultTctConfig
+setMode = flip setModeWith defaultTctConfig
 
 
 --- * Command-Line Options -------------------------------------------------------------------------------------------
@@ -266,10 +266,11 @@ realMain dcfg = do
     let
       TctMode
         { modeParser           = theProblemParser
+        , modeModifyer         = theModifyer
         , modeDefaultStrategy  = theDefaultStrategy
         , modeOptions          = theOptionParser
-        , modeModifyer         = theModifyer
         , modeAnswer           = theAnswer
+        , modeProof            = theProof
         } = mode
       theStrategies = strategies cfg ++ modeStrategies mode
     action <- mkOptions theOptionParser theStrategies
@@ -289,15 +290,15 @@ realMain dcfg = do
             , proofFormat  = theProofFormat } = ucfg
 
         prob <- do
-          f <- tryIO $ readFile theProblemFile
-          liftEither $ theModifyer theOptions `fmap` theProblemParser f
+          f <- tryIO $ theProblemParser theProblemFile
+          liftEither $ either (Left . TctParseError) Right $ theModifyer theOptions `fmap` f
 
         st   <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
 
         let stt = maybe st (`timeoutIn` st) theTimeout
         r    <- liftIO $ run ucfg (evaluate stt prob)
         putAnswer theAnswerFormat (theAnswer theOptions) r
-        putProof  theProofFormat  (theAnswer theOptions) r
+        putProof  theProofFormat  (theProof theOptions) r
   case r of
     Left err -> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
