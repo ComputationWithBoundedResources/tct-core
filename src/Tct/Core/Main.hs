@@ -140,7 +140,7 @@ tct3 :: ProofData i => TctConfiguration i opt -> IO ()
 tct3 conf = Dyre.wrapMain params conf
   where
     params = Dyre.defaultParams
-      { Dyre.projectName = name
+      { Dyre.projectName = "tct-" ++ name
       , Dyre.configCheck = either (const True) (recompile . fst) conf
       , Dyre.realMain    = realMain
       , Dyre.configDir   = Just configDir
