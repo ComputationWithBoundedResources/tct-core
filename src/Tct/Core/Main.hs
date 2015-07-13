@@ -84,7 +84,7 @@ writeAnswerFormat :: AnswerFormat -> String
 writeAnswerFormat SilentAnswerFormat      = "s"
 writeAnswerFormat DefaultAnswerFormat     = "d"
 writeAnswerFormat CompetitionAnswerFormat = "c"
-writeAnswerFormat CustomAnswerFormat      = "c"
+writeAnswerFormat CustomAnswerFormat      = "x"
 
 readAnswerFormat :: Monad m => String -> m AnswerFormat
 readAnswerFormat s
@@ -300,7 +300,7 @@ realMain dcfg = do
         putAnswer theAnswerFormat (theAnswer theOptions) r
         putProof  theProofFormat  (theProof theOptions) r
   case r of
-    Left err -> hPrint stderr err >> exitFailure
+    Left err -> PP.putPretty MaybeDefaultAnswer >> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
 
   where
