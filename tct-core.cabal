@@ -80,7 +80,7 @@ library
     
   hs-source-dirs: src
   ghc-options:
-    -j -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+    -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
   extensions: 
     ConstraintKinds, 
     DataKinds,
