@@ -12,6 +12,7 @@ module Tct.Core.Main.Options
   -- * Option Types
   , option
   , option'
+  , alt
   , unit
   , switch
   , flag
@@ -62,6 +63,10 @@ option = O.option O.auto
 -- | Constructs and Option given the empty option together with its modifiers.
 option' :: (String -> O.ReadM a) -> O.Mod O.OptionFields a -> O.Parser a
 option' f = O.option (O.str >>= f)
+
+-- | An optional argument. Returns 'Nothing' if the argument is not given.
+alt :: O.Alternative f => f a -> f (Maybe a)
+alt = O.optional
 
 -- | Constructs a hidden unit option. This option is ignored during parsing.
 unit :: O.Parser ()
