@@ -41,7 +41,8 @@ table cols = vcat [ pprow row | row <- rows]
     --             , let h = maximum $ 0 : [length c | (_, c) <- r]]
     cols'     = [ (al,len,cs')
                 | (al,cs) <- cols
-                , let cs' = [ lines $ show c | c <- cs ++ replicate (numrows - length cs) empty]
+                -- , let cs' = [ lines $ show c | c <- cs ++ replicate (numrows - length cs) empty]
+                , let cs' = [ lines $ display c | c <- cs ++ replicate (numrows - length cs) empty]
                       len = maximum $ 0: concat [ map length c | c <- cs']]
     numrows = maximum $ 0 : [length cs | (_,cs) <- cols ]
     pprow row =
@@ -58,18 +59,24 @@ table cols = vcat [ pprow row | row <- rows]
             r    = diff - l
         ws n = replicate n ' '
 
+-- | Like Pretty.encloseSep, but does not perform any vertical alignment.
+encloseWith :: Doc -> Doc -> Doc -> [Doc] -> Doc
+encloseWith l r p ds = case ds of
+  []  -> l <> r
+  [d] -> l <> d <> r
+  _   -> hcat (zipWith (<>) (l : repeat (softbreak <> p)) ds) <> r
 
--- | Generalised version of Pretty.list.
+-- | Pretty print a list.
 list :: F.Foldable f => f Doc -> Doc
-list = encloseSep lbracket rbracket comma . F.toList
+list = encloseWith lbracket rbracket comma . F.toList
 
 -- | prop> list' xs == list (fmap pretty xs)
 list' :: (F.Foldable f, Pretty a) =>  f a -> Doc
 list' = list . fmap pretty . F.toList
 
--- | Generalised version of Pretty.tupled.
+-- | Pretty print a tuple.
 tupled :: F.Foldable f => f Doc -> Doc
-tupled = encloseSep lparen rparen comma . F.toList
+tupled = encloseWith lparen rparen comma . F.toList
 
 -- | > tupled' xs == tupled (fmap pretty xs)
 tupled' :: (F.Foldable f, Pretty a) =>  f a -> Doc
@@ -77,9 +84,9 @@ tupled' = tupled . fmap pretty . F.toList
 
 -- | @set ds@ encloses @ds@ in braces and seperates them using commas.
 set :: F.Foldable f => f Doc -> Doc
-set = encloseSep lbrace rbrace comma . F.toList
+set = encloseWith lbrace rbrace comma . F.toList
 
--- | > set' xs == set (nub . fmap pretty xs)
+-- | > set' xs == set (fmap pretty . S.toList $ S.fromList xs)
 set' :: (F.Foldable f, Pretty a, Ord a) =>  f a -> Doc
 set' = set . fmap pretty . F.toList . F.foldr S.insert S.empty
 
@@ -112,14 +119,13 @@ enumerate ds = table [(AlignRight, enumeration), (AlignLeft, ds')]
 enumerate' :: (F.Foldable f, Pretty a) => f a -> Doc
 enumerate' = enumerate . fmap pretty . F.toList
 
-
 -- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc
 paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
 
 -- | Default 'Doc' rendering.
 display :: Doc -> String
-display d = displayS (renderPretty 0.9 100000 d) ""
+display d = displayS (renderPretty 0.9 120 d) ""
 
 -- | Pretty print to stdout.
 putPretty :: Pretty a => a -> IO ()
