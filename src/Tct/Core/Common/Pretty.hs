@@ -2,17 +2,20 @@
 -- provides some additional pretty-printing functions.
 module Tct.Core.Common.Pretty
   ( module Text.PrettyPrint.ANSI.Leijen
+
+  -- combinators
   , Align (..)
   , table
-
   , list, list'
   , tupled, tupled'
   , set, set'
   , itemise, itemise'
   , enumerate, enumerate'
   , listing, listing'
-
   , paragraph
+  , paragraphs
+
+  -- renderering
   , display
   , putPretty
   ) where
@@ -28,9 +31,6 @@ import           Text.PrettyPrint.ANSI.Leijen hiding (list, tupled)
 -- | Sets 'table' alignment.
 data Align = AlignLeft | AlignRight | AlignCenter deriving (Show, Eq)
 
--- FIXME: MS: sometimes we obtain unwanted linebreaks when using table (enumerate, listing, itemise)
--- >ppProofTreeLeafs pp = PP.vcat . map pp . F.toList (works fine)
--- >ppProofTreeLeafs pp = PP.enumerate . map pp . F.toList (not really)
 -- | Provides tabular pretty-printing.
 table :: [(Align, [Doc])] -> Doc
 table cols = vcat [ pprow row | row <- rows]
@@ -92,8 +92,10 @@ set' = set . fmap pretty . F.toList . F.foldr S.insert S.empty
 
 -- | @itemise bullet docs@. Provides an itemise environment.
 itemise :: F.Foldable f => Doc -> f Doc -> Doc
-itemise d ds = table [( AlignRight, replicate (length ds') d), (AlignLeft, ds')]
-  where ds' = F.toList ds
+itemise b = vcat . fmap item . F.toList
+  where
+    len    = length (show b) + 2
+    item d = hang len $ b <> rparen <+> d
 
 -- | > itemise' d ds == itemise d (fmap pretty ds)
 itemise' :: (F.Foldable f, Pretty a) => Doc -> f a -> Doc
@@ -101,8 +103,8 @@ itemise' d = itemise d . fmap pretty . F.toList
 
 -- | Provides a listing environment.
 listing :: F.Foldable f => f (Doc, Doc) -> Doc
-listing xs = table [( AlignLeft, (<> colon <> space) `fmap` is), (AlignLeft, ds)]
-  where (is,ds) = unzip (F.toList xs)
+listing = vcat . fmap item . F.toList
+  where item (i,d) = hang 4 $ i <> colon <+> d
 
 -- | > listing' ds == listing (fmap (pretty *** pretty) ds)
 listing' :: (F.Foldable f, Pretty a, Pretty b) => f (a,b) -> Doc
@@ -110,18 +112,23 @@ listing' = listing . map (pretty *** pretty) . F.toList
 
 -- | Provides an enumerate environment.
 enumerate :: F.Foldable f => f Doc -> Doc
-enumerate ds = table [(AlignRight, enumeration), (AlignLeft, ds')]
+enumerate ds = vcat $ zipWith enum [1..] ds'
   where
-    ds'         = F.toList ds
-    enumeration = take (length ds') [ int i <> text ".) " | i <- [1..]]
+    ds'      = F.toList ds
+    len      = length (show (length ds')) + 3
+    enum i d = hang len $ int i <> text ".) " <> d
 
--- | enumerate' ds == enumerate (fmap pretty ds)
+-- | > enumerate' ds == enumerate (fmap pretty ds)
 enumerate' :: (F.Foldable f, Pretty a) => f a -> Doc
 enumerate' = enumerate . fmap pretty . F.toList
 
 -- | Constructs a paragraph, respecting newline characters.
 paragraph :: String -> Doc
 paragraph s = vcat [fillSep [text w | w <- words l] | l <- lines s]
+
+-- | Constructs paragraphs. Each string is considered as a paragraph.
+paragraphs :: [String] -> Doc
+paragraphs ps = vcat [fillSep [text w | w <- words p] | p <- ps]
 
 -- | Default 'Doc' rendering.
 display :: Doc -> String
