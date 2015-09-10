@@ -1,7 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverlappingInstances #-}
--- |
-
+-- | A declaration associates meta-information such as name and description, to a function.
 module Tct.Core.Data.Declaration
   (
   declName

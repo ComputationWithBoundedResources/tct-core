@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home, hide #-}
 -- | This module defines the most important types.
 module Tct.Core.Data.Types where
 
@@ -23,21 +24,24 @@ import           Tct.Core.Data.Forks           (Id (..))
 
 
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
+-- MS: the state is fixed; sometimes it would be useful to have application dependent states; but this is difficult as
+-- we would have to initialise application dependent states when performing transformations (ie using >=> combinator)
 
--- | Provides Tct runtime options. The State of TcTM monad.
-data TctROState = TctROState
-  { startTime     :: Time.ClockTime
-  , stopTime      :: Maybe Time.ClockTime
-  , tempDirectory :: FilePath
-  , solver        :: Maybe (FilePath, [String])
-  }
-
-
--- | The Tct monad.
+-- | The /TcT/ monad.
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
   deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
+-- | Provides /TcT/ runtime options. The State of 'Tct.Core.Data.TctM.TcTM' monad.
+-- The state can be (locally) updated using 'Tct.Core.Data.TctM.setState'.
+data TctROState = TctROState
+  { startTime     :: Time.ClockTime             -- ^ Start time. Should be set in the start state.
+  , stopTime      :: Maybe Time.ClockTime       -- ^ Stop time. Used to handle timeouts and is updated when 'Tct.Core.Data.TctM.timed' is used.
+  , tempDirectory :: FilePath                   -- ^ The temporary directory. Should be set in the start state.
+  , solver        :: Maybe (FilePath, [String]) -- ^ Information about external applications being used. This is application dependent.
+  }
+
 -- | Defines the (read-only) runtime status of 'TctROState'.
+-- Is obtained via 'Tct.Core.Data.TctM.askStatus'.
 data TctStatus prob = TctStatus
   { currentProblem :: prob      -- ^ Current Problem.
   , runningTime    :: Int       -- ^ Runing time in seconds.
@@ -49,9 +53,10 @@ data TctStatus prob = TctStatus
 
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
-  { processor :: p
-  , problem   :: I p
-  , proof     :: ProofObject p }
+  { processor :: p              -- ^ the processor
+  , problem   :: I p            -- ^ the input problem
+  , proof     :: ProofObject p  -- ^ the proof
+  }
 
 -- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
 -- During evaluation
@@ -117,10 +122,10 @@ instance Show l => Show (Return l) where
 
 -- | Everything that is necessary for defining a processor.
 class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
-  type ProofObject p :: *                                           -- ^ The type of the proof.
-  type I p           :: *                                           -- ^ The type of the input problem.
-  type O p           :: *                                           -- ^ The type of the output problem.
-  type Forking p     :: * -> *                                      -- ^ The type of the (children) collection.
+  type ProofObject p :: *
+  type I p           :: *
+  type O p           :: *
+  type Forking p     :: * -> *
   solve              :: p -> I p -> TctM (Return (ProofTree (O p)))
 
   type Forking p     =  Id
@@ -133,23 +138,18 @@ class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => 
 data Strategy i o where
   Proc       :: (Processor p) => p -> Strategy (I p) (O p)
 
-  -- | Problem type transformation
   Trans      :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
 
-  -- | Sequentiel
   Then       :: Strategy i i -> Strategy i i -> Strategy i i
   ThenPar    :: Strategy i i -> Strategy i i -> Strategy i i
 
 
-  -- | Alternative
   Alt        :: Strategy i o -> Strategy i o -> Strategy i o
   OrFaster   :: Strategy i o -> Strategy i o -> Strategy i o
   OrBetter   :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
 
-  -- | Optional
   Trying     :: Bool -> Strategy i i -> Strategy i i
 
-  -- | Stateful
   WithStatus :: (TctStatus i -> Strategy i o) -> Strategy i o
   WithState  :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable

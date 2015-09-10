@@ -1,4 +1,4 @@
--- | This module re-exports the Tct.Core.Data* modules.
+-- | This module re-exports the Tct.Core.Data.* modules.
 module Tct.Core.Data (module M) where
 
 import Tct.Core.Data.Answer            as M

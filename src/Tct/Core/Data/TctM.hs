@@ -1,4 +1,4 @@
--- | This module provides the Tct monad.
+-- | This module provides the /TcT/ monad.
 module Tct.Core.Data.TctM
   (
   -- * Tct Monad
@@ -38,6 +38,9 @@ setState :: (TctROState -> TctROState) -> TctM a -> TctM a
 setState = local
 
 -- | Returns 'TctStatus' which is obtained from 'TctROState' during runtime.
+--
+-- > runningTime   = now - startTime
+-- > remainingTime = max (0, now - stopTime)
 askStatus :: prob -> TctM (TctStatus prob)
 askStatus prob = do
   st <- askState
@@ -102,6 +105,10 @@ raceWithIO p1 cmp m1 m2 =
 --  * is positive the computation runs at most @i@ seconds.
 --
 -- Returns 'Nothing' if @m@ does not end before the timeout.
+--
+-- Sets 'stopTime'.
+--
+-- > stopTime = min (now + timeout) stopTime
 timed :: Int -> TctM a -> TctM (Maybe a)
 timed n m
   | n < 0  = Just `liftM` m

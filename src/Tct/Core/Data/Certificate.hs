@@ -87,6 +87,7 @@ instance Multiplicative Complexity where
   one = Poly (Just 0)
 
 
+-- | Composition of asymptotic complexity.
 compose :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `compose` a
   | n == 0 = Poly (Just 0)
