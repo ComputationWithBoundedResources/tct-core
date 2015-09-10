@@ -1,9 +1,14 @@
--- | This module provides the standard answer type.
+-- | This module provides standard output formats for certificates.
 module Tct.Core.Data.Answer
-  ( DefaultAnswer (..)
-  , defaultAnswer
-  , CompetitionAnswer (..)
-  , competitionAnswer
+  (
+  Timebounds (..)
+  , timebounds
+  -- * tttac / termcomp (prior 2015) format
+  , TTTAC (..)
+  , tttac
+  -- * termcomp 2015 format
+  , Termcomp (..)
+  , termcomp
   ) where
 
 
@@ -12,41 +17,63 @@ import qualified Tct.Core.Common.Pretty    as PP
 import qualified Tct.Core.Common.Xml       as Xml
 
 import qualified Tct.Core.Data.Certificate as T
-import           Tct.Core.Data.ProofTree
 
 
--- | Default answer type.
-data DefaultAnswer
-  = CertDefaultAnswer (T.Complexity, T.Complexity)
-  | MaybeDefaultAnswer
-  | NoDefaultAnswer
-  deriving Show
+-- | Timebounds
+data Timebounds = Timebounds
+  T.Complexity  -- ^ lower bound
+  T.Complexity  -- ^ upper bound
 
-instance PP.Pretty DefaultAnswer where
-  pretty (CertDefaultAnswer (lb, ub))
+-- | Extracts lowwer and upper bounds of a certificate.
+timebounds :: T.Certificate -> Timebounds
+timebounds c = Timebounds (T.timeLB c) (T.timeUB c)
+
+instance PP.Pretty Timebounds where
+  pretty (Timebounds lb  ub) = PP.text "Timebounds" <> PP.tupled [PP.pretty lb, PP.pretty ub]
+
+instance Xml.Xml Timebounds where
+  toXml (Timebounds lb ub) = Xml.elt "timebounds"
+    [ Xml.elt "lowerbound" [Xml.toXml lb]
+    , Xml.elt "upperbound" [Xml.toXml ub] ]
+
+
+--- * termcomp -------------------------------------------------------------------------------------------------------
+
+-- | Newtype wrapper for 'Timebounds'.
+-- The pretty printing instance corresponds to the old (prior 2015) /termcomp/ format and is compatible with the
+-- /tttac/ testing tool.
+newtype TTTAC = TTTAC Timebounds
+
+-- | Returns the certificate in a /tttac/ compatible format.
+tttac :: T.Certificate -> TTTAC
+tttac = TTTAC . timebounds
+
+instance PP.Pretty TTTAC where
+  pretty (TTTAC (Timebounds lb  ub))
     | lb /= T.Unknown || ub /= T.Unknown = PP.text "YES" <> PP.tupled [PP.pretty lb, PP.pretty ub]
-  pretty NoDefaultAnswer = PP.text "NO"
-  pretty _        = PP.text "MAYBE"
+  pretty _ = PP.text "MAYBE"
 
-instance Xml.Xml DefaultAnswer where
-  toXml (CertDefaultAnswer (lb, ub))
+instance Xml.Xml TTTAC where
+  toXml (TTTAC (Timebounds lb ub))
     | lb /= T.Unknown || ub /= T.Unknown = Xml.elt "certified"
       [ Xml.elt "lowerbound" [Xml.toXml lb]
       , Xml.elt "upperbound" [Xml.toXml ub] ]
-  toXml NoDefaultAnswer = Xml.elt "no" []
-  toXml _        = Xml.elt "maybe" []
+  toXml _  = Xml.elt "maybe" []
 
--- | Returns the time upper bound as an answer.
-defaultAnswer :: ProofTree l -> DefaultAnswer
-defaultAnswer = cert . certificate
-  where cert c = CertDefaultAnswer (T.timeLB c, T.timeUB c)
 
--- | Competition answer type.
-data CompetitionAnswer = CertCompetitionAnswer (T.Complexity, T.Complexity)
-  deriving Show
+--- * termcomp -------------------------------------------------------------------------------------------------------
 
-toCompetitionAnswer :: t -> ((t1, t1) -> t) -> (Int -> t1) -> t1 -> (Int -> t1) -> t1 -> t1 -> CompetitionAnswer -> t
-toCompetitionAnswer maybeA worst omegaA npolyA oA polyA unknownA (CertCompetitionAnswer (lb, ub)) = case (normlb lb, normub ub) of
+-- | Newtype wrapper for 'Timebounds'.
+-- The pretty printing instance corresponds to the /termcomp 2015/ format.
+-- See <http://cbr.uibk.ac.at/competition/rules.php> (September 2015) for more information.
+newtype Termcomp = Termcomp Timebounds
+
+-- | Returns the certificate in the /termcomp 2015/ format.
+termcomp :: T.Certificate -> Termcomp
+termcomp = Termcomp . timebounds
+
+toTermcomp :: t -> ((t1, t1) -> t) -> (Int -> t1) -> t1 -> (Int -> t1) -> t1 -> t1 -> Termcomp -> t
+toTermcomp maybeA worst omegaA npolyA oA polyA unknownA (Termcomp (Timebounds  lb  ub)) = case (normlb lb, normub ub) of
   (T.Unknown, T.Unknown) -> maybeA
   (nlb, nub)             -> worst (toclb nlb, tocub nub)
   where
@@ -66,9 +93,9 @@ toCompetitionAnswer maybeA worst omegaA npolyA oA polyA unknownA (CertCompetitio
     normub p@(T.Poly Nothing)           = p
     normub _                            = T.Unknown
 
-instance PP.Pretty CompetitionAnswer where
+instance PP.Pretty Termcomp where
   pretty =
-    toCompetitionAnswer
+    toTermcomp
       (PP.text "MAYBE")
       (\(lb,ub) -> PP.text "WORST_CASE" <> PP.tupled [lb,ub])
       (\i -> PP.text "Omega" <> PP.parens (PP.text "n^" <> PP.int i))
@@ -77,9 +104,9 @@ instance PP.Pretty CompetitionAnswer where
       (PP.text "POLY")
       (PP.char '?')
 
-instance Xml.Xml CompetitionAnswer where
+instance Xml.Xml Termcomp where
   toXml =
-    toCompetitionAnswer
+    toTermcomp
       (Xml.elt "maybe" [])
       (\(lb,ub) -> Xml.elt "worst_case" [Xml.elt "lowerbound" [lb], Xml.elt "upperbound" [ub]])
       (\i -> Xml.elt "polynomial" [Xml.int i])
@@ -87,9 +114,4 @@ instance Xml.Xml CompetitionAnswer where
       (\i -> Xml.elt "polynomial" [Xml.int i])
       (Xml.text "poly")
       (Xml.text "unknown")
-
--- | Returns the answer in the termcomp format.
-competitionAnswer :: ProofTree l -> CompetitionAnswer
-competitionAnswer = cert . certificate
-  where cert c = CertCompetitionAnswer (T.timeLB c, T.timeUB c)
 

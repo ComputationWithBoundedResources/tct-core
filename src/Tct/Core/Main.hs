@@ -34,7 +34,7 @@ import           System.IO.Temp             (withTempDirectory)
 import           System.Process             (system)
 import qualified System.Time                as Time
 
-import           Tct.Core.Data              as M (ProofTree, competitionAnswer)
+import           Tct.Core.Data              as M (ProofTree)
 import           Tct.Core.Main.Mode         as M
 import           Tct.Core.Main.Options      as M
 
@@ -69,7 +69,7 @@ data TctConfig i = TctConfig
 data AnswerFormat
   = SilentAnswerFormat
   | DefaultAnswerFormat
-  | CompetitionAnswerFormat
+  | TTTACAnswerFormat
   | CustomAnswerFormat
 
 -- | Format of proof output. Printed after answer in main.
@@ -81,17 +81,17 @@ data ProofFormat
   | CustomProofFormat
 
 writeAnswerFormat :: AnswerFormat -> String
-writeAnswerFormat SilentAnswerFormat      = "s"
-writeAnswerFormat DefaultAnswerFormat     = "d"
-writeAnswerFormat CompetitionAnswerFormat = "c"
-writeAnswerFormat CustomAnswerFormat      = "x"
+writeAnswerFormat SilentAnswerFormat  = "s"
+writeAnswerFormat DefaultAnswerFormat = "d"
+writeAnswerFormat TTTACAnswerFormat   = "t"
+writeAnswerFormat CustomAnswerFormat  = "c"
 
 readAnswerFormat :: Monad m => String -> m AnswerFormat
 readAnswerFormat s
-  | s == writeAnswerFormat SilentAnswerFormat      = return SilentAnswerFormat
-  | s == writeAnswerFormat DefaultAnswerFormat     = return DefaultAnswerFormat
-  | s == writeAnswerFormat CompetitionAnswerFormat = return CompetitionAnswerFormat
-  | s == writeAnswerFormat CompetitionAnswerFormat = return CompetitionAnswerFormat
+  | s == writeAnswerFormat SilentAnswerFormat  = return SilentAnswerFormat
+  | s == writeAnswerFormat DefaultAnswerFormat = return DefaultAnswerFormat
+  | s == writeAnswerFormat TTTACAnswerFormat   = return TTTACAnswerFormat
+  | s == writeAnswerFormat CustomAnswerFormat  = return CustomAnswerFormat
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
 
 writeProofFormat :: ProofFormat -> String
@@ -136,6 +136,8 @@ configDir = getHomeDirectory >>= \home -> return (home </> ".tct3")
 
 type TctConfiguration i opt = Either TctError (TctConfig i,  TctMode i i opt)
 
+-- MS: here conf is always defined; ie Right (cfg,mode)
+-- but we want to lift the error to the realMain function
 tct3 :: ProofData i => TctConfiguration i opt -> IO ()
 tct3 conf = Dyre.wrapMain params conf
   where
@@ -162,7 +164,7 @@ setModeWith m c = tct3 $ Right (c,m)
 
 -- | Construct a customised Tct with default configuration.
 --
--- > setMode m = m `setModeWith` defaultTctConfi
+-- > setMode m = m `setModeWith` defaultTctConfig
 setMode :: ProofData i => TctMode i i opt -> IO ()
 setMode = flip setModeWith defaultTctConfig
 
@@ -208,10 +210,10 @@ mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive 
         [ O.short 'a'
         , O.long "answer"
         , O.helpDoc . Just $ PP.vcat
-          [ PP.hsep [PP.text (writeAnswerFormat SilentAnswerFormat)     , PP.text "- silent"]
-          , PP.hsep [PP.text (writeAnswerFormat DefaultAnswerFormat)    , PP.text "- default answer"]
-          , PP.hsep [PP.text (writeAnswerFormat CompetitionAnswerFormat), PP.text "- competition answer"]
-          , PP.hsep [PP.text (writeAnswerFormat CustomAnswerFormat)     , PP.text "- custom answer"] ]]))
+          [ PP.hsep [PP.text (writeAnswerFormat SilentAnswerFormat)  , PP.text "- silent"]
+          , PP.hsep [PP.text (writeAnswerFormat DefaultAnswerFormat) , PP.text "- default answer (termcomp 2015)"]
+          , PP.hsep [PP.text (writeAnswerFormat TTTACAnswerFormat )  , PP.text "- competition answer"]
+          , PP.hsep [PP.text (writeAnswerFormat CustomAnswerFormat)  , PP.text "- custom answer"] ]]))
       <*> O.optional (O.option (O.str >>= readProofFormat) (mconcat
         [ O.short 'p'
         , O.long "proof"
@@ -300,20 +302,26 @@ realMain dcfg = do
         putAnswer theAnswerFormat (theAnswer theOptions) r
         putProof  theProofFormat  (theProof theOptions) r
   case r of
-    Left err -> PP.putPretty MaybeDefaultAnswer >> hPrint stderr err >> exitFailure
+    Left err -> PP.putPretty (PP.text "ERROR") >> hPrint stderr err >> exitFailure
     Right _  -> exitSuccess
 
   where
     mkOptions optParser strats = liftIO $ O.execParser (mkParser strats optParser)
 
+    parseStrategy sds s = case strategyFromString sds s of
+      Left err -> Left $ TctParseError (show err)
+      Right st -> Right st
+
     putAnswer v custom ret = liftIO $
       case (v,ret) of
-        (SilentAnswerFormat, _)      -> return ()
-        (CustomAnswerFormat, _)      -> custom ret
+        (SilentAnswerFormat, _)       -> return ()
+        (CustomAnswerFormat, _)       -> custom ret
 
-        (_, Halt _)                  -> PP.putPretty MaybeDefaultAnswer
-        (DefaultAnswerFormat, r)     -> PP.putPretty (defaultAnswer     $ fromReturn r)
-        (CompetitionAnswerFormat, r) -> PP.putPretty (competitionAnswer $ fromReturn r)
+        (DefaultAnswerFormat, Halt _) -> PP.putPretty (termcomp unbounded)
+        (TTTACAnswerFormat, Halt _)   -> PP.putPretty (tttac unbounded)
+
+        (DefaultAnswerFormat, r)      -> PP.putPretty (termcomp . certificate $ fromReturn r)
+        (TTTACAnswerFormat, r)        -> PP.putPretty (tttac    . certificate $ fromReturn r)
     putProof v custom ret = liftIO $
       case (v,ret) of
         (SilentProofFormat, _)      -> return ()
@@ -323,8 +331,4 @@ realMain dcfg = do
         (DefaultProofFormat, r)     -> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
         (VerboseProofFormat, r)     -> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
         (XmlProofFormat, _)         -> error "missing: toXml proofTree" --TODO
-
-    parseStrategy sds s = case strategyFromString sds s of
-      Left err -> Left $ TctParseError (show err)
-      Right st -> Right st
 
