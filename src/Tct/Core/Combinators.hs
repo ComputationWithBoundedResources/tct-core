@@ -6,7 +6,7 @@ module Tct.Core.Combinators
   -- Following precedence holds: optionally,stateful > alternative > sequential > transformations.
   -- For example,
   --
-  -- prop> try s1 >>> s2 >||> s3 <> s4 >>> s5 = (try s1) >>> (s2 >||> ((s3 <> s4) >>> s5))
+  -- prop> try s1 .>>> s2 .>||> s3 <> s4 .>>> s5 = (try s1) .>>> (s2 .>||> ((s3 <> s4) .>>> s5))
   --
   -- We say that a @'Strategy' s@
   --
@@ -16,13 +16,13 @@ module Tct.Core.Combinators
   --  * is halting otherwise.
   module M
   -- ** Sequential
-  , (>>>), (>||>)
+  , (.>>>), (.>||>)
   , chain
   , chainWith
   -- ** Transformation
-  , (>=>)
+  , (.>=>)
   -- ** Alternative
-  , (<|>), (<||>), (<?>)
+  , (.<|>), (.<||>), (.<?>)
   , alternative
   , fastest
   , fastestN
@@ -60,47 +60,47 @@ import Tct.Core.Processor.Wait          as M
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
 
-infixr 4 >=>
-infixr 5 >>>, >||>
-infixr 6 <|>, <||>
+infixr 4 .>=>
+infixr 5 .>>>, .>||>
+infixr 6 .<|>, .<||>
 
 -- | Infix version of 'Then'.
--- @s1 '>>>' s2@ applies @s1@ before @s2@.
-(>>>) :: Strategy i i -> Strategy i i -> Strategy i i
-(>>>)  = Then
+-- @s1 '.>>>' s2@ applies @s1@ before @s2@.
+(.>>>) :: Strategy i i -> Strategy i i -> Strategy i i
+(.>>>)  = Then
 
 -- | Infix version of 'ThenPar'.
--- Like ('>>>') but applies @s2@ on all problems in parallel.
-(>||>) :: Strategy i i -> Strategy i i -> Strategy i i
-(>||>) = ThenPar
+-- Like ('.>>>') but applies @s2@ on all problems in parallel.
+(.>||>) :: Strategy i i -> Strategy i i -> Strategy i i
+(.>||>) = ThenPar
 
 -- | Infix version of 'Trans'.
-(>=>) :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
-(>=>) = Trans
+(.>=>) :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
+(.>=>) = Trans
 
 
 -- | Infix version of 'Alt'.
--- @s1 '<|>' s2@
-(<|>) :: Strategy i o -> Strategy i o-> Strategy i o
-(<|>) = Alt
+-- @s1 '.<|>' s2@
+(.<|>) :: Strategy i o -> Strategy i o-> Strategy i o
+(.<|>) = Alt
 
 -- | Infix version of 'OrFaster'.
--- Behaves like ('<|>') but applies the strategies in parallel.
+-- Behaves like ('.<|>') but applies the strategies in parallel.
 -- Suppose that @s2@ ends before @s1@ then:
 --
--- prop> s1 <||> s2  = s2 <> s1
-(<||>) :: Strategy i o -> Strategy i o -> Strategy i o
-(<||>) = OrFaster
+-- prop> s1 .<||> s2  = s2 <> s1
+(.<||>) :: Strategy i o -> Strategy i o -> Strategy i o
+(.<||>) = OrFaster
 
 -- | Timed version of 'OrBetter'.
 --
--- @('<?>') cmp s1 s2@ applies @'timeoutIn' n s1@ and @'timeoutIn' n s2@ in parallel and waits until both strategies have
+-- @('.<?>') cmp s1 s2@ applies @'timeoutIn' n s1@ and @'timeoutIn' n s2@ in parallel and waits until both strategies have
 -- finished. Here @n@ depends on 'remainingTime'.
 -- An example implementation of cmp is:
 --
 -- > cmp pt1 pt2 = flip compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
-(<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
+(.<?>) :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
+(.<?>) cmp s1 s2 = OrBetter cmp (to s1) (to s2)
   where  to = timeoutRemaining
 
 
@@ -128,43 +128,43 @@ withProblem g = WithStatus (g . currentProblem)
 withSolver :: String -> [String] -> Strategy i o -> Strategy i o
 withSolver cmd args = WithState (\st -> st { solver = Just (cmd,args) })
 
--- | List version of ('>>>').
+-- | List version of ('.>>>').
 --
 -- prop> chain [] = identity
 chain :: ProofData i => [Strategy i i] -> Strategy i i
 chain [] = identity
-chain ss = foldr1 (>>>) ss
+chain ss = foldr1 (.>>>) ss
 
 -- | Like 'chain' but additionally executes the provided strategy after each strategy of the list.
 --
 -- > chainWith [] (try empty)      == try empty
--- > chainWith [s1,s2] (try empty) == s1 >>> try empty >>> s2 >>> try empty
+-- > chainWith [s1,s2] (try empty) == s1 .>>> try empty .>>> s2 .>>> try empty
 chainWith :: ProofData i => Strategy i i -> [Strategy i i] -> Strategy i i
 chainWith s [] = s
-chainWith s ss = foldr1 (\t ts -> t >>> s >>> ts) ss >>> s
+chainWith s ss = foldr1 (\t ts -> t .>>> s .>>> ts) ss .>>> s
 
--- | List version of ('<|>').
+-- | List version of ('.<|>').
 --
 -- prop> alternative [] = failing
 alternative :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
 alternative [] = failing
-alternative ss = foldr1 (<|>) ss
+alternative ss = foldr1 (.<|>) ss
 
--- | List version of ('<||>').
+-- | List version of ('.<||>').
 fastest :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
 fastest [] = failing
-fastest ss = foldr1 (<||>) ss
+fastest ss = foldr1 (.<||>) ss
 
 -- | Like 'fastest'. But only runs @n@ strategies in parallel.
 fastestN :: (ProofData i, Show o) => Int -> [Strategy i o] -> Strategy i o
 fastestN _ [] = failing
-fastestN n ss = fastest ss1 <|> fastestN n ss2
+fastestN n ss = fastest ss1 .<|> fastestN n ss2
   where (ss1,ss2) = splitAt n ss
 
--- | List version of ('<?>').
+-- | List version of ('.<?>').
 best :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
 best _   [] = failing
-best cmp ss = foldr1 (cmp <?>) ss
+best cmp ss = foldr1 (cmp .<?>) ss
 
 -- | Compares time upperbounds. Useful with 'best'.
 cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering
@@ -175,12 +175,12 @@ cmpTimeUB pt1 pt2 = compare (tu pt2) (tu pt1)
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
 exhaustively :: Strategy i i -> Strategy i i
-exhaustively s =  force s >>> try (exhaustively s)
+exhaustively s =  force s .>>> try (exhaustively s)
 
 -- | Like 'exhaustively'. But maximal @n@ times.
 exhaustivelyN :: ProofData i => Int -> Strategy i i -> Strategy i i
 exhaustivelyN n s
-  | n > 1     = force s >>> try (exhaustivelyN (n-1) s)
+  | n > 1     = force s .>>> try (exhaustivelyN (n-1) s)
   | n == 1    = s
   | otherwise = identity
 
@@ -202,8 +202,8 @@ when b st = if b then st else identity
 check :: ProofData i => (i -> Bool) -> String -> Strategy i i
 check f msg = withProblem $ \p -> if f p then succeeding else failing' msg
 
--- | prop> iteProgress test s1 s2 == test >>> s1, if we have a progress after applying test
+-- | prop> iteProgress test s1 s2 == test .>>> s1, if we have a progress after applying test
 -- | prop> iteProgress test s1 s2 == s1, otherwise
 iteProgress :: Strategy i i -> Strategy i i -> Strategy i i -> Strategy i i
-iteProgress b s1 s2 = (force b >>> s1) <|> s2
+iteProgress b s1 s2 = (force b .>>> s1) .<|> s2
 
