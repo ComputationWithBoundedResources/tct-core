@@ -91,20 +91,28 @@ evaluate (Trans s1 s2) prob = do
     Abort pt    -> return (Halt $ ProofBox `fmap` pt)
     Halt pt     -> return (Halt pt)
 
-evaluate (Trying True s) prob = do
-  r1 <- evaluate s prob
-  return $ case r1 of
-    Continue pt -> Continue pt
-    Abort pt    -> Continue pt
-    Halt _      -> Continue (Open prob)
+evaluate (Trying True s) prob =
+  case s of
+    -- try . force = try
+    Trying False s' -> evaluate (Trying True s') prob
+    WithStatus f    -> evaluate (WithStatus $ Trying True . f) prob
+    _               -> do
+      r1 <- evaluate s prob
+      return $ case r1 of
+        Continue pt -> Continue pt
+        Abort pt    -> Continue pt
+        Halt _      -> Continue (Open prob)
 
-evaluate (Trying False s) prob = do
-  r1 <- evaluate s prob
-  return $ case r1 of
-    Continue pt
-      | progress pt -> Continue pt
-      | otherwise   -> Abort pt
-    pt -> pt
+evaluate (Trying False s) prob =
+  case s of
+    WithStatus f -> evaluate (WithStatus $ Trying False . f) prob
+    _            -> do
+      r1 <- evaluate s prob
+      return $ case r1 of
+        Continue pt
+          | progress pt -> Continue pt
+          | otherwise   -> Abort pt
+        pt -> pt
 
 evaluate (WithStatus f) prob = do
   st <- askStatus prob

@@ -104,18 +104,13 @@ infixr 6 .<|>, .<||>
   where  to = timeoutRemaining
 
 
-trying :: Bool -> Strategy i i -> Strategy i i
-trying b s@(Trying _ _) = Trying b s
-trying b (WithStatus f) = WithStatus (trying b . f)
-trying b s              = Trying b s
-
 -- | @'try' s@ is continuing even if @s@ is not.
 try :: Strategy i i -> Strategy i i
-try = trying True
+try = Trying True
 
 -- | @'force' s@ fails if @s@ is not progressing.
 force :: Strategy i i -> Strategy i i
-force = trying False
+force = Trying False
 
 -- | Applied strategy depends on run time status.
 withState :: (TctStatus i -> Strategy i o) -> Strategy i o
