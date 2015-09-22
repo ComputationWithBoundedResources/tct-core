@@ -15,12 +15,8 @@ module Tct.Core
   , AnswerFormat (..)
   , ProofFormat (..)
   -- * Initialising Tct
-  , TctMode
-  , defaultMode
-  , withStrategies
+  , addStrategies
   , withDefaultStrategy
-  , setMode
-  , setModeWith
   -- * Processor / Strategy
   , toStrategy
   , ProofData
@@ -51,10 +47,10 @@ import Tct.Core.Main
 
 
 -- | Adds a list of 'StrategyDeclaraton' to the existing ones.
-withStrategies :: TctMode i o opt -> [StrategyDeclaration i o] -> TctMode i o opt
-withStrategies m sds = m { modeStrategies = modeStrategies m ++ sds }
+addStrategies :: TctConfig i -> [StrategyDeclaration i i] -> TctConfig i
+addStrategies cfg sds = cfg { strategies = sds }
 
 -- | Sets the default Strategy.
-withDefaultStrategy :: TctMode i o opt -> Strategy i o -> TctMode i o opt
-withDefaultStrategy m st = m { modeDefaultStrategy = st }
+withDefaultStrategy :: TctConfig i -> Strategy i i -> TctConfig i
+withDefaultStrategy cfg st = cfg { defaultStrategy = st }
 

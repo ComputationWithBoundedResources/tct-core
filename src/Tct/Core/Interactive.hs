@@ -9,6 +9,7 @@ module Tct.Core.Interactive
   (
   -- * Load and Modify Problems
   load
+  , load'
   , modifyProblems
   , onProblems
   , onTree
@@ -176,10 +177,16 @@ modifySt f = onSt (putSt . St . f . unSt)
 --- * interface ------------------------------------------------------------------------------------------------------
 
 -- | Load a problem.
-load :: ProofData i => TctMode i i o -> FilePath -> IO ()
-load m fp = do
-  ret <- runErroneousIO $ tryIO (modeParser m fp) >>= liftEither . either (Left . TctParseError) Right
+load :: ProofData i => (FilePath -> IO (Either String i)) -> FilePath -> IO ()
+load p  fp = do
+  ret <- runErroneousIO $ tryIO (p fp) >>= liftEither . either (Left . TctParseError) Right
   either print (\prob -> initSt prob >> print "Problem loaded." >> printState) ret
+
+-- | Like 'load' but extracts the parser from a configuration.
+-- 
+-- > load' = load . parseProblem
+load' :: ProofData i => TctConfig i -> FilePath -> IO ()
+load' = load . parseProblem
 
 -- | Modifies all sub-problems.
 modifyProblems :: ProofData i => (i -> i) -> IO ()
@@ -205,7 +212,7 @@ selectAll = onSt $ \(St l) -> putSt (St (selectAllLeafs l)) >> printState
 
 apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))) -> Strategy i o -> IO ()
 apply' eval str = onSt $ \st -> do
-  (b,ret) <- run defaultTctInteractiveConfig (eval str $ unSt st)
+  (b,ret) <- run undefined (eval str $ unSt st)
   if b && isContinuing ret
     then putSt (St (fromReturn ret)) >> printState >> print "progressed :)"
     else print "no progress :/"
