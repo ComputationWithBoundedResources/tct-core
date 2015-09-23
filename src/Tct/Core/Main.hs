@@ -2,15 +2,16 @@
 module Tct.Core.Main
   (
   module M
-  , version
   -- * Tct Configuration
-  -- | 
+  -- |
   , TctConfig (..)
   , defaultTctConfig
+  , InteractiveGHCi (..)
   -- * Tct Initialisation
   , run
+  , runInteractive
   , tct3
-  , tct3With
+  , tct3WithOptions
   -- * Pretty Print
   , AnswerFormat (..)
   , ProofFormat (..)
@@ -18,16 +19,16 @@ module Tct.Core.Main
 
 
 import           Control.Applicative        ((<$>), (<*>), (<|>))
+import           Control.Monad              (void)
 import           Control.Monad.Reader       (runReaderT)
 import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid                (mconcat)
 import qualified Options.Applicative        as O
 import           System.Exit                (exitFailure, exitSuccess)
-import           System.IO                  (hPrint, stderr)
-import           System.IO.Temp             (withTempDirectory)
+import           System.IO                  (hPrint, stderr, hPutStrLn, hClose)
+import           System.IO.Temp             (withTempDirectory, withSystemTempFile)
 import           System.Process             (system)
 import qualified System.Time                as Time
-import           System.Directory           (doesFileExist)
 
 import           Tct.Core.Data              as M (ProofTree)
 import           Tct.Core.Main.Options      as M
@@ -41,10 +42,6 @@ import           Tct.Core.Processor.Failing (failing)
 import           Tct.Core.Processor.Timeout (timeoutIn)
 
 
--- | Current version.
-version :: String
-version = "3.1.0"
-
 synopsis :: String
 synopsis = "TcT is a transformer framework for automated complexity analysis."
 
@@ -54,27 +51,35 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 -- | The Tct configuration defines global properties.
 -- The configuration affects the execution of ('tct3') and sets initial properties ('run') when eva
 data TctConfig i = TctConfig
-  { parseProblem       :: FilePath -> IO (Either String i)
-  , putAnswer          :: Return (ProofTree i) -> IO ()
-  , putProof           :: Return (ProofTree i) -> IO ()
+  { parseProblem    :: FilePath -> IO (Either String i)
+  , putAnswer       :: Return (ProofTree i) -> IO ()
+  , putProof        :: Return (ProofTree i) -> IO ()
 
-  , strategies         :: [StrategyDeclaration i i]
-  , defaultStrategy    :: Strategy i i
+  , strategies      :: [StrategyDeclaration i i]
+  , defaultStrategy :: Strategy i i
 
-  , defaultSolver      :: Maybe (FilePath, [String])
-  , runInteractiveWith :: FilePath -> String
+  , defaultSolver   :: Maybe (FilePath, [String])
+  , interactiveGHCi :: InteractiveGHCi
+  , version         :: String
   }
+
+-- | Specifies how interactive mode is executed. See 'runInteractive'.
+data InteractiveGHCi = GHCiScript [String] | GHCiCommand String
 
 -- | Default configuration. Minimal requirement 'parseProblem'.
 defaultTctConfig :: ProofData i => (FilePath -> IO (Either String i)) -> TctConfig i
 defaultTctConfig p = TctConfig
-  { parseProblem       = p
-  , putAnswer          = const $ return ()
-  , putProof           = const $ return ()
-  , strategies         = declarations
-  , defaultStrategy    = failing
-  , defaultSolver      = Nothing
-  , runInteractiveWith = \fp -> "ghci +RTS -N -RTS" ++ fp}
+  { parseProblem    = p
+  , putAnswer       = const $ return ()
+  , putProof        = const $ return ()
+  , strategies      = declarations
+  , defaultStrategy = failing
+  , defaultSolver   = Nothing
+  , interactiveGHCi = GHCiScript
+      [ ":set prompt \"tct>\""
+      , ":module +Tct.Core.Interactive" ]
+  , version         = "3.1.0.0"
+  }
 
 
 prettySilentAnswer, prettyDefaultAnswer, prettyTTTacAnswer :: Return (ProofTree i) -> PP.Doc
@@ -144,42 +149,6 @@ readProofFormat s
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
 
 
-
-    -- putAnswer v custom ret = liftIO $
-    --   case (v,ret) of
-    --     (SilentAnswerFormat, _)       -> return ()
-    --     (CustomAnswerFormat, _)       -> custom ret
-
-    --     (DefaultAnswerFormat, Halt _) -> PP.putPretty (termcomp unbounded)
-    --     (TTTACAnswerFormat, Halt _)   -> PP.putPretty (tttac unbounded)
-
-    --     (DefaultAnswerFormat, r)      -> PP.putPretty (termcomp . certificate $ fromReturn r)
-    --     (TTTACAnswerFormat, r)        -> PP.putPretty (tttac    . certificate $ fromReturn r)
-    -- putProof v custom ret = liftIO $
-    --   case (v,ret) of
-    --     (SilentProofFormat, _)      -> return ()
-    --     (CustomProofFormat, _)      -> custom ret
-
-    --     (_, Halt pt)                -> PP.putPretty (ppDetailedProofTree PP.pretty pt)
-    --     (DefaultProofFormat, r)     -> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
-    --     (VerboseProofFormat, r)     -> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
-    --     (XmlProofFormat, _)         -> error "missing: toXml proofTree" --TODO
-
---- * Mode Application -----------------------------------------------------------------------------------------------
-
--- | Construct a customised Tct. Example usage:
---
--- > main = tct3 $ trsMode `setModeWith` defaultTctConfig
--- applyConfig :: ProofData i => TctConfig i -> IO ()
--- applyConfig = tct3 cfg
-
--- | Construct a customised Tct with default configuration.
---
--- > setMode m = m `setModeWith` defaultTctConfig
--- setMode :: ProofData i => TctMode i i opt -> IO ()
--- setMode = flip setModeWith defaultTctConfig
-
-
 --- * Command-Line Options -------------------------------------------------------------------------------------------
 
 -- | Tct command line options.
@@ -194,23 +163,23 @@ data TctOptions m = TctOptions
 
 data TctAction m
   = Run (TctOptions m)
-  | RunInteractive String
+  | RunInteractive
 
-mkParser :: [StrategyDeclaration i o] -> O.Parser m -> O.ParserInfo (TctAction m)
-mkParser ps mparser = O.info (versioned <*> listed <*> O.helper <*> interactive <|> tctp) desc
+mkParser :: [StrategyDeclaration i o] -> String -> O.Parser m -> O.ParserInfo (TctAction m)
+mkParser ps vers mparser = O.info (versioned <*> listed <*> O.helper <*> interactive <|> tctp) desc
   where
     listed = O.infoOption (PP.display . PP.vcat $ map PP.pretty ps) $ mconcat
       [ O.long "list"
       , O.help "Display list of strategies."]
-    versioned = O.infoOption version  $ mconcat
+    versioned = O.infoOption vers  $ mconcat
       [ O.long "version"
       , O.short 'v'
       , O.help "Display Version."
       , O.hidden]
-    interactive = RunInteractive <$> O.strOption (O.long "hello")
-      -- [ O.long "interactive"
-      -- , O.short 'i'
-      -- , O.help "Interactive mode (experimental)." ])))
+    interactive = O.flag' RunInteractive $ mconcat
+      [ O.long "interactive"
+      , O.short 'i'
+      , O.help "Interactive mode (experimental)." ]
     tctp = fmap Run $ TctOptions
       <$> O.optional (O.option (O.str >>= readAnswerFormat) (mconcat
         [ O.short 'a'
@@ -256,21 +225,20 @@ run cfg m = do
       , solver        = defaultSolver cfg }
   withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
 
-runInteractive :: (FilePath -> String) -> FilePath -> IO ()
-runInteractive cmd fp = do
-  ret <- runErroneousIO $ do
-    _ <- tryIO $ doesFileExist fp >>= \b -> return $ if b then Right fp else Left ("Can not find: " ++ fp)
-    _ <- tryIO $ system $ cmd fp
-    return ()
-  either print return ret
+runInteractive :: InteractiveGHCi -> IO ()
+runInteractive ig = void $ case ig of
+  GHCiCommand cmd -> system cmd
+  GHCiScript  scr -> withSystemTempFile "ghcix" $ \fp hf -> do
+    hPutStrLn hf (unlines scr) >> hClose hf
+    system $ "ghci -ingore-dot-ghci -ghci-script " ++ fp
 
 -- > tct3 = tct3With const unit
 tct3 :: ProofData i => TctConfig i -> IO ()
-tct3 = tct3With const unit
+tct3 = tct3WithOptions const unit
 
 -- | Default main function.
 --
--- @tct3With update options config@
+-- @tct3WithOptions update options config@
 --
 -- 1. builds a strategy parser from the strategies defined in @config@
 -- 2. parses the command line arguments including arguments defined in @options@
@@ -278,13 +246,13 @@ tct3 = tct3With const unit
 -- 4. updates @config@ from standard arguments; in particular answer output and proof output overrides @config@ if given
 -- 5. evaluates strategy with the given timeout
 -- 6. output answer and proof as given in (updated) @config@
-tct3With :: ProofData i => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
-tct3With theUpdate theOptions cfg = do
+tct3WithOptions :: ProofData i => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
+tct3WithOptions theUpdate theOptions cfg = do
   r <- runErroneousIO $ do
-    action <- mkOptions theOptions (strategies cfg)
+    action <- liftIO $ O.execParser $ mkParser (strategies cfg) (version cfg) theOptions
     case action of
-      RunInteractive fp -> tryIO $ runInteractive (runInteractiveWith cfg) fp
-      Run opts          -> do
+      RunInteractive -> tryIO $ runInteractive (interactiveGHCi cfg)
+      Run opts       -> do
         let
           TctOptions
             { strategyName_ = theStrategyName
@@ -305,10 +273,11 @@ tct3With theUpdate theOptions cfg = do
           f <- tryIO $ theParser theProblemFile
           liftEither $ either (Left . TctParseError) Right f
 
-        st   <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
+        st <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
 
         let stt = maybe st (`timeoutIn` st) theTimeout
-        r    <- liftIO $ run ucfg (evaluate stt prob)
+        r <- liftIO $ run ucfg (evaluate stt prob)
+
         liftIO $ theAnswer r
         liftIO $ theProof r
   case r of
@@ -316,7 +285,6 @@ tct3With theUpdate theOptions cfg = do
     Right _  -> exitSuccess
 
   where
-    mkOptions optParser strats = liftIO $ O.execParser (mkParser strats optParser)
 
     updateTctConfig f opt cf = cfg'
       { putAnswer = putAnswer cfg' `fromMaybe` (putAnswerFormat <$> answerFormat_ opt)

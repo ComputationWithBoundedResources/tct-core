@@ -17,6 +17,7 @@ module Tct.Core
   -- * Initialising Tct
   , addStrategies
   , withDefaultStrategy
+  , appendGHCiScript
   -- * Processor / Strategy
   , toStrategy
   , ProofData
@@ -53,4 +54,11 @@ addStrategies cfg sds = cfg { strategies = sds }
 -- | Sets the default Strategy.
 withDefaultStrategy :: TctConfig i -> Strategy i i -> TctConfig i
 withDefaultStrategy cfg st = cfg { defaultStrategy = st }
+
+-- | Sets 'GHCiScript'; and appends the given script.
+appendGHCiScript :: TctConfig i -> [String] -> TctConfig i
+appendGHCiScript cfg ss = cfg { interactiveGHCi = k (interactiveGHCi cfg) ss}
+  where
+    k (GHCiCommand _) xs = GHCiScript xs
+    k (GHCiScript s1) xs = GHCiScript (s1 ++ xs)
 
