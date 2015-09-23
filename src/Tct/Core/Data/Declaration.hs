@@ -57,8 +57,8 @@ instance WithHelp (Declaration c) where withHelp (Decl n _ f as) h' = Decl n h' 
 -- | Specifies the default function of a 'Declaration'.
 type family DeflFun c where
   DeflFun ('[] :-> r) = r
-  DeflFun (Argument Optional a ': as :-> r) = DeflFun (as :-> r)
-  DeflFun (Argument Required a ': as :-> r) = a -> DeflFun (as :-> r)
+  DeflFun (Argument 'Optional a ': as :-> r) = DeflFun (as :-> r)
+  DeflFun (Argument 'Required a ': as :-> r) = a -> DeflFun (as :-> r)
 
 -- | Specifies the default function of a 'Declaration'.
 -- The default function instantiates all optional arguments with their default value.
@@ -68,11 +68,11 @@ class DefF c where
 instance DefF ('[] :-> f) where
   deflFun (Decl _ _ f _) = f
 
-instance (DefF (as :-> r)) => DefF (Argument Optional a ': as :-> r) where
+instance (DefF (as :-> r)) => DefF (Argument 'Optional a ': as :-> r) where
   deflFun (Decl n h f (HCons a as)) = deflFun (Decl n h (f (argDefault a)) as)
   deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
-instance DefF (as :-> r) => DefF (Argument Required a ': as :-> r) where
+instance DefF (as :-> r) => DefF (Argument 'Required a ': as :-> r) where
   deflFun (Decl n h f (HCons _ as)) = \ a' -> deflFun (Decl n h (f a') as)
   deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
@@ -85,11 +85,11 @@ instance Functor (Argument r) where
     OptArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = f (argDefault ar) }
 
 -- | Generic argument with name "arg" and domain "<arg>".
-arg :: Argument Required a
+arg :: Argument 'Required a
 arg = ReqArg {argName = "arg", argDomain = "<arg>", argHelp = []}
 
 -- | Transforms a required argument to an optional by providing a default value.
-optional :: Argument Required a -> a -> Argument Optional a
+optional :: Argument 'Required a -> a -> Argument 'Optional a
 optional ar a = OptArg {argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = a }
 
 -- | Wraps an argument into 'Maybe'.
@@ -100,18 +100,18 @@ some ar = Just `fmap` ar { argDomain = argDomain ar ++ "|none"}
 type Nat = Int
 
 -- | Specifies a natural argument with name "nat" and domain "<nat>".
-nat :: Argument Required Nat
+nat :: Argument 'Required Nat
 nat = arg { argName = "nat", argDomain = "<nat>" }
 
 -- | Specifies a bool argument with name "bool" and domain "<bool>".
-bool :: Argument Required Bool
+bool :: Argument 'Required Bool
 bool = arg { argName = "bool", argDomain = "<bool>" }
 
-string :: Argument Required String
+string :: Argument 'Required String
 string = arg { argName = "string", argDomain = "<string>" }
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
-strat :: Argument Required (Strategy i o)
+strat :: Argument 'Required (Strategy i o)
 strat = arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
 
 withDomain :: Argument r a -> [String] -> Argument r a

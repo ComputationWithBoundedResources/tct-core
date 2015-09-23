@@ -215,9 +215,9 @@ data ArgFlag = Optional | Required
 -- An argument contains meta information - name, domain and description - for displaying and parsing.
 -- An optional argument additionally requires a default value.
 data Argument :: ArgFlag -> * -> * where
-  ReqArg :: r ~ Required =>
+  ReqArg :: r ~ 'Required =>
     { argName :: String, argDomain :: String, argHelp :: [String] } -> Argument r a
-  OptArg :: r ~ Optional =>
+  OptArg :: r ~ 'Optional =>
     { argName :: String, argDomain :: String, argHelp :: [String], argDefault :: a } -> Argument r a
 
 -- | Associates the types to a list of arguments.
