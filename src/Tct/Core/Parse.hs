@@ -67,17 +67,17 @@ instance ParsableArgs i o '[] where
   mkOptParser _   = []
   mkArgParser _ _ = return HNil
 
-instance (Typeable a, SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument Optional a ': as) where
+instance (Typeable a, SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument 'Optional a ': as) where
   mkOptParser (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParser as
     where
-      pa :: SParsable i o a => Argument Optional a -> SParser i o a
+      pa :: SParsable i o a => Argument 'Optional a -> SParser i o a
       pa _ = symbol (':' : argName a) >> parseS
   mkArgParser (HCons a as) ls = do
     let v = fromMaybe (argDefault a) (lookup (argName a) ls >>= fromDynamic)
     vs <- mkArgParser as ls
     return (HCons v  vs)
 
-instance (SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument Required a ': as) where
+instance (SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument 'Required a ': as) where
   mkOptParser (HCons ReqArg{} as) = mkOptParser as
   mkArgParser (HCons _ as) ls     = do
     v  <- lexeme parseS
