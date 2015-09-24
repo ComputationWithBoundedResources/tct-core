@@ -1,0 +1,6 @@
+flags: {}
+packages:
+- '.'
+- '../slogic'
+extra-deps:
+resolver: lts-2.22
