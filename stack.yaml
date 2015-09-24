@@ -1,0 +1,10 @@
+flags: {}
+packages:
+- '.'
+
+- location:
+    git: git@github.com:ComputationWithBoundedResources/slogic
+    commit: 1f9c923a4d55ea700aa98a83d99836a3c419385b
+
+extra-deps:
+resolver: lts-2.22
