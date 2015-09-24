@@ -39,7 +39,9 @@ declaration (Decl n _ f as) = do
 strategyDeclarations :: [StrategyDeclaration i o] -> SParser i o (Strategy i o)
 strategyDeclarations decls =
   choice [ declaration d | SD d <- sortBy k decls ]
-    where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
+    -- MS: there is an issue when declarations have only optional arguments and a common prefix
+    -- as decl will always be successfull; so we sort the list in rev. lex order
+    where k (SD d1) (SD d2) = compare (D.declName d2) (D.declName d1)
 
 strategy :: SParser i i (Strategy i i)
 strategy = PE.buildExpressionParser table strat <?> "stratgy"
@@ -49,16 +51,11 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
       <|> predefined
       <?> "expression"
     predefined :: SParser i o (Strategy i o)
-    predefined = do
-      decls <- getState
-      -- MS: there is an issue when declarations have only optional arguments and a common prefix
-      -- as decl will always be successfull; so we sort the list in rev. lex order
-      choice [ declaration d | SD d <- sortBy k decls ]
-        where k (SD d1) (SD d2)= compare (D.declName d2) (D.declName d1)
+    predefined = getState >>= strategyDeclarations
 
-    table = [ [unary "try" C.try ,      unary "force" C.force ]
+    table = [ [unary "try" C.try , unary "force" C.force ]
             , [unary "es"  C.es ]
-            , [binary "<|>" S.Alt PE.AssocRight,   binary "<||>" S.OrFaster PE.AssocRight ]
+            , [binary "<|>" S.Alt PE.AssocRight,  binary "<||>" S.OrFaster PE.AssocRight ]
             , [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
     unary name fun = PE.Prefix (do{ reserved name; return fun })
