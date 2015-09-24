@@ -33,7 +33,7 @@ module Tct.Core.Combinators
   -- ** Stateful
   , withState
   , withProblem
-  , withSolver
+  , withKvPair
 
   -- ** Combinators
   , exhaustively
@@ -46,16 +46,18 @@ module Tct.Core.Combinators
   ) where
 
 
-import Tct.Core.Data
+import qualified Data.Map                         as M (insert)
 
-import Tct.Core.Processor.Annotated     as M
-import Tct.Core.Processor.Failing       as M
-import Tct.Core.Processor.Identity      as M
-import Tct.Core.Processor.Succeeding    as M
-import Tct.Core.Processor.Timeout       as M
-import Tct.Core.Processor.Transform     as M
-import Tct.Core.Processor.TransformWith as M
-import Tct.Core.Processor.Wait          as M
+import           Tct.Core.Data
+
+import           Tct.Core.Processor.Annotated     as M
+import           Tct.Core.Processor.Failing       as M
+import           Tct.Core.Processor.Identity      as M
+import           Tct.Core.Processor.Succeeding    as M
+import           Tct.Core.Processor.Timeout       as M
+import           Tct.Core.Processor.Transform     as M
+import           Tct.Core.Processor.TransformWith as M
+import           Tct.Core.Processor.Wait          as M
 
 
 -- Strategy Combinators ----------------------------------------------------------------------------------------------
@@ -120,8 +122,9 @@ withState = WithStatus
 withProblem :: (i -> Strategy i o) -> Strategy i o
 withProblem g = WithStatus (g . currentProblem)
 
-withSolver :: String -> [String] -> Strategy i o -> Strategy i o
-withSolver cmd args = WithState (\st -> st { solver = Just (cmd,args) })
+-- | Sets a key-value pair for a strategy.
+withKvPair :: (String, [String]) -> Strategy i o -> Strategy i o
+withKvPair (k,v) = WithState $ \st -> st { kvPairs = M.insert k v (kvPairs st) }
 
 -- | List version of ('.>>>').
 --

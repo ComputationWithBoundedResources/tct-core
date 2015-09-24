@@ -8,6 +8,7 @@ import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
 import           Data.Foldable                 as F (Foldable)
+import qualified Data.Map                      as M
 import           Data.Traversable              as T (Traversable)
 import           Data.Typeable
 import qualified System.Time                   as Time
@@ -34,10 +35,10 @@ newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
 -- | Provides /TcT/ runtime options. The State of 'Tct.Core.Data.TctM.TcTM' monad.
 -- The state can be (locally) updated using 'Tct.Core.Data.TctM.setState'.
 data TctROState = TctROState
-  { startTime     :: Time.ClockTime             -- ^ Start time. Should be set in the start state.
-  , stopTime      :: Maybe Time.ClockTime       -- ^ Stop time. Used to handle timeouts and is updated when 'Tct.Core.Data.TctM.timed' is used.
-  , tempDirectory :: FilePath                   -- ^ The temporary directory. Should be set in the start state.
-  , solver        :: Maybe (FilePath, [String]) -- ^ Information about external applications being used. This is application dependent.
+  { startTime     :: Time.ClockTime        -- ^ Start time. Should be set in the start state.
+  , stopTime      :: Maybe Time.ClockTime  -- ^ Stop time. Used to handle timeouts and is updated when 'Tct.Core.Data.TctM.timed' is used.
+  , tempDirectory :: FilePath              -- ^ The temporary directory. Should be set in the start state.
+  , kvPairs       :: M.Map String [String] -- ^ Key-Value pairs. This field is application dependent.
   }
 
 -- | Defines the (read-only) runtime status of 'TctROState'.

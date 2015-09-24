@@ -7,6 +7,8 @@ module Tct.Core.Data.TctM
   , TctStatus (..)
   , askState
   , setState
+  , setKvPair
+  , getKvPair
   , askStatus
 
   -- * Lifted IO functions
@@ -19,11 +21,13 @@ module Tct.Core.Data.TctM
   ) where
 
 
-import           Control.Applicative      ((<|>))
+import           Control.Applicative      ((<$>), (<|>))
 import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
 import           Control.Monad.Reader     (ask, liftIO, local, runReaderT)
+import qualified Data.Map                 as M
+import           Data.Maybe               (fromMaybe)
 import qualified System.Time              as Time
 
 import           Tct.Core.Data.Types
@@ -37,6 +41,14 @@ askState = ask
 setState :: (TctROState -> TctROState) -> TctM a -> TctM a
 setState = local
 
+-- | Sets (locally) a key-value pair.
+setKvPair :: (String, [String]) -> TctM a -> TctM a
+setKvPair (k,v) = local $ \st -> st { kvPairs = M.insert k v (kvPairs st) }
+
+-- | Given a key; asks for a value. Returns [] if there is no value.
+getKvPair :: String -> TctM [String]
+getKvPair s = (get . kvPairs) <$> ask
+  where get m = [] `fromMaybe` M.lookup s m
 -- | Returns 'TctStatus' which is obtained from 'TctROState' during runtime.
 --
 -- > runningTime   = now - startTime

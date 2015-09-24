@@ -18,6 +18,7 @@ module Tct.Core
   , addStrategies
   , withDefaultStrategy
   , appendGHCiScript
+  , addRuntimeOption
   -- * Processor / Strategy
   , toStrategy
   , ProofData
@@ -61,4 +62,8 @@ appendGHCiScript cfg ss = cfg { interactiveGHCi = k (interactiveGHCi cfg) ss}
   where
     k (GHCiCommand _) xs = GHCiScript xs
     k (GHCiScript s1) xs = GHCiScript (s1 ++ xs)
+
+-- | Adds a key-value pair to the runtime options.
+addRuntimeOption :: TctConfig i -> String -> [String] -> TctConfig i
+addRuntimeOption cfg s ss = cfg { runtimeOptions = (s,ss) :runtimeOptions cfg }
 

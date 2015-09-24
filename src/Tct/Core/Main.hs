@@ -18,6 +18,7 @@ module Tct.Core.Main
   ) where
 
 
+import qualified Data.Map as M
 import           Control.Applicative        ((<$>), (<*>), (<|>))
 import           Control.Monad              (void)
 import           Control.Monad.Reader       (runReaderT)
@@ -58,7 +59,8 @@ data TctConfig i = TctConfig
   , strategies      :: [StrategyDeclaration i i]
   , defaultStrategy :: Strategy i i
 
-  , defaultSolver   :: Maybe (FilePath, [String])
+  , runtimeOptions  :: [(String, [String])]
+
   , interactiveGHCi :: InteractiveGHCi
   , version         :: String
   }
@@ -74,7 +76,7 @@ defaultTctConfig p = TctConfig
   , putProof        = PP.putPretty . prettyDefaultProof
   , strategies      = declarations
   , defaultStrategy = failing
-  , defaultSolver   = Nothing
+  , runtimeOptions  = []
   , interactiveGHCi = GHCiScript
       [ ":set prompt \"tct>\""
       , ":module +Tct.Core.Interactive" ]
@@ -222,7 +224,7 @@ run cfg m = do
       { startTime     = time
       , stopTime      = Nothing
       , tempDirectory = tmp
-      , solver        = defaultSolver cfg }
+      , kvPairs       = M.fromList (runtimeOptions cfg) }
   withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
 
 runInteractive :: InteractiveGHCi -> IO ()
