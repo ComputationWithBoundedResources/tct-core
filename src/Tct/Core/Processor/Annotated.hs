@@ -39,7 +39,7 @@ instance (ProofData i, ProofData o) => Processor (Annotation i o) where
   solve p@(Timed st) prob = do
     t1 <- liftIO Time.getClockTime
     ret <- evaluate st prob
-    t2 <- isProgressing ret `seq` liftIO Time.getClockTime
+    t2 <- isOpen ret `seq` liftIO Time.getClockTime
     let
       diff = fromIntegral (Time.tdPicosec (Time.diffClockTimes t2 t1)) / (10**(-12))
       pn = ProofNode { processor = p, problem = prob, proof = TimedProof (diff :: Double) }

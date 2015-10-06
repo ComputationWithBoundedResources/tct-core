@@ -9,7 +9,6 @@ module Tct.Core.Data.ProofTree
   , flatten
 
   -- * Certification
-  , collectCertificate
   , certificate
   , certificateWith
 
@@ -25,7 +24,7 @@ module Tct.Core.Data.ProofTree
   ) where
 
 
-import           Control.Applicative       as A ((<$>))
+import           Control.Applicative       ((<$>), pure)
 import           Data.Foldable             as F (Foldable, foldMap, foldr, toList)
 import           Data.Traversable          as T (Traversable, traverse)
 
@@ -40,16 +39,16 @@ open = F.foldr (:) []
 
 -- | Flattens a nested prooftree.
 flatten :: ProofTree (ProofTree l) -> ProofTree l
-flatten (Open pt)             = pt
-flatten (NoProgress pn pt)    = NoProgress pn (flatten pt)
-flatten (Progress pn cns pts) = Progress pn cns (flatten `fmap` pts)
+flatten (Open pt)            = pt
+flatten Fail                 = Fail
+flatten (Success pn cns pts) = Success pn cns (flatten `fmap` pts)
 
 
 -- | Computes the 'Certificate' of 'ProofTree'.
 collectCertificate :: ProofTree Certificate -> Certificate
-collectCertificate (Open c)                      = c
-collectCertificate (NoProgress _ subtree)        = collectCertificate subtree
-collectCertificate (Progress _ certfn' subtrees) = certfn' (collectCertificate `fmap` subtrees)
+collectCertificate (Open c)                     = c
+collectCertificate Fail                         = unbounded
+collectCertificate (Success _ certfn' subtrees) = certfn' (collectCertificate `fmap` subtrees)
 
 -- | Computes the 'Certificate' of a 'ProofTree'.
 -- 'Open' nodes have the 'Certificate' 'unboundend'.
@@ -68,9 +67,8 @@ certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 
 -- | Checks if the 'ProofTree' contains a 'Progress' node.
 progress :: ProofTree l -> Bool
-progress (Open _)          = False
-progress (NoProgress _ pt) = progress pt
-progress (Progress {})     = True
+progress Success {} = True
+progress _ = False
 
 -- | Checks if there exists 'Open' nodes in the 'ProofTree'.
 isOpen :: ProofTree l -> Bool
@@ -82,21 +80,20 @@ isOpen = not . isClosed
 isClosed :: ProofTree l -> Bool
 isClosed = null . open
 
-
 instance Functor ProofTree where
-  f `fmap` Open l              = Open (f l)
-  f `fmap` NoProgress pn pt    = NoProgress pn (f `fmap` pt)
-  f `fmap` Progress pn cns pts = Progress pn cns ((f `fmap`) `fmap` pts)
+  f `fmap` Open l             = Open (f l)
+  _ `fmap` Fail               = Fail
+  f `fmap` Success pn cns pts = Success pn cns ((f `fmap`) `fmap` pts)
 
 instance Foldable ProofTree where
-  f `foldMap` (Open l)           = f l
-  f `foldMap` (NoProgress _ pt)  = f `foldMap` pt
-  f `foldMap` (Progress _ _ pts) = (f `foldMap`) `foldMap` pts
+  f `foldMap` Open l          = f l
+  _ `foldMap` Fail            = mempty
+  f `foldMap` Success _ _ pts = (f `foldMap`) `foldMap` pts
 
 instance Traversable ProofTree where
-  f `traverse` (Open l)              = Open A.<$> f l
-  f `traverse` (NoProgress pn pt)    = NoProgress pn A.<$> f `traverse` pt
-  f `traverse` (Progress pn cfn pts) = Progress pn cfn A.<$> (f `traverse`) `traverse` pts
+  f `traverse` Open l  = Open <$> f l
+  _ `traverse` Fail = pure Fail
+  f `traverse` Success pn cfn pts = Success pn cfn <$> (f `traverse`) `traverse` pts
 
 instance Show (ProofTree l) where
   show _ = "showTree"
@@ -121,14 +118,10 @@ ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.
 ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
   [ ppHeader pt is "Open"
   , PP.indent 4 (ppProb l) ]
-ppProofTree' (i,is) ppProb detailed (NoProgress pn pt)
-  | detailed = PP.vcat
-    [ ppHeader pt (i,is) "NoProgress"
-    , PP.indent 4 (ppNodeShort pn)
-    , ppProofTree' (i+1,is) ppProb detailed pt]
-  | otherwise   = ppProofTree' (i,is) ppProb detailed pt
-ppProofTree' (i,is) ppProb detailed pt@(Progress pn _ pts) = PP.vcat
-  [ ppHeader pt (i,is) "Progress"
+ppProofTree' is _ _ Fail = ppHeader Fail is "Failure"
+    
+ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) = PP.vcat
+  [ ppHeader pt (i,is) "Success"
   , PP.indent 4 (ppProofNode pn)
   , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
     where ppts = (\(j,t) -> ppProofTree' (j, is++[i]) ppProb detailed t) `fmap` zip [1..] (F.toList pts)

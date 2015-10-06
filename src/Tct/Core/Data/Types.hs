@@ -1,14 +1,13 @@
-{-# OPTIONS_HADDOCK not-home, hide #-}
 -- | This module defines the most important types.
 module Tct.Core.Data.Types where
 
 
-import           Control.Applicative
+
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
-import           Data.Foldable                 as F (Foldable)
-import           Data.Traversable              as T (Traversable)
+
+
 import           Data.Typeable
 import qualified System.Time                   as Time
 import           Text.Parsec                   (alphaNum, letter, oneOf)
@@ -24,24 +23,21 @@ import           Tct.Core.Data.Forks           (Id (..))
 
 
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
--- MS: the state is fixed; sometimes it would be useful to have application dependent states; but this is difficult as
--- we would have to initialise application dependent states when performing transformations (ie using >=> combinator)
 
--- | The /TcT/ monad.
+-- | Provides Tct runtime options. The State of TcTM monad.
+data TctROState = TctROState
+  { startTime     :: Time.ClockTime
+  , stopTime      :: Maybe Time.ClockTime
+  , tempDirectory :: FilePath
+  , solver        :: Maybe (FilePath, [String])
+  }
+
+
+-- | The Tct monad.
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
   deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
--- | Provides /TcT/ runtime options. The State of 'Tct.Core.Data.TctM.TcTM' monad.
--- The state can be (locally) updated using 'Tct.Core.Data.TctM.setState'.
-data TctROState = TctROState
-  { startTime     :: Time.ClockTime             -- ^ Start time. Should be set in the start state.
-  , stopTime      :: Maybe Time.ClockTime       -- ^ Stop time. Used to handle timeouts and is updated when 'Tct.Core.Data.TctM.timed' is used.
-  , tempDirectory :: FilePath                   -- ^ The temporary directory. Should be set in the start state.
-  , solver        :: Maybe (FilePath, [String]) -- ^ Information about external applications being used. This is application dependent.
-  }
-
 -- | Defines the (read-only) runtime status of 'TctROState'.
--- Is obtained via 'Tct.Core.Data.TctM.askStatus'.
 data TctStatus prob = TctStatus
   { currentProblem :: prob      -- ^ Current Problem.
   , runningTime    :: Int       -- ^ Runing time in seconds.
@@ -53,10 +49,9 @@ data TctStatus prob = TctStatus
 
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
-  { processor :: p              -- ^ the processor
-  , problem   :: I p            -- ^ the input problem
-  , proof     :: ProofObject p  -- ^ the proof
-  }
+  { processor :: p
+  , problem   :: I p
+  , proof     :: ProofObject p }
 
 -- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
 -- During evaluation
@@ -66,10 +61,11 @@ data ProofNode p = ProofNode
 -- * 'Progress' nodes result from successfull 'Processor' application ('Success').
 --
 -- The type of the proof tree depends on the open nodes. A prooftree wihtout open nodes can be casted to any type.
-data ProofTree l where
-  Open       :: l -> ProofTree l
-  NoProgress :: Processor p => ProofNode p -> ProofTree l -> ProofTree l
-  Progress   :: Processor p => ProofNode p -> CertificateFn p -> Forking p (ProofTree l) -> ProofTree l
+
+data ProofTree o where
+  Open     :: o -> ProofTree o
+  Success  :: Processor p => ProofNode p -> CertificateFn p -> Forking p (ProofTree o) -> ProofTree o
+  Fail     :: ProofTree o
 
 
 --- * Processor  -----------------------------------------------------------------------------------------------------
@@ -84,49 +80,14 @@ type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
--- | The result of applying a @'Processor' p@ to a problem.
-data Result p
-  = Fail
-    { proofData :: ProofObject p }
-  | Success
-    { subProblems   :: Forking p (O p)
-    , proofData     :: ProofObject p
-    , certificateFn :: CertificateFn p }
-
--- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
--- See "Combinators" for a detailed description.
---
--- The 'Halt' constructor stores a closed prooftree which is only used for output. As 'Halt' does not depend on any
--- type 'Return' can be casted to any type  in this case.
-data Return l where
-  Continue :: { fromReturn :: l } -> Return l
-  Abort    :: { fromReturn :: l } -> Return l
-  Halt     :: ProofTree ProofBox -> Return l
-
--- | Existential type for ProofData.
-data ProofBox where
-  ProofBox :: ProofData l => l -> ProofBox
-
-instance PP.Pretty ProofBox where
-  pretty (ProofBox p) = PP.pretty p
-
-instance Functor Return where
-  f `fmap` Continue l = Continue (f l)
-  f `fmap` Abort l    = Abort (f l)
-  _ `fmap` Halt pt    = Halt pt
-
-instance Show l => Show (Return l) where
-  show (Continue l) = "Continue: " ++ show l
-  show (Abort l)    = "Abort " ++ show l
-  show (Halt _)     = "Halt "
 
 -- | Everything that is necessary for defining a processor.
 class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
-  type ProofObject p :: *
-  type I p           :: *
-  type O p           :: *
-  type Forking p     :: * -> *
-  solve              :: p -> I p -> TctM (Return (ProofTree (O p)))
+  type ProofObject p :: *                                           -- ^ The type of the proof.
+  type I p           :: *                                           -- ^ The type of the input problem.
+  type O p           :: *                                           -- ^ The type of the output problem.
+  type Forking p     :: * -> *                                      -- ^ The type of the (children) collection.
+  solve              :: p -> I p -> TctM (ProofTree (O p))
 
   type Forking p     =  Id
 
@@ -138,18 +99,19 @@ class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => 
 data Strategy i o where
   Proc       :: (Processor p) => p -> Strategy (I p) (O p)
 
+  -- | Problem type transformation
   Trans      :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
 
-  Then       :: Strategy i i -> Strategy i i -> Strategy i i
-  ThenPar    :: Strategy i i -> Strategy i i -> Strategy i i
-
-
+  -- | Alternative
   Alt        :: Strategy i o -> Strategy i o -> Strategy i o
   OrFaster   :: Strategy i o -> Strategy i o -> Strategy i o
   OrBetter   :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
 
-  Trying     :: Bool -> Strategy i i -> Strategy i i
+  -- | Optional
+  Try     :: Strategy i i -> Strategy i i
+  Force   :: Strategy i o -> Strategy i o
 
+  -- | Stateful
   WithStatus :: (TctStatus i -> Strategy i o) -> Strategy i o
   WithState  :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable
