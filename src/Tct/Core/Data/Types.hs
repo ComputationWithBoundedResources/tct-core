@@ -80,6 +80,9 @@ type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
+data Return p =
+  Failure
+  | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (O p)))
 
 -- | Everything that is necessary for defining a processor.
 class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
@@ -87,7 +90,7 @@ class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => 
   type I p           :: *                                           -- ^ The type of the input problem.
   type O p           :: *                                           -- ^ The type of the output problem.
   type Forking p     :: * -> *                                      -- ^ The type of the (children) collection.
-  solve              :: p -> I p -> TctM (ProofTree (O p))
+  solve              :: p -> I p -> TctM (Return p)
 
   type Forking p     =  Id
 
@@ -97,23 +100,21 @@ class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => 
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
-  Proc       :: (Processor p) => p -> Strategy (I p) (O p)
+  Apply       :: (Processor p) => p -> Strategy (I p) (O p)
 
-  -- | Problem type transformation
-  Trans      :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
-
-  -- | Alternative
-  Alt        :: Strategy i o -> Strategy i o -> Strategy i o
-  OrFaster   :: Strategy i o -> Strategy i o -> Strategy i o
-  OrBetter   :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
-
-  -- | Optional
-  Try     :: Strategy i i -> Strategy i i
-  Force   :: Strategy i o -> Strategy i o
-
-  -- | Stateful
-  WithStatus :: (TctStatus i -> Strategy i o) -> Strategy i o
-  WithState  :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
+  -- | Sequential Application
+  Sequence    :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
+  Alternative :: Strategy i o -> Strategy i o -> Strategy i o
+  -- | Parallel Application
+  Par         :: Strategy i o -> Strategy i o
+  Race        :: Strategy i o -> Strategy i o -> Strategy i o
+  Better      :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
+  
+  -- | Control Operators
+  Try         :: Strategy i i -> Strategy i i
+  Force       :: Strategy i o -> Strategy i o
+  WithStatus  :: (TctStatus i -> Strategy i o) -> Strategy i o
+  WithState   :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable
 
 

@@ -8,12 +8,13 @@ module Tct.Core.Data.Processor
   , CertificateFn
 
   , toStrategy
+  , apply 
   -- , ErroneousProof (..)
-  , solveCatchingIOErr
+  -- , solveCatchingIOErr
   ) where
 
 
-import qualified Tct.Core.Common.Pretty as PP
+
 import qualified Tct.Core.Common.Xml    as Xml
 import           Tct.Core.Data.Types
 import           Control.Monad.Error     (catchError)
@@ -22,8 +23,16 @@ import           Control.Monad.Error     (catchError)
 
 -- | prop> toStrategy == Proc
 toStrategy :: Processor p => p -> Strategy (I p) (O p)
-toStrategy = Proc
+toStrategy = Apply
 
+apply :: Processor p => p -> I p -> TctM (ProofTree (O p))
+apply p i = do 
+   res <- solve p i `catchError` handler
+   return (toProofTree res)
+  where 
+    toProofTree Failure = Fail
+    toProofTree (Progress ob ts c) = Success (ProofNode p i ob) ts c
+    handler _ = return Failure
 -- --- * Error Processor ------------------------------------------------------------------------------------------------
 
 -- data ErroneousProof p = ErroneousProof IOError p deriving Show
@@ -47,5 +56,5 @@ toStrategy = Proc
 
 --   solve ep@(ErroneousProc e p) prob = failWith ep prob (ErroneousProof e p)
 
-solveCatchingIOErr :: Processor p => p -> I p -> TctM (ProofTree (O p))
-solveCatchingIOErr p prob = solve p prob `catchError` const (return Fail)
+-- solveCatchingIOErr :: Processor p => p -> I p -> TctM (ProofTree (O p))
+-- solveCatchingIOErr p prob = solve p prob `catchError` const (return Fail)

@@ -4,8 +4,7 @@ module Tct.Core.Data.Strategy
   Strategy (..)
   -- * Strategy evaluation
   , evaluate
-  , evaluateTree
-  , evaluateTreePar
+  -- , evaluatePar
   -- * Declaration
   , StrategyDeclaration (..)
   , strategy
@@ -30,60 +29,74 @@ instance Show (Strategy i o) where
 instance PP.Pretty (Strategy i o) where
   pretty _ = PP.text "someStrategy"
 
+-- pickNonFail :: ProofTree o -> ProofTree o -> ProofTree o
+-- pt1@Success{} `pickNonFail` _             = pt1
+-- _             `pickNonFail` pt2@Success{} = pt2
+-- pt1@Open{}    `pickNonFail` _             = pt1
+-- _             `pickNonFail` pt2@Open{}    = pt2
+-- pt1           `pickNonFail` _             = pt1
 
-pickNonFail :: ProofTree o -> ProofTree o -> ProofTree o
-pt1@Success{} `pickNonFail` _             = pt1
-_             `pickNonFail` pt2@Success{} = pt2
-pt1@Open{}    `pickNonFail` _             = pt1
-_             `pickNonFail` pt2@Open{}    = pt2
-pt1           `pickNonFail` _             = pt1
-
--- | @'evaluate' s prob@ defines the application of @s@ to a problem.
+-- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
-evaluate :: ProofData o => Strategy i o -> i -> TctM (ProofTree o)
-evaluate (Proc p) prob = solveCatchingIOErr p prob
-evaluate (Trans s1 s2) prob = evaluate s1 prob >>= evaluateTree s2 
-evaluate (Try s) prob = do
-  r1 <- evaluate s prob
-  return $ case r1 of
-    Fail -> Open prob
-    pt -> pt
-evaluate (Force s) prob = do
-  r1 <- evaluate s prob
-  return $ case r1 of
-    Open _ -> Fail
-    pt -> pt
-evaluate (WithStatus f) prob = do
+evaluate1 :: ProofData o => Strategy i o -> i -> TctM (ProofTree o)
+evaluate1 (Apply p) prob = apply p prob
+evaluate1 (Sequence s1 s2) prob = do
+  pt <- evaluate1 s1 prob
+  if failure pt
+   then return Fail
+   else evaluate s2 pt
+evaluate1 (Alternative s1 s2) prob = do
+  pt <- evaluate1 s1 prob
+  if failure pt
+   then evaluate1 s2 prob
+   else return pt
+evaluate1 (Try s) prob = do
+  pt <- evaluate1 s prob
+  if failure pt
+   then return (Open prob)
+   else return pt
+evaluate1 (Force s) prob = do
+  pt <- evaluate1 s prob
+  case pt of
+    Open{} -> return Fail
+    _ -> return pt
+evaluate1 (Par s) prob = evaluate1 s prob
+evaluate1 (Race s1 s2) prob =
+  raceWith (not . failure) const (evaluate1 s1 prob) (evaluate1 s2 prob)
+evaluate1 (Better cmp s1 s2) prob =
+  uncurry pick <$> concurrently (evaluate1 s1 prob) (evaluate1 s2 prob) where
+    pick r1 r2 | cmp r1 r2 == GT = r2
+               | otherwise = r1
+evaluate1 (WithStatus f) prob = do
   st <- askStatus prob
-  evaluate (f st) prob
-evaluate (WithState f s) prob =
-  setState f (evaluate s prob)
-evaluate (Alt s1 s2) prob = do
-  pt1 <- evaluate s1 prob
-  case pt1 of
-    Success {} -> return pt1
-    _ -> do
-      pt2 <- evaluate s2 prob
-      return (pickNonFail pt1 pt2)
-evaluate (OrFaster s1 s2) prob =
-  raceWith nonFail pickNonFail (evaluate s1 prob) (evaluate s2 prob) where
-    nonFail Fail = False
-    nonFail _    = True
-evaluate (OrBetter cmp s1 s2) prob = do
-  uncurry pickNonFail <$> concurrently (evaluate s1 prob) (evaluate s2 prob)
+  evaluate1 (f st) prob
+evaluate1 (WithState f s) prob =
+  setState f (evaluate1 s prob)
+
+
 
 -- | 'evaluate' on a 'ProofTree'.
-evaluateTree :: ProofData o => Strategy i o -> ProofTree i -> TctM (ProofTree o)
-evaluateTree s (Open p)  = evaluate s p
-evaluateTree s Fail      = return Fail
-evaluateTree s (Success pn certfn subtrees) =
-  Success pn certfn <$> (evaluateTree s `T.mapM` subtrees)
+evaluate :: ProofData o => Strategy i o -> ProofTree i -> TctM (ProofTree o)
+evaluate (Par s) = evaluatePar s
+evaluate s = evaluateSeq s
+-- evaluate s (Open p)  = evaluate s p
+-- evaluate s Fail      = return Fail
+-- evaluate s (Success pn certfn subtrees) =
+--   Success pn certfn <$> (evaluateTree s `T.mapM` subtrees)
 
 -- | 'evaluate' on a 'ProofTree' in parallel.
-evaluateTreePar :: ProofData o => Strategy i o -> ProofTree i -> TctM (ProofTree o)
-evaluateTreePar s t = spawnTree t >>= collect
+evaluateSeq :: ProofData o => Strategy i o -> ProofTree i -> TctM (ProofTree o)
+evaluateSeq s (Open i) = evaluate1 s i
+evaluateSeq _ Fail = return Fail
+evaluateSeq s (Success pn certfn subtrees) =
+-- MA:TODO: implement early abort  
+  Success pn certfn <$> (evaluateSeq s `T.mapM` subtrees)
+            
+-- | 'evaluate' on a 'ProofTree' in parallel.
+evaluatePar :: ProofData o => Strategy i o -> ProofTree i -> TctM (ProofTree o)
+evaluatePar s t = spawnTree t >>= collect
   where
-    spawnTree (Open p)  = Open <$> async (evaluate s p)
+    spawnTree (Open p)  = Open <$> async (evaluate1 s p)
     spawnTree Fail = return Fail
     spawnTree (Success n certfn subtrees) = Success n certfn <$> (spawnTree `T.mapM` subtrees)
 

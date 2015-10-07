@@ -15,6 +15,7 @@ module Tct.Core.Data.ProofTree
   -- * Properites
   , progress
   , isOpen
+  , failure
   , isClosed
 
   -- * Output
@@ -69,6 +70,12 @@ certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 progress :: ProofTree l -> Bool
 progress Success {} = True
 progress _ = False
+
+-- | Checks if the 'ProofTree' contains a 'Failure' node.
+failure :: ProofTree l -> Bool
+failure Fail = True
+failure (Success _ _ pts) = any failure pts
+failure _ = False
 
 -- | Checks if there exists 'Open' nodes in the 'ProofTree'.
 isOpen :: ProofTree l -> Bool
