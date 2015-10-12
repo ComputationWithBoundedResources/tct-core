@@ -28,10 +28,14 @@ module Tct.Core
   -- ** Argument
   , Argument
   , ArgFlag (..)
+  , arg
   , nat
   , bool
   , strat
+  , string
+  , strat
   , some
+  , withDomain
   , optional
   -- ** Declaration
   , StrategyDeclaration (..)
