@@ -29,7 +29,7 @@ import           System.IO.Unsafe
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml
-import           Tct.Core.Data              hiding (proof)
+import           Tct.Core.Data              hiding (proof, apply)
 import           Tct.Core.Main
 
 
@@ -53,11 +53,12 @@ selectLeafs ns pt = S.evalState (F.mapM k pt) 0
 unselectLeafs :: ProofTree (Selected l) -> ProofTree (Selected l)
 unselectLeafs = fmap (either Right Right) where
 
-evaluateSelected :: ProofData i => Strategy i i -> ProofTree (Selected i) -> TctM (Return (ProofTree (Selected i)))
-evaluateSelected _ pt@(Open (Left _))           = return (Continue pt)
-evaluateSelected s (Open (Right p))             = (fmap . fmap) Right `fmap` evaluate s p
-evaluateSelected s (NoProgress n subtree)       = liftNoProgress n `fmap` evaluateSelected s subtree
-evaluateSelected s (Progress n certfn subtrees) = liftProgress n certfn `fmap` (evaluateSelected s `F.mapM` subtrees)
+-- MA:TODO please check
+evaluateSelected :: ProofData i => Strategy i i -> ProofTree (Selected i) -> TctM (ProofTree (Selected i))
+evaluateSelected _ pt@(Open (Left _))          = return pt
+evaluateSelected s (Open (Right p))            = fmap Right `fmap` evaluate s (Open p)
+evaluateSelected _ (Failure r)                 = return (Failure r)
+evaluateSelected s (Success n certfn subtrees) = Success n certfn <$> (evaluateSelected s `F.mapM` subtrees)
 
 
 --- * state ----------------------------------------------------------------------------------------------------------
@@ -134,7 +135,7 @@ apply :: ProofData i => Strategy i i -> IO ()
 apply str = onSt $ \st -> do
   ret <- run defaultTctInteractiveConfig (evaluateSelected str $ unSt st)
   if isProgressing ret
-    then putSt (St (fromReturn ret)) >> printState >> print "progressed :)"
+    then putSt (St ret) >> printState >> print "progressed :)"
     else print "no progress :/"
 
 proof :: IO ()

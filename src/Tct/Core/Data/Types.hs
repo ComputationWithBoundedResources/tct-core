@@ -21,7 +21,6 @@ import qualified Tct.Core.Common.Xml           as Xml
 import qualified Tct.Core.Data.Certificate     as C
 import           Tct.Core.Data.Forks           (Id (..))
 
-
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
 
 -- | Provides Tct runtime options. The State of TcTM monad.
@@ -47,25 +46,24 @@ data TctStatus prob = TctStatus
 
 --- * Proof Trees ----------------------------------------------------------------------------------------------------
 
+-- | Reason for failure of a 'Processor'
+data Reason where
+  IOError    :: IOError -> Reason
+  Aborted    :: Reason
+  TimedOut   :: Reason
+  SomeReason :: (Show r, PP.Pretty r) => r -> Reason
+
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
-  { processor :: p
-  , problem   :: I p
-  , proof     :: ProofObject p }
+  { appliedProcessor :: p
+  , problem          :: In p
+  , proof            :: ProofObject p }
 
 -- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
--- During evaluation
---
--- * 'Open' nodes store the open (sub-)problems,
--- * 'NoProgress' nodes result from failing 'Processor' applications ('Fail'), and
--- * 'Progress' nodes result from successfull 'Processor' application ('Success').
---
--- The type of the proof tree depends on the open nodes. A prooftree wihtout open nodes can be casted to any type.
-
 data ProofTree o where
   Open     :: o -> ProofTree o
   Success  :: Processor p => ProofNode p -> CertificateFn p -> Forking p (ProofTree o) -> ProofTree o
-  Fail     :: ProofTree o
+  Failure  :: Reason -> ProofTree o
 
 
 --- * Processor  -----------------------------------------------------------------------------------------------------
@@ -81,42 +79,43 @@ type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
 data Return p =
-  Failure
-  | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (O p)))
+  NoProgress Reason
+  | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (Out p)))
 
 -- | Everything that is necessary for defining a processor.
-class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
+class (Show p, ProofData (ProofObject p), ProofData (In p), Fork (Forking p)) => Processor p where
   type ProofObject p :: *                                           -- ^ The type of the proof.
-  type I p           :: *                                           -- ^ The type of the input problem.
-  type O p           :: *                                           -- ^ The type of the output problem.
+  type In p          :: *                                           -- ^ The type of the input problem.
+  type Out p         :: *                                           -- ^ The type of the output problem.
   type Forking p     :: * -> *                                      -- ^ The type of the (children) collection.
-  solve              :: p -> I p -> TctM (Return p)
+  execute            :: p -> In p -> TctM (Return p)
 
   type Forking p     =  Id
 
 
 -- Strategy ----------------------------------------------------------------------------------------------------------
 
+
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
-  Apply       :: (Processor p) => p -> Strategy (I p) (O p)
-
-  -- | Sequential Application
-  Sequence    :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
-  Alternative :: Strategy i o -> Strategy i o -> Strategy i o
+  Apply       :: (Processor p) => p -> Strategy (In p) (Out p)
+  IdStrategy  :: Strategy i i
+  Abort       :: Strategy i o
+  -- MA: can we avoid the first argument?
+  Cond        :: (ProofTree q -> Bool) -> Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
   -- | Parallel Application
   Par         :: Strategy i o -> Strategy i o
   Race        :: Strategy i o -> Strategy i o -> Strategy i o
   Better      :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
-  
-  -- | Control Operators
-  Try         :: Strategy i i -> Strategy i i
-  Force       :: Strategy i o -> Strategy i o
+  -- | Misc
+  Timeout     :: RelTimeout -> Strategy i o -> Strategy i o
+  Wait        :: RelTimeout -> Strategy i o -> Strategy i o 
   WithStatus  :: (TctStatus i -> Strategy i o) -> Strategy i o
   WithState   :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable
 
+data RelTimeout = TimeoutIn Int | TimeoutUntil Int
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------
 

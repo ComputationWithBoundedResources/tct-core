@@ -7,7 +7,6 @@ module Tct.Core.Main.Mode
 
 import Tct.Core.Data
 import Tct.Core.Main.Options
-import Tct.Core.Processor.Failing (failing)
 
 
 -- | 'TctMode' provides all infromation necesary to construct a Tct instance customised for a problem type.
@@ -20,8 +19,8 @@ data TctMode i o opt = TctMode
                                                                  --   These are added to the standard Tct options.
   , modeModifyer        :: opt -> i -> i                         -- ^ This function is applied to the initial problem,
   , modeParser          :: FilePath -> IO (Either String i)      -- ^ The parser for the problem.
-  , modeAnswer          :: opt -> Return (ProofTree o) -> IO ()  -- ^ Custom Answer.
-  , modeProof           :: opt -> Return (ProofTree o) -> IO ()  -- ^ Custom Proof. Printed after Answer.
+  , modeAnswer          :: opt -> (ProofTree o) -> IO ()         -- ^ Custom Answer.
+  , modeProof           :: opt -> (ProofTree o) -> IO ()         -- ^ Custom Proof. Printed after Answer.
   }
 
 
@@ -30,7 +29,7 @@ defaultMode :: (ProofData i, ProofData o) => String -> (FilePath -> IO (Either S
 defaultMode mid mparser = TctMode
   { modeId              = mid
   , modeStrategies      = []
-  , modeDefaultStrategy = failing
+  , modeDefaultStrategy = abort
   , modeOptions         = unit
   , modeModifyer        = \_ i -> i
   , modeParser          = mparser

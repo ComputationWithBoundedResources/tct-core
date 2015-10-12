@@ -21,10 +21,12 @@ module Tct.Core
   , withDefaultStrategy
   , setMode
   , setModeWith
-  -- * Processor / Strategy
-  , toStrategy
+  -- * Processor
   , ProofData
-  , Strategy
+  , succeedWith
+  , succeedWith0
+  , succeedWith1
+  , abortWith
   -- ** Argument
   , Argument
   , ArgFlag (..)
@@ -41,14 +43,13 @@ module Tct.Core
   , withName
   , withHelp
   -- ** Combinators
-  , module Tct.Core.Combinators
+  , module Tct.Core.Data.Strategy
   ) where
 
 
-import Tct.Core.Combinators
 import Tct.Core.Data
 import Tct.Core.Main
-
+import Tct.Core.Data.Strategy
 
 -- | Adds a list of 'StrategyDeclaraton' to the existing ones.
 withStrategies :: TctMode i o opt -> [StrategyDeclaration i o] -> TctMode i o opt

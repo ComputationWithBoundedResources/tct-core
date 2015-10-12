@@ -24,7 +24,7 @@ import qualified Config.Dyre                as Dyre (Params (..), defaultParams,
 import           Control.Applicative        ((<$>), (<*>), (<|>))
 import           Control.Monad.Reader       (runReaderT)
 import           Data.Maybe                 (fromMaybe)
-import           Data.Monoid                (mconcat)
+
 import qualified Options.Applicative        as O
 import           System.Directory           (getHomeDirectory, setCurrentDirectory)
 import           System.Exit                (exitFailure, exitSuccess)
@@ -34,17 +34,15 @@ import           System.IO.Temp             (withTempDirectory)
 import           System.Process             (system)
 import qualified System.Time                as Time
 
-import           Tct.Core.Data              as M (ProofTree)
+import           Tct.Core.Data as M (ProofTree)
 import           Tct.Core.Main.Mode         as M
 import           Tct.Core.Main.Options      as M
 
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
-import           Tct.Core.Data
+import           Tct.Core.Data hiding ((<|>))
 import           Tct.Core.Declarations      (declarations)
 import           Tct.Core.Parse             (strategyFromString)
-import           Tct.Core.Processor.Timeout (timeoutIn)
-
 
 -- | Current version.
 version :: String
@@ -298,7 +296,7 @@ realMain dcfg = do
         st   <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
 
         let stt = maybe st (`timeoutIn` st) theTimeout
-        r    <- liftIO $ run ucfg (evaluate stt prob)
+        r    <- liftIO $ run ucfg (evaluate stt (Open prob))
         putAnswer theAnswerFormat (theAnswer theOptions) r
         putProof  theProofFormat  (theProof theOptions) r
   case r of
@@ -316,19 +314,13 @@ realMain dcfg = do
       case (v,ret) of
         (SilentAnswerFormat, _)       -> return ()
         (CustomAnswerFormat, _)       -> custom ret
-
-        (DefaultAnswerFormat, Halt _) -> PP.putPretty (termcomp unbounded)
-        (TTTACAnswerFormat, Halt _)   -> PP.putPretty (tttac unbounded)
-
-        (DefaultAnswerFormat, r)      -> PP.putPretty (termcomp . certificate $ fromReturn r)
-        (TTTACAnswerFormat, r)        -> PP.putPretty (tttac    . certificate $ fromReturn r)
+        (DefaultAnswerFormat, r)      -> PP.putPretty (termcomp (certificate r))
+        (TTTACAnswerFormat, r)        -> PP.putPretty (tttac    (certificate r))
     putProof v custom ret = liftIO $
       case (v,ret) of
         (SilentProofFormat, _)      -> return ()
         (CustomProofFormat, _)      -> custom ret
-
-        (_, Halt pt)                -> PP.putPretty (ppDetailedProofTree PP.pretty pt)
-        (DefaultProofFormat, r)     -> PP.putPretty (ppProofTree PP.pretty $ fromReturn r)
-        (VerboseProofFormat, r)     -> PP.putPretty (ppDetailedProofTree PP.pretty $ fromReturn r)
+        (DefaultProofFormat, r)     -> PP.putPretty (ppProofTree PP.pretty r)
+        (VerboseProofFormat, r)     -> PP.putPretty (ppDetailedProofTree PP.pretty r)
         (XmlProofFormat, _)         -> error "missing: toXml proofTree" --TODO
 

@@ -2,59 +2,37 @@
 -- 'Processor' instances define transformations from problems to a (possible empty) set of subproblems.
 module Tct.Core.Data.Processor
   ( Processor (..)
-
   , Fork
   , ProofData
   , CertificateFn
-
-  , toStrategy
-  , apply 
-  -- , ErroneousProof (..)
-  -- , solveCatchingIOErr
+  , apply
+  , succeedWith
+  , abortWith
+  , succeedWith1
+  , succeedWith0
   ) where
 
-
-
-import qualified Tct.Core.Common.Xml    as Xml
 import           Tct.Core.Data.Types
-import           Control.Monad.Error     (catchError)
+import           Control.Monad.Except     (catchError)
+import qualified Tct.Core.Data.Forks as F
+import qualified Tct.Core.Common.Pretty as PP
 
---- * Processor ------------------------------------------------------------------------------------------------------
-
--- | prop> toStrategy == Proc
-toStrategy :: Processor p => p -> Strategy (I p) (O p)
-toStrategy = Apply
-
-apply :: Processor p => p -> I p -> TctM (ProofTree (O p))
-apply p i = do 
-   res <- solve p i `catchError` handler
-   return (toProofTree res)
+apply :: Processor p => p -> In p -> TctM (ProofTree (Out p))
+apply p i = toProofTree <$> (execute p i `catchError` handler) 
   where 
-    toProofTree Failure = Fail
-    toProofTree (Progress ob ts c) = Success (ProofNode p i ob) ts c
-    handler _ = return Failure
--- --- * Error Processor ------------------------------------------------------------------------------------------------
+    toProofTree (NoProgress r) = Failure r
+    toProofTree (Progress pn cf ts) = Success (ProofNode p i pn) cf ts
+    handler = return . NoProgress . IOError
 
--- data ErroneousProof p = ErroneousProof IOError p deriving Show
+succeedWith :: Processor p => ProofObject p -> CertificateFn p -> (Forking p (ProofTree (Out p))) -> TctM (Return p)
+succeedWith pn cfn ts = return (Progress pn cfn ts)
 
--- instance Processor p => PP.Pretty (ErroneousProof p) where
---   pretty (ErroneousProof err p) = PP.vcat
---     [ PP.text "Processor" PP.<+> PP.squotes (PP.text (show p)) PP.<+> PP.text "signalled the following error:"
---     , PP.indent 2 $ PP.paragraph (show err) ]
+succeedWith0 :: (Processor p, Forking p ~ F.Judgement) => ProofObject p -> CertificateFn p -> TctM (Return p)
+succeedWith0 pn cfn = return (Progress pn cfn F.Judgement)
 
--- instance Processor p => Xml.Xml (ErroneousProof p) where
---   toXml (ErroneousProof err p) = Xml.elt "error"
---     [ Xml.elt "processor" [Xml.text $ show p]
---     , Xml.elt "message"   [Xml.text $ show err] ]
+succeedWith1 :: (Processor p, Forking p ~ F.Id) => ProofObject p -> CertificateFn p -> ProofTree (Out p) -> TctM (Return p)
+succeedWith1 pn cfn p = return (Progress pn cfn (F.toId p))
+  
+abortWith :: (Show r, PP.Pretty r) => r -> TctM (Return p)
+abortWith = return . NoProgress . SomeReason
 
--- data ErroneousProcessor p = ErroneousProc IOError p deriving Show
-
--- instance Processor p => Processor (ErroneousProcessor p) where
---   type ProofObject (ErroneousProcessor p) = ErroneousProof p
---   type I (ErroneousProcessor p)      = I p
---   type O (ErroneousProcessor p)      = O p
-
---   solve ep@(ErroneousProc e p) prob = failWith ep prob (ErroneousProof e p)
-
--- solveCatchingIOErr :: Processor p => p -> I p -> TctM (ProofTree (O p))
--- solveCatchingIOErr p prob = solve p prob `catchError` const (return Fail)

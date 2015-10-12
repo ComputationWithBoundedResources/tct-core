@@ -7,17 +7,17 @@ module Tct.Core.Data.ProofTree
   , ProofTree (..)
   , open
   , flatten
-
+  , substitute
+  , substituteM
   -- * Certification
   , certificate
   , certificateWith
 
   -- * Properites
-  , progress
   , isOpen
-  , failure
+  , isFailure
   , isClosed
-
+  , isProgressing
   -- * Output
   , ppProofTree
   , ppProofTreeLeafs
@@ -25,30 +25,37 @@ module Tct.Core.Data.ProofTree
   ) where
 
 
-import           Control.Applicative       ((<$>), pure)
+
 import           Data.Foldable             as F (Foldable, foldMap, foldr, toList)
-import           Data.Traversable          as T (Traversable, traverse)
+
 
 import qualified Tct.Core.Common.Pretty    as PP
 import           Tct.Core.Data.Certificate (Certificate, timeLB, timeUB, unbounded)
 import           Tct.Core.Data.Types
 
-
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
 open = F.foldr (:) []
 
+-- | Substitute the open leaves of a proof tree according to the given function
+substituteM :: Monad m => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)
+substituteM s (Open l)             = s l
+substituteM _ (Failure r)          = return (Failure r)
+substituteM s (Success pn cf pts) = Success pn cf <$> mapM (substituteM s) pts
+
+substitute :: (l -> ProofTree k) -> ProofTree l -> ProofTree k
+substitute f  (Open l)           = f l
+substitute _ (Failure r)         = Failure r
+substitute f (Success pn cf pts) = Success pn cf (substitute f `fmap` pts)
+
 -- | Flattens a nested prooftree.
 flatten :: ProofTree (ProofTree l) -> ProofTree l
-flatten (Open pt)            = pt
-flatten Fail                 = Fail
-flatten (Success pn cns pts) = Success pn cns (flatten `fmap` pts)
-
+flatten = substitute id
 
 -- | Computes the 'Certificate' of 'ProofTree'.
 collectCertificate :: ProofTree Certificate -> Certificate
 collectCertificate (Open c)                     = c
-collectCertificate Fail                         = unbounded
+collectCertificate Failure{}                    = unbounded
 collectCertificate (Success _ certfn' subtrees) = certfn' (collectCertificate `fmap` subtrees)
 
 -- | Computes the 'Certificate' of a 'ProofTree'.
@@ -66,16 +73,17 @@ certificateWith :: ProofTree l -> Certificate -> Certificate
 certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 
 
--- | Checks if the 'ProofTree' contains a 'Progress' node.
-progress :: ProofTree l -> Bool
-progress Success {} = True
-progress _ = False
-
 -- | Checks if the 'ProofTree' contains a 'Failure' node.
-failure :: ProofTree l -> Bool
-failure Fail = True
-failure (Success _ _ pts) = any failure pts
-failure _ = False
+isFailure :: ProofTree l -> Bool
+isFailure Failure{}         = True
+isFailure (Success _ _ pts) = any isFailure pts
+isFailure _                 = False
+
+-- | Checks that the 'ProofTree' does not contain a 'Failure' node
+-- and not consist of a single 'Open' node
+isProgressing :: ProofTree l -> Bool
+isProgressing (Open _) = False
+isProgressing p = not (isFailure p)
 
 -- | Checks if there exists 'Open' nodes in the 'ProofTree'.
 isOpen :: ProofTree l -> Bool
@@ -89,17 +97,17 @@ isClosed = null . open
 
 instance Functor ProofTree where
   f `fmap` Open l             = Open (f l)
-  _ `fmap` Fail               = Fail
+  _ `fmap` (Failure r)        = Failure r
   f `fmap` Success pn cns pts = Success pn cns ((f `fmap`) `fmap` pts)
 
 instance Foldable ProofTree where
   f `foldMap` Open l          = f l
-  _ `foldMap` Fail            = mempty
+  _ `foldMap` Failure{}       = mempty
   f `foldMap` Success _ _ pts = (f `foldMap`) `foldMap` pts
 
 instance Traversable ProofTree where
   f `traverse` Open l  = Open <$> f l
-  _ `traverse` Fail = pure Fail
+  _ `traverse` Failure r = pure (Failure r)
   f `traverse` Success pn cfn pts = Success pn cfn <$> (f `traverse`) `traverse` pts
 
 instance Show (ProofTree l) where
@@ -125,7 +133,7 @@ ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.
 ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
   [ ppHeader pt is "Open"
   , PP.indent 4 (ppProb l) ]
-ppProofTree' is _ _ Fail = ppHeader Fail is "Failure"
+ppProofTree' is _ _ f@(Failure _) = ppHeader f is "Failure"
     
 ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) = PP.vcat
   [ ppHeader pt (i,is) "Success"
