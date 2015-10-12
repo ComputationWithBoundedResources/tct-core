@@ -33,7 +33,6 @@ module Tct.Core
   , bool
   , strat
   , string
-  , strat
   , some
   , withDomain
   , optional
