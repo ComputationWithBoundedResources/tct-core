@@ -19,6 +19,7 @@ module Tct.Core.Main
   , module M
   ) where
 
+-- MA: shouldn't here TctMode be exported?
 
 import qualified Config.Dyre                as Dyre (Params (..), defaultParams, wrapMain)
 import           Control.Applicative        ((<$>), (<*>), (<|>))
@@ -62,7 +63,7 @@ data TctConfig i = TctConfig
   { answerFormat  :: AnswerFormat
   , proofFormat   :: ProofFormat
   , recompile     :: Bool
-  , strategies    :: [StrategyDeclaration i i]
+  , strategies    :: [StrategyDeclaration i i] -- MA: I would have expected this as parameter of TctMode; why is input == output fixed?
   , defaultSolver :: Maybe (FilePath, [String]) }
 
 -- | Format of answer output.
@@ -155,6 +156,9 @@ tct3 conf = Dyre.wrapMain params conf
       ["-threaded", "-O","-fno-spec-constr-count", "-rtsopts", "-with-rtsopts=-N"]
 
 --- * Mode Application -----------------------------------------------------------------------------------------------
+
+-- MA: this reads strange, shouldn't it be something like runWith, i.e.
+-- hocaMode `runWith` defaultTctConfig { recompile = False }
 
 -- | Construct a customised Tct. Example usage:
 --

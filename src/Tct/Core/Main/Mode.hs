@@ -10,6 +10,9 @@ import Tct.Core.Main.Options
 import Tct.Core.Processor.Failing (failing)
 
 
+-- MA: modifyer => modifier
+-- MA: if TctConfig is restricted to i == o, why not TctMode?
+
 -- | 'TctMode' provides all infromation necesary to construct a Tct instance customised for a problem type.
 data TctMode i o opt = TctMode
   { modeId              :: String                                -- ^ id used for package name
@@ -24,6 +27,8 @@ data TctMode i o opt = TctMode
   , modeProof           :: opt -> Return (ProofTree o) -> IO ()  -- ^ Custom Proof. Printed after Answer.
   }
 
+
+-- MA: I would drop the arguments, and set modeId to default-string, and modeParser to undefined
 
 -- | A default mode. Minimum requirement @modId@ and @modeParser@.
 defaultMode :: (ProofData i, ProofData o) => String -> (FilePath -> IO (Either String i)) -> TctMode i o ()
