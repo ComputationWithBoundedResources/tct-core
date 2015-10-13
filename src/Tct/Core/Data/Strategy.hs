@@ -34,6 +34,7 @@ module Tct.Core.Data.Strategy
   -- ** Inspecting the Status
   , withState
   , withProblem
+  , withKvPair
   -- * Strategy evaluation
   , evaluate
   -- * Declaration
@@ -43,6 +44,7 @@ module Tct.Core.Data.Strategy
 
 
 import           Control.Applicative
+import qualified Data.Map                  as M (insert)
 import           Data.Maybe                (fromMaybe)
 import qualified Data.Traversable          as F (traverse)
 
@@ -291,4 +293,8 @@ withState = WithStatus
 -- | Specialised version of 'withState'.
 withProblem :: (i -> Strategy i o) -> Strategy i o
 withProblem g = WithStatus (g . currentProblem)
+
+-- | Sets a key-value pair for a strategy.
+withKvPair :: (String, [String]) -> Strategy i o -> Strategy i o
+withKvPair (k,v) = WithState $ \st -> st { kvPairs = M.insert k v (kvPairs st) }
 
