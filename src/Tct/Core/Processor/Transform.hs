@@ -29,10 +29,9 @@ instance (ProofData i, ProofData o) => Processor (Transform i o) where
   type In (Transform i o)          = i
   type Out (Transform i o)         = o
 
-  execute (Transform msg t) prob =
-    res `seq` case res of { Left err -> abortWith err;
-                            Right new -> succeedWith1 (TransformProof msg prob new) fromId (Open new)}
-    where res = t prob
+  execute (Transform msg t) prob = case t prob of 
+    Left err  -> abortWith err;
+    Right new -> succeedWith1 (TransformProof msg prob new) fromId new
 
 -- | The /Transform/ strategy.
 transform :: (ProofData i, ProofData o)
