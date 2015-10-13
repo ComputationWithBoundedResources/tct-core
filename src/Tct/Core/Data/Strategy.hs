@@ -70,10 +70,7 @@ reltimeToTimeout t = do
 evaluate1 :: Strategy i o -> i -> TctM (ProofTree o)
 evaluate1 (Apply p)          prob = apply p prob
 evaluate1 IdStrategy         prob = return (Open prob)
-evaluate1 Abort              prob = return (Failure Aborted)
--- evaluate1 (Force s)          prob = enforce <$> evaluate1 s prob
---   where enforce (Open _) = Failure Aborted
---         enforece pt      = pt
+evaluate1 Abort              _    = return (Failure Aborted)
 evaluate1 (Cond g sb st se)  prob = evaluate1 sb prob >>= continue where
   continue pt | g pt         = evaluate st pt
               | otherwise    = evaluate1 se prob
@@ -104,7 +101,6 @@ evaluate (Par s)    t = evaluatePar s t
 evaluate s          t = evaluateSeq s t
 
 evaluateSeq s = substituteM (evaluate1 s)
-
 evaluatePar s t = spawnTree t >>= collect where
   spawnTree = traverse (async . evaluate1 s)
   collect = substituteM TctM.wait
