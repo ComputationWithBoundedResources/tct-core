@@ -91,8 +91,8 @@ evaluate1 (Race s1 s2)       prob =
   raceWith (not . isFailure) const (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
   uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
-    pick r1 r2 | cmp r1 r2 == GT = r2
-               | otherwise = r1
+    pick r1 r2 | cmp r2 r1 == GT = r2
+               | otherwise       = r1
     to st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 evaluate1 (Timeout t s) prob = do
   timeout <- reltimeToTimeout t
