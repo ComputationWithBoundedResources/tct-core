@@ -26,14 +26,14 @@ apply p i = toProofTree <$> (execute p i `catchError` handler)
     toProofTree (Progress pn cf ts) = Success (ProofNode p i pn) cf ts
     handler = return . NoProgress . IOError
 
-succeedWith :: Processor p => ProofObject p -> CertificateFn p -> (Forking p (ProofTree (Out p))) -> TctM (Return p)
-succeedWith pn cfn ts = return (Progress pn cfn ts)
+succeedWith :: Processor p => ProofObject p -> CertificateFn p -> Forking p (Out p) -> TctM (Return p)
+succeedWith pn cfn ts = return $ Progress pn cfn (Open <$> ts)
 
 succeedWith0 :: (Processor p, Forking p ~ F.Judgement) => ProofObject p -> CertificateFn p -> TctM (Return p)
 succeedWith0 pn cfn = return (Progress pn cfn F.Judgement)
 
-succeedWith1 :: (Processor p, Forking p ~ F.Id) => ProofObject p -> CertificateFn p -> ProofTree (Out p) -> TctM (Return p)
-succeedWith1 pn cfn p = return (Progress pn cfn (F.toId p))
+succeedWith1 :: (Processor p, Forking p ~ F.Id) => ProofObject p -> CertificateFn p -> Out p -> TctM (Return p)
+succeedWith1 pn cfn p = return $ Progress pn cfn (F.toId $ Open p)
 
 abortWith :: (Show r, PP.Pretty r) => r -> TctM (Return p)
 abortWith = return . NoProgress . SomeReason
