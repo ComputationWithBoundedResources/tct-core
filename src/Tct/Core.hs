@@ -54,7 +54,7 @@ import Tct.Core.Data.Strategy
 
 -- | Adds a list of 'StrategyDeclaraton' to the existing ones.
 addStrategies :: TctConfig i -> [StrategyDeclaration i i] -> TctConfig i
-addStrategies cfg sds = cfg { strategies = sds }
+addStrategies cfg sds = cfg { strategies = (strategies cfg) ++ sds }
 
 -- | Sets the default Strategy.
 withDefaultStrategy :: TctConfig i -> Strategy i i -> TctConfig i
