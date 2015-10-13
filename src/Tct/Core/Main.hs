@@ -19,28 +19,26 @@ module Tct.Core.Main
 
 -- MA: shouldn't here TctMode be exported?
 
-import Data.Monoid (mconcat)
-import qualified Data.Map as M
-import           Control.Applicative        ((<$>), (<*>), (<|>))
-import           Control.Monad              (void)
-import           Control.Monad.Reader       (runReaderT)
-import           Data.Maybe                 (fromMaybe)
-
-import qualified Options.Applicative        as O
-import           System.Exit                (exitFailure, exitSuccess)
-import           System.IO                  (hPrint, stderr, hPutStrLn, hClose)
-import           System.IO.Temp             (withTempDirectory, withSystemTempFile)
-import           System.Process             (system)
-import qualified System.Time                as Time
-
-import           Tct.Core.Data              as M (ProofTree)
-import           Tct.Core.Main.Options      as M
+import           Control.Applicative    ((<$>), (<*>), (<|>))
+import           Control.Monad          (void)
+import           Control.Monad.Reader   (runReaderT)
+import qualified Data.Map               as M
+import           Data.Maybe             (fromMaybe)
+import           Data.Monoid            (mconcat)
+import qualified Options.Applicative    as O
+import           System.Exit            (exitFailure, exitSuccess)
+import           System.IO              (hClose, hPrint, hPutStrLn, stderr)
+import           System.IO.Temp         (withSystemTempFile, withTempDirectory)
+import           System.Process         (system)
+import qualified System.Time            as Time
 
 import           Tct.Core.Common.Error
-import qualified Tct.Core.Common.Pretty     as PP
-import           Tct.Core.Data hiding ((<|>))
-import           Tct.Core.Declarations      (declarations)
-import           Tct.Core.Parse             (strategyFromString)
+import qualified Tct.Core.Common.Pretty as PP
+import           Tct.Core.Data          as M (ProofTree)
+import           Tct.Core.Data
+import           Tct.Core.Declarations  (declarations)
+import           Tct.Core.Main.Options  as M
+import           Tct.Core.Parse         (strategyFromString)
 
 
 synopsis :: String

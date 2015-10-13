@@ -2,7 +2,7 @@
 module Tct.Core.Data.Types where
 
 
-import Control.Applicative
+import           Control.Applicative
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
@@ -25,7 +25,6 @@ import           Tct.Core.Data.Forks           (Id (..))
 
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
 
--- | Provides Tct runtime options. The State of TcTM monad.
 -- | Provides /TcT/ runtime options. The State of 'Tct.Core.Data.TctM.TcTM' monad.
 -- The state can be (locally) updated using 'Tct.Core.Data.TctM.setState'.
 data TctROState = TctROState
@@ -34,7 +33,6 @@ data TctROState = TctROState
   , tempDirectory :: FilePath              -- ^ The temporary directory. Should be set in the start state.
   , kvPairs       :: M.Map String [String] -- ^ Key-Value pairs. This field is application dependent.
   }
-
 
 -- | The Tct monad.
 newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
@@ -99,7 +97,6 @@ class (Show p, ProofData (ProofObject p), ProofData (In p), Fork (Forking p)) =>
 
 -- Strategy ----------------------------------------------------------------------------------------------------------
 
-
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
@@ -114,12 +111,13 @@ data Strategy i o where
   Better      :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
   -- | Misc
   Timeout     :: RelTimeout -> Strategy i o -> Strategy i o
-  Wait        :: RelTimeout -> Strategy i o -> Strategy i o 
+  Wait        :: RelTimeout -> Strategy i o -> Strategy i o
   WithStatus  :: (TctStatus i -> Strategy i o) -> Strategy i o
   WithState   :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable
 
 data RelTimeout = TimeoutIn Int | TimeoutUntil Int
+
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------
 

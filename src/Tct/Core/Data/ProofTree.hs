@@ -127,11 +127,11 @@ ppProofNode (ProofNode p prob po) = PP.vcat
   , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
   where ind = PP.indent 2
 
-ppNodeShort :: (PP.Pretty (ProofObject a), Show a) => ProofNode a -> PP.Doc
-ppNodeShort (ProofNode p _ po) = PP.vcat
-  [ PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
-  , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
-  where ind = PP.indent 2
+-- ppNodeShort :: (PP.Pretty (ProofObject a), Show a) => ProofNode a -> PP.Doc
+-- ppNodeShort (ProofNode p _ po) = PP.vcat
+--   [ PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
+--   , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
+--   where ind = PP.indent 2
 
 ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
 ppProofTree' is ppProb _ pt@(Open l) = PP.vcat

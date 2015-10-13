@@ -7,26 +7,28 @@ module Tct.Core.Data.Strategy
   , abort
   , processor
   , ite
-  , (>>>)
-  , (<|>)
+  , (.>>>)
+  , (.<|>)
   , try
   , force
   , exhaustively , es, te
   , exhaustivelyN
   , chain
   , chainWith
-  , alternative    
+  , alternative
   , when
   , timeoutIn
   , timeoutUntil
+  , timeoutRelative
   , wait
   , waitUntil
   -- ** Parallel application
   , inParallel
-  , (>||>)
-  , (<||>)
-  , (<?>)
+  , (.>||>)
+  , (.<||>)
+  , (.<?>)
   , fastest
+  , fastestN
   , best
   -- ** Inspecting the Status
   , withState
@@ -38,18 +40,16 @@ module Tct.Core.Data.Strategy
   , strategy
   ) where
 
--- import Debug.Trace
 
+import           Control.Applicative
+import           Data.Maybe              (fromMaybe)
+import qualified Data.Traversable        as F (traverse)
 
-import Control.Applicative hiding ((<|>))
-import qualified Data.Traversable as F (traverse)
-
-import Data.Maybe (fromMaybe)
 import qualified Tct.Core.Common.Pretty  as PP
 import           Tct.Core.Data.Processor
 import           Tct.Core.Data.ProofTree
-import           Tct.Core.Data.TctM hiding (wait)
-import qualified Tct.Core.Data.TctM as TctM
+import           Tct.Core.Data.TctM      hiding (wait)
+import qualified Tct.Core.Data.TctM      as TctM
 import           Tct.Core.Data.Types
 
 
@@ -60,32 +60,35 @@ instance PP.Pretty (Strategy i o) where
   pretty _ = PP.text "someStrategy"
 
 reltimeToTimeout :: RelTimeout -> TctM Int
-reltimeToTimeout t = do 
+reltimeToTimeout t = do
   running <- runningTime `fmap` askStatus undefined
   let to = max 0 (case t of { TimeoutIn secs -> secs; TimeoutUntil secs -> secs - running })
   remains <- (fromMaybe to . remainingTime) `fmap` askStatus undefined
   return (max 0 (min to (remains - 1)))
+
+
+
 
 -- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
 evaluate1 :: Strategy i o -> i -> TctM (ProofTree o)
 evaluate1 (Apply p)          prob = apply p prob
 evaluate1 IdStrategy         prob = return (Open prob)
-evaluate1 Abort              prob = return (Failure Aborted)
+evaluate1 Abort              _    = return (Failure Aborted)
 -- evaluate1 (Force s)          prob = enforce <$> evaluate1 s prob
 --   where enforce (Open _) = Failure Aborted
 --         enforece pt      = pt
 evaluate1 (Cond g sb st se)  prob = evaluate1 sb prob >>= continue where
   continue pt | g pt         = evaluate st pt
               | otherwise    = evaluate1 se prob
--- MA:TODO: check that Race/Better/Par interacts appropriate with timeout, see old <?> processor
 evaluate1 (Par s)            prob = evaluate1 s prob
 evaluate1 (Race s1 s2)       prob =
   raceWith (not . isFailure) const (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
-  uncurry pick <$> concurrently (evaluate1 s1 prob) (evaluate1 s2 prob) where
+  uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
     pick r1 r2 | cmp r1 r2 == GT = r2
                | otherwise = r1
+    to st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 evaluate1 (Timeout t s) prob = do
   timeout <- reltimeToTimeout t
   fromMaybe (Failure TimedOut) <$> timed timeout (evaluate1 s prob)
@@ -110,6 +113,7 @@ evaluatePar s t = spawnTree t >>= collect where
   spawnTree = F.traverse (async . evaluate1 s)
   collect = substituteM TctM.wait
 
+
 -- * Strategy Declaration ---------------------------------------------------------------------------------------------
 
 -- |  Constructs a strategy declaration. For example: Assume that @st :: Int -> Maybe Int -> Strategy prob@.
@@ -129,37 +133,37 @@ strategy n = declare n []
 
 -- * Strategies
 
-infixr 5 >>>, >||>
-infixr 6 <|>, <||>
+infixr 5 .>>>, .>||>
+infixr 6 .<|>, .<||>
 
-identity :: Strategy i i 
+identity :: Strategy i i
 identity = IdStrategy
 
 abort :: Strategy i o
 abort = Abort
 
--- | lift a processor to a strategy 
+-- | lift a processor to a strategy
 processor :: (Processor p) => p -> Strategy (In p) (Out p)
 processor = Apply
 
--- | conditional 
--- | prop> ite test s1 s2 == test >>> s1, if we have a progress after applying test
+-- | conditional
+-- | prop> ite test s1 s2 == test .>>> s1, if we have a progress after applying test
 -- | prop> ite test s1 s2 == s2, otherwise
 ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
-ite = Cond (not . isFailure) 
+ite = Cond (not . isFailure)
 
 -- | sequencing
-(>>>) :: Strategy i q -> Strategy q o -> Strategy i o
-s1 >>> s2 = ite s1 s2 abort
+(.>>>) :: Strategy i q -> Strategy q o -> Strategy i o
+s1 .>>> s2 = ite s1 s2 abort
 
 
 -- | choice
-(<|>) :: Strategy i o -> Strategy i o -> Strategy i o
-s1 <|> s2 = ite s1 identity s2
+(.<|>) :: Strategy i o -> Strategy i o -> Strategy i o
+s1 .<|> s2 = ite s1 identity s2
 
 -- | @try s@ behaves like @s@, except in case of failure of @s@, @try s@ behaves like @identity@
 try :: Strategy i i -> Strategy i i
-try s = s <|> identity
+try s = s .<|> identity
 
 force :: Strategy i o -> Strategy i o
 force s = Cond g s identity abort where
@@ -169,12 +173,12 @@ force s = Cond g s identity abort where
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
 exhaustively :: Strategy i i -> Strategy i i
-exhaustively s =  force s >>> try (exhaustively s)
+exhaustively s =  force s .>>> try (exhaustively s)
 
 -- | Like 'exhaustively'. But maximal @n@ times.
 exhaustivelyN :: Int -> Strategy i i -> Strategy i i
 exhaustivelyN n s
-  | n > 1     = force s >>> try (exhaustivelyN (n-1) s)
+  | n > 1     = force s .>>> try (exhaustivelyN (n-1) s)
   | n == 1    = s
   | otherwise = identity
 
@@ -186,27 +190,27 @@ es = exhaustively
 te :: Strategy i i -> Strategy i i
 te = try . exhaustively
 
--- | List version of ('>>>').
+-- | List version of ('.>>>').
 --
 -- prop> chain [] = identity
 chain :: ProofData i => [Strategy i i] -> Strategy i i
 chain [] = identity
-chain ss = foldr1 (>>>) ss
+chain ss = foldr1 (.>>>) ss
 
 -- | Like 'chain' but additionally executes the provided strategy after each strategy of the list.
 --
 -- > chainWith [] (try empty)      == try empty
--- > chainWith [s1,s2] (try empty) == s1 >>> try empty >>> s2 >>> try empty
+-- > chainWith [s1,s2] (try empty) == s1 .>>> try empty .>>> s2 .>>> try empty
 chainWith :: ProofData i => Strategy i i -> [Strategy i i] -> Strategy i i
 chainWith s [] = s
-chainWith s ss = foldr1 (\t ts -> t >>> s >>> ts) ss >>> s
+chainWith s ss = foldr1 (\t ts -> t .>>> s .>>> ts) ss .>>> s
 
--- | List version of ('<|>').
+-- | List version of ('.<|>').
 --
 -- prop> alternative [] = failing
 alternative :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
 alternative [] = abort
-alternative ss = foldr1 (<|>) ss
+alternative ss = foldr1 (.<|>) ss
 
 
 -- | @'when' b st@ applies @st@ if @b@ is true.
@@ -218,6 +222,18 @@ timeoutIn secs = Timeout (TimeoutIn secs)
 timeoutUntil secs = Timeout (TimeoutUntil secs)
 
 
+-- | Sets timeout relative to the given percentage.
+-- Useful together with total timeout.
+--
+-- > timeoutRelative (Just 60) 50 st = timeoutIn 30 st
+-- > timeoutRelative Nothing   50 st = st
+timeoutRelative :: (ProofData i, ProofData o) => Maybe Int -> Int -> Strategy i o -> Strategy i o
+timeoutRelative mtotal percent st = maybe st timeout mtotal
+  where timeout total = timeoutIn (floor $ (fromIntegral (total*percent :: Int) / 100 :: Double)) st
+
+
+
+
 wait,waitUntil :: Int -> Strategy i o -> Strategy i o
 wait secs = Wait (TimeoutIn secs)
 waitUntil secs = Wait (TimeoutUntil secs)
@@ -227,38 +243,38 @@ inParallel :: Strategy i o -> Strategy i o
 inParallel = Par
 
 -- | parallel sequencing
-(>||>) :: Strategy i q -> Strategy q o -> Strategy i o
-s1 >||> s2 = ite s1 (inParallel s2) abort
+(.>||>) :: Strategy i q -> Strategy q o -> Strategy i o
+s1 .>||> s2 = ite s1 (inParallel s2) abort
 
 -- | parallel choice
-(<||>) :: Strategy i o -> Strategy i o -> Strategy i o
-(<||>) = Race
+(.<||>) :: Strategy i o -> Strategy i o -> Strategy i o
+(.<||>) = Race
 
 
 -- | List version of ('<||>').
 fastest :: (ProofData i, Show o) => [Strategy i o] -> Strategy i o
 fastest [] = abort
-fastest ss = foldr1 (<||>) ss
+fastest ss = foldr1 (.<||>) ss
 
 -- | Like 'fastest'. But only runs @n@ strategies in parallel.
 fastestN :: (ProofData i, Show o) => Int -> [Strategy i o] -> Strategy i o
 fastestN _ [] = abort
-fastestN n ss = fastest ss1 <|> fastestN n ss2
+fastestN n ss = fastest ss1 .<|> fastestN n ss2
   where (ss1,ss2) = splitAt n ss
 
 -- | List version of ('<?>').
 best :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -> [Strategy i o] -> Strategy i o
 best _   [] = abort
-best cmp ss = foldr1 (cmp <?>) ss
+best cmp ss = foldr1 (cmp .<?>) ss
 
 -- MA:TODO
--- | @('<?>') cmp s1 s2@ applies @ s1@ and @ s2@ in parallel, returning 
+-- | @('<?>') cmp s1 s2@ applies @ s1@ and @ s2@ in parallel, returning
 -- the (successful) result @r1@ of strategy @s1@ iff @comp r1 r2 == GT@,
--- otherwise @r2@ is returned. An example for @comp@ is 
--- 
+-- otherwise @r2@ is returned. An example for @comp@ is
+--
 -- > comp pt1 pt2 = flip compare (timeUB $ certificate pt1) (timeUB $ certificate pt2)
-(<?>) :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
-(<?>) = Better
+(.<?>) :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
+(.<?>) = Better
 
 -- -- | Compares time upperbounds. Useful with 'best'.
 -- cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering

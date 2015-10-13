@@ -10,7 +10,6 @@ module Tct.Core.Data.Declaration
   -- * StrategyDeclaration
   , StrategyDeclaration
 
-
   -- * Arguments
   , Argument (..)
   , ArgFlag (..)

@@ -12,16 +12,17 @@ module Tct.Core.Data.Processor
   , succeedWith0
   ) where
 
-import Control.Applicative
-import           Tct.Core.Data.Types
-import           Control.Monad.Error     (catchError)
-import qualified Tct.Core.Data.Forks as F
+import           Control.Applicative
+import           Control.Monad.Error    (catchError)
+
 import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Data.Forks    as F
+import           Tct.Core.Data.Types
 
 apply :: Processor p => p -> In p -> TctM (ProofTree (Out p))
-apply p i = toProofTree <$> (execute p i `catchError` handler) 
-  where 
-    toProofTree (NoProgress r) = Failure r
+apply p i = toProofTree <$> (execute p i `catchError` handler)
+  where
+    toProofTree (NoProgress r)      = Failure r
     toProofTree (Progress pn cf ts) = Success (ProofNode p i pn) cf ts
     handler = return . NoProgress . IOError
 
@@ -33,7 +34,7 @@ succeedWith0 pn cfn = return (Progress pn cfn F.Judgement)
 
 succeedWith1 :: (Processor p, Forking p ~ F.Id) => ProofObject p -> CertificateFn p -> ProofTree (Out p) -> TctM (Return p)
 succeedWith1 pn cfn p = return (Progress pn cfn (F.toId p))
-  
+
 abortWith :: (Show r, PP.Pretty r) => r -> TctM (Return p)
 abortWith = return . NoProgress . SomeReason
 

@@ -17,8 +17,6 @@ import Data.Foldable
 import Data.Traversable
 
 
-
-
 -- | 'Judgement' representst a node with no successor.
 data Judgement a = Judgement deriving (Foldable,Functor,Traversable)
 

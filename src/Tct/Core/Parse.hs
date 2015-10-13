@@ -52,8 +52,8 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
     -- MA:TODO: todo, add more
     table = [ [unary "try" S.try , unary "force" S.force ]
             , [unary "es"  S.es ]
-            , [binary "<|>" (S.<|>) PE.AssocRight,   binary "<||>" (S.<||>) PE.AssocRight ]
-            , [binary ">>>" (S.>>>) PE.AssocRight, binary ">||>" (S.>||>) PE.AssocRight ] ]
+            , [binary "<|>" (S..<|>) PE.AssocRight,   binary "<||>" (S..<||>) PE.AssocRight ]
+            , [binary ">>>" (S..>>>) PE.AssocRight, binary ">||>" (S..>||>) PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
     unary name fun = PE.Prefix (do{ reserved name; return fun })
 

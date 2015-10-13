@@ -27,6 +27,7 @@ module Tct.Core.Data.Certificate
 
 
 import           Data.Monoid
+
 import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Xml      as Xml
