@@ -13,8 +13,10 @@ module Tct.Core.Data.Forks
 
 
 import Control.Applicative (liftA2, (<$>))
-import Data.Foldable       as F (Foldable (..))
-import Data.Traversable    as T (Traversable (..))
+import Data.Foldable
+import Data.Traversable
+
+
 
 
 -- | 'Judgement' representst a node with no successor.

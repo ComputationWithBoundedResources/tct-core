@@ -37,6 +37,7 @@ module Tct.Core.Interactive
   ) where
 
 
+import Control.Applicative ((<$>))
 import           Control.Monad
 import qualified Control.Monad.State.Strict as S
 import           Data.Either                (rights)
@@ -48,7 +49,7 @@ import           System.IO.Unsafe
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml
-import           Tct.Core.Data              hiding (proof)
+import           Tct.Core.Data              hiding (proof, apply)
 import           Tct.Core.Main
 
 
@@ -75,42 +76,58 @@ selectAllLeafs = fmap (either Right Right)
 removeSelection :: ProofTree (Selected l) -> ProofTree l
 removeSelection = fmap (either id id)
 
--- MS: The notion of progress in the interactive node is a bit different from the default semantics.
--- Given for example @try poly@, we have progress when one of the selected leafs successfully applies the strategy.
-evaluateSelected :: ProofData i => Strategy i i -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected i)))
-evaluateSelected _ pt@(Open (Left _))           = return (False, Continue pt)
-evaluateSelected s (Open (Right p))             = do
-  ret <- evaluate s p
-  if isProgressing ret
-    then return (True,  (fmap . fmap) Right ret)
-    else return (False, (fmap . fmap) Right ret)
-evaluateSelected s (NoProgress n subtree)       = fmap (liftNoProgress n) `fmap` evaluateSelected s subtree
-evaluateSelected s (Progress n certfn subtrees) = do
-  f <- evaluateSelected s `F.mapM` subtrees
-  let
-    bs = fmap fst f
-    ns = fmap snd f
-  return (or (F.toList bs), liftProgress n certfn ns)
+-- evaluateSelected :: ProofData i => Strategy i i -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected i)))
+-- evaluateSelected _ pt@(Open (Left _))           = return (False, Continue pt)
+-- evaluateSelected s (Open (Right p))             = do
+--   ret <- evaluate s p
+--   if isProgressing ret
+--     then return (True,  (fmap . fmap) Right ret)
+--     else return (False, (fmap . fmap) Right ret)
+-- evaluateSelected s (NoProgress n subtree)       = fmap (liftNoProgress n) `fmap` evaluateSelected s subtree
+-- evaluateSelected s (Progress n certfn subtrees) = do
+--   f <- evaluateSelected s `F.mapM` subtrees
+--   let
+--     bs = fmap fst f
+--     ns = fmap snd f
+--   return (or (F.toList bs), liftProgress n certfn ns)
 
 -- MS: Strategies with (possible) different input output type have to be applied to all problems.
-evaluateAll :: ProofData o => Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))
-evaluateAll s (Open (Left p))           = do
-  ret <- evaluate s p
-  if isProgressing ret
-    then return (True,  (fmap . fmap) Left ret)
-    else return (False, (fmap . fmap) Left ret)
-evaluateAll s (Open (Right p))             = do
-  ret <- evaluate s p
-  if isProgressing ret
-    then return (True,  (fmap . fmap) Right ret)
-    else return (False, (fmap . fmap) Right ret)
-evaluateAll s (NoProgress n subtree)       = fmap (liftNoProgress n) `fmap` evaluateAll s subtree
-evaluateAll s (Progress n certfn subtrees) = do
-  f <- evaluateAll s `F.mapM` subtrees
-  let
-    bs = fmap fst f
-    ns = fmap snd f
-  return (or (F.toList bs), liftProgress n certfn ns)
+-- evaluateAll :: ProofData o => Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))
+-- evaluateAll s (Open (Left p))           = do
+--   ret <- evaluate s p
+--   if isProgressing ret
+--     then return (True,  (fmap . fmap) Left ret)
+--     else return (False, (fmap . fmap) Left ret)
+-- evaluateAll s (Open (Right p))             = do
+--   ret <- evaluate s p
+--   if isProgressing ret
+--     then return (True,  (fmap . fmap) Right ret)
+--     else return (False, (fmap . fmap) Right ret)
+-- evaluateAll s (NoProgress n subtree)       = fmap (liftNoProgress n) `fmap` evaluateAll s subtree
+-- evaluateAll s (Progress n certfn subtrees) = do
+--   f <- evaluateAll s `F.mapM` subtrees
+--   let
+--     bs = fmap fst f
+--     ns = fmap snd f
+--   return (or (F.toList bs), liftProgress n certfn ns)
+
+-- MS:TODO check if this is still true, if so adapt
+-- MS: The notion of progress in the interactive node is a bit different from the default semantics
+-- Given for example @try poly@, we have progress when one of the selected leafs successfully applies the strategy.
+
+-- MS: Strategies with (possible) different input output type have to be applied to all problems.
+evaluateAll :: ProofData o => Strategy i o -> ProofTree (Selected i) -> TctM (ProofTree (Selected o))
+evaluateAll s (Open (Left p))             = fmap Left `fmap` evaluate s (Open p)
+evaluateAll s (Open (Right p))            = fmap Right `fmap` evaluate s (Open p)
+evaluateAll _ (Failure r)                 = return (Failure r)
+evaluateAll s (Success n certfn subtrees) = Success n certfn <$> (evaluateAll s `F.mapM` subtrees)
+
+-- MA:TODO please check
+evaluateSelected :: ProofData i => Strategy i i -> ProofTree (Selected i) -> TctM (ProofTree (Selected i))
+evaluateSelected _ pt@(Open (Left _))          = return pt
+evaluateSelected s (Open (Right p))            = fmap Right `fmap` evaluate s (Open p)
+evaluateSelected _ (Failure r)                 = return (Failure r)
+evaluateSelected s (Success n certfn subtrees) = Success n certfn <$> (evaluateSelected s `F.mapM` subtrees)
 
 
 --- * state ----------------------------------------------------------------------------------------------------------
@@ -209,12 +226,15 @@ select is = onSt $ \(St l) -> putSt (St (selectLeafs is l)) >> printState
 selectAll :: IO ()
 selectAll = onSt $ \(St l) -> putSt (St (selectAllLeafs l)) >> printState
 
-
-apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))) -> Strategy i o -> IO ()
+-- MS: TODO check; at some point it worked why do we have undefined here
+-- apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))) -> Strategy i o -> IO ()
+apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (ProofTree (Selected o))) -> Strategy i o -> IO ()
 apply' eval str = onSt $ \st -> do
-  (b,ret) <- run undefined (eval str $ unSt st)
-  if b && isContinuing ret
-    then putSt (St (fromReturn ret)) >> printState >> print "progressed :)"
+  ret <- run undefined (eval str $ unSt st)
+  -- (b,ret) <- run undefined (eval str $ unSt st)
+  -- if b -- && hasProgress ret
+  if False 
+    then putSt (St ret) >> printState >> print "progressed :)"
     else print "no progress :/"
 
 -- | Applies a strategy on all sub-problems.

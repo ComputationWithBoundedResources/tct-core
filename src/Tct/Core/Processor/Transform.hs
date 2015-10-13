@@ -26,20 +26,20 @@ data TransformProof i o
 
 instance (ProofData i, ProofData o) => Processor (Transform i o) where
   type ProofObject (Transform i o) = TransformProof i o
-  type I (Transform i o)           = i
-  type O (Transform i o)           = o
+  type In (Transform i o)          = i
+  type Out (Transform i o)         = o
 
-  solve p@(Transform msg t) prob = t prob `seq` return . resultToTree' p prob $ case t prob of
-    Left  err   -> Fail $ TransformFail err
-    Right nprob -> Success (toId nprob) (TransformProof msg prob nprob) fromId
-
+  execute (Transform msg t) prob =
+    res `seq` case res of { Left err -> abortWith err;
+                            Right new -> succeedWith1 (TransformProof msg prob new) fromId (Open new)}
+    where res = t prob
 
 -- | The /Transform/ strategy.
 transform :: (ProofData i, ProofData o)
   => String                 -- ^ Description of the transformation; used in the proof output.
   -> (i -> Either String o) -- ^ A (possible) failing transformation.
   -> Strategy i o
-transform msg = Proc . Transform msg
+transform msg = processor . Transform msg
 
 -- | >transform' = transform ""
 transform' :: (ProofData i, ProofData o) => (i -> Either String o) -> Strategy i o

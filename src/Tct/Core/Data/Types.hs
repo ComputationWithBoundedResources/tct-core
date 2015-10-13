@@ -1,9 +1,8 @@
-{-# OPTIONS_HADDOCK not-home, hide #-}
 -- | This module defines the most important types.
 module Tct.Core.Data.Types where
 
 
-import           Control.Applicative
+import Control.Applicative
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
@@ -25,13 +24,8 @@ import           Tct.Core.Data.Forks           (Id (..))
 
 
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
--- MS: the state is fixed; sometimes it would be useful to have application dependent states; but this is difficult as
--- we would have to initialise application dependent states when performing transformations (ie using >=> combinator)
 
--- | The /TcT/ monad.
-newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
-  deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
-
+-- | Provides Tct runtime options. The State of TcTM monad.
 -- | Provides /TcT/ runtime options. The State of 'Tct.Core.Data.TctM.TcTM' monad.
 -- The state can be (locally) updated using 'Tct.Core.Data.TctM.setState'.
 data TctROState = TctROState
@@ -41,8 +35,12 @@ data TctROState = TctROState
   , kvPairs       :: M.Map String [String] -- ^ Key-Value pairs. This field is application dependent.
   }
 
+
+-- | The Tct monad.
+newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
+  deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
+
 -- | Defines the (read-only) runtime status of 'TctROState'.
--- Is obtained via 'Tct.Core.Data.TctM.askStatus'.
 data TctStatus prob = TctStatus
   { currentProblem :: prob      -- ^ Current Problem.
   , runningTime    :: Int       -- ^ Runing time in seconds.
@@ -52,25 +50,24 @@ data TctStatus prob = TctStatus
 
 --- * Proof Trees ----------------------------------------------------------------------------------------------------
 
+-- | Reason for failure of a 'Processor'
+data Reason where
+  IOError    :: IOError -> Reason
+  Aborted    :: Reason
+  TimedOut   :: Reason
+  SomeReason :: (Show r, PP.Pretty r) => r -> Reason
+
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
-  { processor :: p              -- ^ the processor
-  , problem   :: I p            -- ^ the input problem
-  , proof     :: ProofObject p  -- ^ the proof
-  }
+  { appliedProcessor :: p
+  , problem          :: In p
+  , proof            :: ProofObject p }
 
 -- | A 'ProofTree' is constructed by applying a 'Tct.Core.Strategy' to a problem.
--- During evaluation
---
--- * 'Open' nodes store the open (sub-)problems,
--- * 'NoProgress' nodes result from failing 'Processor' applications ('Fail'), and
--- * 'Progress' nodes result from successfull 'Processor' application ('Success').
---
--- The type of the proof tree depends on the open nodes. A prooftree wihtout open nodes can be casted to any type.
-data ProofTree l where
-  Open       :: l -> ProofTree l
-  NoProgress :: Processor p => ProofNode p -> ProofTree l -> ProofTree l
-  Progress   :: Processor p => ProofNode p -> CertificateFn p -> Forking p (ProofTree l) -> ProofTree l
+data ProofTree o where
+  Open     :: o -> ProofTree o
+  Success  :: Processor p => ProofNode p -> CertificateFn p -> Forking p (ProofTree o) -> ProofTree o
+  Failure  :: Reason -> ProofTree o
 
 
 --- * Processor  -----------------------------------------------------------------------------------------------------
@@ -85,76 +82,44 @@ type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
--- | The result of applying a @'Processor' p@ to a problem.
-data Result p
-  = Fail
-    { proofData :: ProofObject p }
-  | Success
-    { subProblems   :: Forking p (O p)
-    , proofData     :: ProofObject p
-    , certificateFn :: CertificateFn p }
-
--- | 'Return' specifies if the evaluation of a strategy is aborted or continued.
--- See "Combinators" for a detailed description.
---
--- The 'Halt' constructor stores a closed prooftree which is only used for output. As 'Halt' does not depend on any
--- type 'Return' can be casted to any type  in this case.
-data Return l where
-  Continue :: { fromReturn :: l } -> Return l
-  Abort    :: { fromReturn :: l } -> Return l
-  Halt     :: ProofTree ProofBox -> Return l
-
--- | Existential type for ProofData.
-data ProofBox where
-  ProofBox :: ProofData l => l -> ProofBox
-
-instance PP.Pretty ProofBox where
-  pretty (ProofBox p) = PP.pretty p
-
-instance Functor Return where
-  f `fmap` Continue l = Continue (f l)
-  f `fmap` Abort l    = Abort (f l)
-  _ `fmap` Halt pt    = Halt pt
-
-instance Show l => Show (Return l) where
-  show (Continue l) = "Continue: " ++ show l
-  show (Abort l)    = "Abort " ++ show l
-  show (Halt _)     = "Halt "
+data Return p =
+  NoProgress Reason
+  | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (Out p)))
 
 -- | Everything that is necessary for defining a processor.
-class (Show p, ProofData (ProofObject p), ProofData (I p), Fork (Forking p)) => Processor p where
-  type ProofObject p :: *
-  type I p           :: *
-  type O p           :: *
-  type Forking p     :: * -> *
-  solve              :: p -> I p -> TctM (Return (ProofTree (O p)))
+class (Show p, ProofData (ProofObject p), ProofData (In p), Fork (Forking p)) => Processor p where
+  type ProofObject p :: *                                           -- ^ The type of the proof.
+  type In p          :: *                                           -- ^ The type of the input problem.
+  type Out p         :: *                                           -- ^ The type of the output problem.
+  type Forking p     :: * -> *                                      -- ^ The type of the (children) collection.
+  execute            :: p -> In p -> TctM (Return p)
 
   type Forking p     =  Id
 
 
 -- Strategy ----------------------------------------------------------------------------------------------------------
 
+
 -- | A 'Strategy' composes instances of 'Processor' and specifies in which order they are applied.
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
-  Proc       :: (Processor p) => p -> Strategy (I p) (O p)
-
-  Trans      :: ProofData p => Strategy i p -> Strategy p o -> Strategy i o
-
-  Then       :: Strategy i i -> Strategy i i -> Strategy i i
-  ThenPar    :: Strategy i i -> Strategy i i -> Strategy i i
-
-
-  Alt        :: Strategy i o -> Strategy i o -> Strategy i o
-  OrFaster   :: Strategy i o -> Strategy i o -> Strategy i o
-  OrBetter   :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
-
-  Trying     :: Bool -> Strategy i i -> Strategy i i
-
-  WithStatus :: (TctStatus i -> Strategy i o) -> Strategy i o
-  WithState  :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
+  Apply       :: (Processor p) => p -> Strategy (In p) (Out p)
+  IdStrategy  :: Strategy i i
+  Abort       :: Strategy i o
+  -- MA: can we avoid the first argument?
+  Cond        :: (ProofTree q -> Bool) -> Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+  -- | Parallel Application
+  Par         :: Strategy i o -> Strategy i o
+  Race        :: Strategy i o -> Strategy i o -> Strategy i o
+  Better      :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
+  -- | Misc
+  Timeout     :: RelTimeout -> Strategy i o -> Strategy i o
+  Wait        :: RelTimeout -> Strategy i o -> Strategy i o 
+  WithStatus  :: (TctStatus i -> Strategy i o) -> Strategy i o
+  WithState   :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
   deriving Typeable
 
+data RelTimeout = TimeoutIn Int | TimeoutUntil Int
 
 -- Heterogenous List -------------------------------------------------------------------------------------------------
 

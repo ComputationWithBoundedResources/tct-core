@@ -20,9 +20,11 @@ module Tct.Core
   , appendGHCiScript
   , addRuntimeOption
   -- * Processor / Strategy
-  , toStrategy
   , ProofData
-  , Strategy
+  , succeedWith
+  , succeedWith0
+  , succeedWith1
+  , abortWith
   -- ** Argument
   , Argument
   , ArgFlag (..)
@@ -33,20 +35,18 @@ module Tct.Core
   , optional
   -- ** Declaration
   , StrategyDeclaration (..)
-  , strategy
   , OneTuple (..)
   -- ** Argument and Declaration Modifyer
   , withName
   , withHelp
   -- ** Combinators
-  , module Tct.Core.Combinators
+  , module Tct.Core.Data.Strategy
   ) where
 
 
-import Tct.Core.Combinators
 import Tct.Core.Data
 import Tct.Core.Main
-
+import Tct.Core.Data.Strategy
 
 -- | Adds a list of 'StrategyDeclaraton' to the existing ones.
 addStrategies :: TctConfig i -> [StrategyDeclaration i i] -> TctConfig i

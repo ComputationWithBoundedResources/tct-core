@@ -25,9 +25,10 @@ module Tct.Core.Common.Xml
   ) where
 
 
+import Data.Monoid
 import qualified Data.ByteString.Lazy  as BS
 import           Data.Maybe            (fromMaybe)
-import           Data.Monoid
+
 import qualified Data.Text             as Txt
 import qualified Data.Text.IO          as Txt (hPutStr, putStr)
 import           GHC.IO.Handle

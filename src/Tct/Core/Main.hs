@@ -18,12 +18,13 @@ module Tct.Core.Main
   ) where
 
 
+import Data.Monoid (mconcat)
 import qualified Data.Map as M
 import           Control.Applicative        ((<$>), (<*>), (<|>))
 import           Control.Monad              (void)
 import           Control.Monad.Reader       (runReaderT)
 import           Data.Maybe                 (fromMaybe)
-import           Data.Monoid                (mconcat)
+
 import qualified Options.Applicative        as O
 import           System.Exit                (exitFailure, exitSuccess)
 import           System.IO                  (hPrint, stderr, hPutStrLn, hClose)
@@ -36,11 +37,9 @@ import           Tct.Core.Main.Options      as M
 
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
-import           Tct.Core.Data
+import           Tct.Core.Data hiding ((<|>))
 import           Tct.Core.Declarations      (declarations)
 import           Tct.Core.Parse             (strategyFromString)
-import           Tct.Core.Processor.Failing (failing)
-import           Tct.Core.Processor.Timeout (timeoutIn)
 
 
 synopsis :: String
@@ -53,8 +52,8 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 -- The configuration affects the execution of ('tct3') and sets initial properties ('run') when eva
 data TctConfig i = TctConfig
   { parseProblem    :: FilePath -> IO (Either String i)
-  , putAnswer       :: Return (ProofTree i) -> IO ()
-  , putProof        :: Return (ProofTree i) -> IO ()
+  , putAnswer       :: ProofTree i -> IO ()
+  , putProof        :: ProofTree i -> IO ()
 
   , strategies      :: [StrategyDeclaration i i]
   , defaultStrategy :: Strategy i i
@@ -75,7 +74,7 @@ defaultTctConfig p = TctConfig
   , putAnswer       = PP.putPretty . prettyDefaultAnswer
   , putProof        = PP.putPretty . prettyDefaultProof
   , strategies      = declarations
-  , defaultStrategy = failing
+  , defaultStrategy = abort
   , runtimeOptions  = []
   , interactiveGHCi = GHCiScript
       [ ":set prompt \"tct>\""
@@ -84,27 +83,23 @@ defaultTctConfig p = TctConfig
   }
 
 
-prettySilentAnswer, prettyDefaultAnswer, prettyTTTacAnswer :: Return (ProofTree i) -> PP.Doc
+prettySilentAnswer, prettyDefaultAnswer, prettyTTTacAnswer :: ProofTree i -> PP.Doc
 prettySilentAnswer  _        = PP.empty
-prettyDefaultAnswer (Halt _) = PP.pretty (termcomp unbounded)
-prettyDefaultAnswer r        = PP.pretty (termcomp . certificate $ fromReturn r)
-prettyTTTacAnswer   (Halt _) = PP.pretty (tttac unbounded)
-prettyTTTacAnswer   r        = PP.pretty (tttac    . certificate $ fromReturn r)
+prettyDefaultAnswer r        = PP.pretty (termcomp (certificate r))
+prettyTTTacAnswer   r        = PP.pretty (tttac (certificate r))
 
-prettySilentProof, prettyDefaultProof, prettyVerboseProof :: PP.Pretty i => Return (ProofTree i) -> PP.Doc
+prettySilentProof, prettyDefaultProof, prettyVerboseProof :: PP.Pretty i => ProofTree i -> PP.Doc
 prettySilentProof _          = PP.empty
-prettyDefaultProof (Halt pt) = PP.pretty (ppDetailedProofTree PP.pretty pt)
-prettyDefaultProof r         = PP.pretty (ppProofTree PP.pretty $ fromReturn r)
-prettyVerboseProof (Halt pt) = PP.pretty (ppDetailedProofTree PP.pretty pt)
-prettyVerboseProof r         = PP.pretty (ppDetailedProofTree PP.pretty $ fromReturn r)
+prettyDefaultProof r         = PP.pretty (ppProofTree PP.pretty r)
+prettyVerboseProof r         = PP.pretty (ppDetailedProofTree PP.pretty r)
 -- prettyXmlProof r             = error "missing: toXml proofTree" -- TODO
 
-putAnswerFormat :: AnswerFormat -> Return (ProofTree i) -> IO ()
+putAnswerFormat :: AnswerFormat -> ProofTree i -> IO ()
 putAnswerFormat SilentAnswerFormat  = PP.putPretty . prettySilentAnswer
 putAnswerFormat DefaultAnswerFormat = PP.putPretty . prettyDefaultAnswer
 putAnswerFormat TTTACAnswerFormat   = PP.putPretty . prettyTTTacAnswer
 
-putProofFormat :: PP.Pretty i => ProofFormat -> Return (ProofTree i) -> IO ()
+putProofFormat :: PP.Pretty i => ProofFormat -> ProofTree i -> IO ()
 putProofFormat SilentProofFormat  = PP.putPretty . prettySilentProof
 putProofFormat DefaultProofFormat = PP.putPretty . prettyDefaultProof
 putProofFormat VerboseProofFormat = PP.putPretty . prettyVerboseProof
@@ -278,7 +273,7 @@ tct3WithOptions theUpdate theOptions cfg = do
         st <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
 
         let stt = maybe st (`timeoutIn` st) theTimeout
-        r <- liftIO $ run ucfg (evaluate stt prob)
+        r <- liftIO $ run ucfg (evaluate stt (Open prob))
 
         liftIO $ theAnswer r
         liftIO $ theProof r

@@ -26,7 +26,6 @@ source-repository head
 library
   exposed-modules:
     Tct.Core
-    Tct.Core.Combinators
     Tct.Core.Common.Concurrent
     Tct.Core.Common.Error
     Tct.Core.Common.Parser
@@ -48,17 +47,9 @@ library
     Tct.Core.Interactive
     Tct.Core.Main
     Tct.Core.Main.Options
-    Tct.Core.Processor.Annotated
     Tct.Core.Processor.Assumption
-    Tct.Core.Processor.Cast
     Tct.Core.Processor.Empty
-    Tct.Core.Processor.Failing
-    Tct.Core.Processor.Identity
-    Tct.Core.Processor.Succeeding
-    Tct.Core.Processor.Timeout
     Tct.Core.Processor.Transform
-    Tct.Core.Processor.TransformWith
-    Tct.Core.Processor.Wait
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,
     async                == 2.*,

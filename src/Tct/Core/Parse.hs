@@ -9,8 +9,7 @@ module Tct.Core.Parse
   , strategyFromString
   ) where
 
-
-import           Control.Applicative       ((<$>))
+import Control.Applicative ((<$>))
 import           Data.Data                 (Typeable)
 import           Data.Dynamic              (fromDynamic, toDyn)
 import           Data.List                 (sortBy)
@@ -20,8 +19,6 @@ import qualified Text.Parsec.Expr          as PE
 import qualified Tct.Core.Data.Declaration as D
 import qualified Tct.Core.Data.Strategy    as S
 import           Tct.Core.Data.Types
-
-import qualified Tct.Core.Combinators      as C
 import           Tct.Core.Common.Parser
 
 
@@ -52,11 +49,11 @@ strategy = PE.buildExpressionParser table strat <?> "stratgy"
       <?> "expression"
     predefined :: SParser i o (Strategy i o)
     predefined = getState >>= strategyDeclarations
-
-    table = [ [unary "try" C.try , unary "force" C.force ]
-            , [unary "es"  C.es ]
-            , [binary "<|>" S.Alt PE.AssocRight,  binary "<||>" S.OrFaster PE.AssocRight ]
-            , [binary ">>>" S.Then PE.AssocRight, binary ">||>" S.ThenPar PE.AssocRight ] ]
+    -- MA:TODO: todo, add more
+    table = [ [unary "try" S.try , unary "force" S.force ]
+            , [unary "es"  S.es ]
+            , [binary "<|>" (S.<|>) PE.AssocRight,   binary "<||>" (S.<||>) PE.AssocRight ]
+            , [binary ">>>" (S.>>>) PE.AssocRight, binary ">||>" (S.>||>) PE.AssocRight ] ]
     binary name fun = PE.Infix (do{ reserved name; return fun })
     unary name fun = PE.Prefix (do{ reserved name; return fun })
 
