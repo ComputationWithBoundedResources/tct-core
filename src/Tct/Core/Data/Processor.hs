@@ -35,6 +35,9 @@ succeedWith0 pn cfn = return (Progress pn cfn F.Judgement)
 succeedWith1 :: (Processor p, Forking p ~ F.Id) => ProofObject p -> CertificateFn p -> Out p -> TctM (Return p)
 succeedWith1 pn cfn p = return $ Progress pn cfn (F.toId $ Open p)
 
+succeedWithId :: (Processor p, Forking p ~ F.Id) => ProofObject p -> CertificateFn p -> Out p -> TctM (Return p)
+succeedWithId pn cfn p = return $ Progress pn F.fromId (F.toId $ Open p)
+
 abortWith :: (Show r, PP.Pretty r) => r -> TctM (Return p)
 abortWith = return . NoProgress . SomeReason
 
