@@ -6,6 +6,7 @@ module Tct.Core.Data.ProofTree
   ProofNode (..)
   , ProofTree (..)
   , open
+  , size
   , flatten
   , substitute
   , substituteM
@@ -26,11 +27,11 @@ module Tct.Core.Data.ProofTree
 
 
 
-import Prelude hiding (mapM,any)
-import Data.Monoid
+import           Control.Applicative
+import           Data.Foldable             as F (Foldable, any, foldMap, foldr, sum, toList)
+import           Data.Monoid
 import           Data.Traversable
-import Control.Applicative
-import           Data.Foldable             as F (Foldable, foldMap, foldr, toList, any)
+import           Prelude                   hiding (any, mapM)
 
 
 import qualified Tct.Core.Common.Pretty    as PP
@@ -40,6 +41,12 @@ import           Tct.Core.Data.Types
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
 open = F.foldr (:) []
+
+-- | Returns the number of nodes of a 'ProofTree'.
+size :: ProofTree l -> Int
+size (Open _)          = 1
+size (Failure _)       = 1
+size (Success _ _ pts) = 1 + F.sum (size <$> pts)
 
 -- | Substitute the open leaves of a proof tree according to the given function
 substituteM :: (Functor m, Monad m) => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)
@@ -138,7 +145,7 @@ ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
   [ ppHeader pt is "Open"
   , PP.indent 4 (ppProb l) ]
 ppProofTree' is _ _ f@(Failure _) = ppHeader f is "Failure"
-    
+
 ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) = PP.vcat
   [ ppHeader pt (i,is) "Success"
   , PP.indent 4 (ppProofNode pn)

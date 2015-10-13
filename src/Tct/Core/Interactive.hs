@@ -37,7 +37,7 @@ module Tct.Core.Interactive
   ) where
 
 
-import Control.Applicative ((<$>))
+import           Control.Applicative        ((<$>))
 import           Control.Monad
 import qualified Control.Monad.State.Strict as S
 import           Data.Either                (rights)
@@ -49,7 +49,7 @@ import           System.IO.Unsafe
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml
-import           Tct.Core.Data              hiding (proof, apply)
+import           Tct.Core.Data              hiding (apply, proof)
 import           Tct.Core.Main
 
 
@@ -75,45 +75,6 @@ selectAllLeafs = fmap (either Right Right)
 
 removeSelection :: ProofTree (Selected l) -> ProofTree l
 removeSelection = fmap (either id id)
-
--- evaluateSelected :: ProofData i => Strategy i i -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected i)))
--- evaluateSelected _ pt@(Open (Left _))           = return (False, Continue pt)
--- evaluateSelected s (Open (Right p))             = do
---   ret <- evaluate s p
---   if isProgressing ret
---     then return (True,  (fmap . fmap) Right ret)
---     else return (False, (fmap . fmap) Right ret)
--- evaluateSelected s (NoProgress n subtree)       = fmap (liftNoProgress n) `fmap` evaluateSelected s subtree
--- evaluateSelected s (Progress n certfn subtrees) = do
---   f <- evaluateSelected s `F.mapM` subtrees
---   let
---     bs = fmap fst f
---     ns = fmap snd f
---   return (or (F.toList bs), liftProgress n certfn ns)
-
--- MS: Strategies with (possible) different input output type have to be applied to all problems.
--- evaluateAll :: ProofData o => Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))
--- evaluateAll s (Open (Left p))           = do
---   ret <- evaluate s p
---   if isProgressing ret
---     then return (True,  (fmap . fmap) Left ret)
---     else return (False, (fmap . fmap) Left ret)
--- evaluateAll s (Open (Right p))             = do
---   ret <- evaluate s p
---   if isProgressing ret
---     then return (True,  (fmap . fmap) Right ret)
---     else return (False, (fmap . fmap) Right ret)
--- evaluateAll s (NoProgress n subtree)       = fmap (liftNoProgress n) `fmap` evaluateAll s subtree
--- evaluateAll s (Progress n certfn subtrees) = do
---   f <- evaluateAll s `F.mapM` subtrees
---   let
---     bs = fmap fst f
---     ns = fmap snd f
---   return (or (F.toList bs), liftProgress n certfn ns)
-
--- MS:TODO check if this is still true, if so adapt
--- MS: The notion of progress in the interactive node is a bit different from the default semantics
--- Given for example @try poly@, we have progress when one of the selected leafs successfully applies the strategy.
 
 -- MS: Strategies with (possible) different input output type have to be applied to all problems.
 evaluateAll :: ProofData o => Strategy i o -> ProofTree (Selected i) -> TctM (ProofTree (Selected o))
@@ -200,7 +161,7 @@ load p  fp = do
   either print (\prob -> initSt prob >> print "Problem loaded." >> printState) ret
 
 -- | Like 'load' but extracts the parser from a configuration.
--- 
+--
 -- > load' = load . parseProblem
 load' :: ProofData i => TctConfig i -> FilePath -> IO ()
 load' = load . parseProblem
@@ -230,11 +191,10 @@ selectAll = onSt $ \(St l) -> putSt (St (selectAllLeafs l)) >> printState
 -- apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))) -> Strategy i o -> IO ()
 apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (ProofTree (Selected o))) -> Strategy i o -> IO ()
 apply' eval str = onSt $ \st -> do
-  ret <- run undefined (eval str $ unSt st)
-  -- (b,ret) <- run undefined (eval str $ unSt st)
-  -- if b -- && hasProgress ret
-  if False 
-    then putSt (St ret) >> printState >> print "progressed :)"
+  let t1 = unSt st
+  t2 <- run undefined (eval str t1)
+  if not (isFailure t2) && size t2 > size t1
+    then putSt (St t2) >> printState >> print "progressed :)"
     else print "no progress :/"
 
 -- | Applies a strategy on all sub-problems.
