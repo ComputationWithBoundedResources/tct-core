@@ -7,6 +7,7 @@ module Tct.Core.Data.Strategy
   , abort
   , processor
   , ite
+  , iteProgress -- MS: rename ?
   , (.>>>)
   , (.<|>)
   , try
@@ -155,6 +156,9 @@ processor = Apply
 -- | prop> ite test s1 s2 == s2, otherwise
 ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
 ite = Cond (not . isFailure)
+
+iteProgress :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+iteProgress = Cond isProgressing
 
 -- | sequencing
 (.>>>) :: Strategy i q -> Strategy q o -> Strategy i o
