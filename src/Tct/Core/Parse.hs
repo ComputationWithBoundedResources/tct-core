@@ -1,8 +1,8 @@
 -- | This module provides common 'SParsable' instances and the strategy parser.
 module Tct.Core.Parse
   (
-  SParsable
-  , ParsableArgs
+  SParsable (..)
+  , ParsableArgs (..)
   , declaration
   , strategy
   , strategyDeclarations

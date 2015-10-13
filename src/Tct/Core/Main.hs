@@ -17,6 +17,7 @@ module Tct.Core.Main
   , ProofFormat (..)
   ) where
 
+-- MA: shouldn't here TctMode be exported?
 
 import Data.Monoid (mconcat)
 import qualified Data.Map as M
@@ -104,7 +105,6 @@ putProofFormat SilentProofFormat  = PP.putPretty . prettySilentProof
 putProofFormat DefaultProofFormat = PP.putPretty . prettyDefaultProof
 putProofFormat VerboseProofFormat = PP.putPretty . prettyVerboseProof
 -- putXmlFormat XmlProofFormat = PP.putPretty prettyXmlProof
-
 
 -- | Format of answer output.
 data AnswerFormat
