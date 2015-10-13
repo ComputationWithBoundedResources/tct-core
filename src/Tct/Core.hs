@@ -21,10 +21,11 @@ module Tct.Core
   , addRuntimeOption
   -- * Processor / Strategy
   , ProofData
+  , abortWith
   , succeedWith
   , succeedWith0
   , succeedWith1
-  , abortWith
+  , succeedWithId
   -- ** Argument
   , Argument
   , ArgFlag (..)
