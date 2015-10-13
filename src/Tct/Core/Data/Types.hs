@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 -- | This module defines the most important types.
 module Tct.Core.Data.Types where
 
@@ -54,6 +55,14 @@ data Reason where
   Aborted    :: Reason
   TimedOut   :: Reason
   SomeReason :: (Show r, PP.Pretty r) => r -> Reason
+
+deriving instance Show Reason
+
+instance PP.Pretty Reason where
+  pretty (IOError io)   = PP.text (show io)
+  pretty Aborted        = PP.text "aborted"
+  pretty TimedOut       = PP.text "timed out"
+  pretty (SomeReason r) = PP.pretty r
 
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
