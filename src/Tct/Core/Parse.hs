@@ -81,7 +81,7 @@ instance (SParsable i o a, ParsableArgs i o as) => ParsableArgs i o (Argument 'R
 instance SParsable i o D.Nat          where parseS = nat
 instance SParsable i o Bool           where parseS = bool
 instance SParsable i o String         where parseS = identifier
-instance SParsable i i (Strategy i i) where parseS = strategy
+-- instance SParsable i i (Strategy i i) where parseS = strategy
 instance (Typeable a, SParsable i o a) => SParsable i o (Maybe a) where
   parseS = (try (symbol "none") >> return Nothing) <|> Just `fmap` parseS <?> "maybe"
 
