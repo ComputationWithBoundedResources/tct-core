@@ -17,17 +17,30 @@ module Tct.Core.Common.Error
 
 import Control.Exception   (IOException, try)
 import Control.Monad.Error (Error (..), ErrorT (..), liftIO, runErrorT)
-
+import qualified Tct.Core.Common.Pretty  as PP
+import           Text.Parsec (ParseError)
 
 -- | Custom error type.
 data TctError
   = TctDyreError String     -- ^ Indicates an Error of Config.Dyre
-  | TctParseError String
+  | TctProblemParseError String
+  | TctStrategyParseError ParseError
   | TctIOError IOError
-  | TctUnknonwError String
+  | TctUnknownError String
   deriving Show
 
-instance Error TctError where strMsg = TctUnknonwError
+instance Error TctError where strMsg = TctUnknownError
+
+prettyError :: String -> PP.Doc -> PP.Doc
+prettyError name reason = PP.align (PP.text name PP.<> PP.text ":" PP.</> PP.indent 2 reason)
+  
+
+instance PP.Pretty TctError where
+  pretty (TctDyreError s)          = prettyError "Compilation failed" (PP.text s)
+  pretty (TctProblemParseError s)  = prettyError "Parsing of problem failed" (PP.text s)
+  pretty (TctStrategyParseError s) = prettyError "Parsing of strategy failed" (PP.text (show s))
+  pretty (TctIOError s)            = prettyError "IO error" (PP.text (show s))
+  pretty (TctUnknownError s)       = prettyError "Unknown error" (PP.text (show s))
 
 -- | Wraps 'IO' into an erroneous compuation with custom error handling.
 type ErroneousIO e = ErrorT e IO

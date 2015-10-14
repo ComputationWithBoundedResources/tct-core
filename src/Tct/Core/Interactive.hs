@@ -159,7 +159,7 @@ modifySt f = onSt (putSt . St . f . unSt)
 -- | Load a problem.
 load :: ProofData i => (FilePath -> IO (Either String i)) -> FilePath -> IO ()
 load p  fp = do
-  ret <- runErroneousIO $ tryIO (p fp) >>= liftEither . either (Left . TctParseError) Right
+  ret <- runErroneousIO $ tryIO (p fp) >>= liftEither . either (Left . TctProblemParseError) Right
   either print (\prob -> initSt prob >> print "Problem loaded." >> printState) ret
 
 -- | Like 'load' but extracts the parser from a configuration.

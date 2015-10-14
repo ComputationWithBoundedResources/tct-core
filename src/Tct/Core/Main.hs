@@ -270,7 +270,7 @@ tct3WithOptions theUpdate theOptions cfg = do
 
         prob <- do
           f <- tryIO $ theParser theProblemFile
-          liftEither $ either (Left . TctParseError) Right f
+          liftEither $ either (Left . TctProblemParseError) Right f
 
         st <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
 
@@ -280,7 +280,7 @@ tct3WithOptions theUpdate theOptions cfg = do
         liftIO $ theAnswer r
         liftIO $ theProof r
   case r of
-    Left err -> PP.putPretty (PP.text "ERROR") >> hPrint stderr err >> exitFailure
+    Left err -> PP.putPretty (PP.text "ERROR") >> PP.hPutDoc stderr (PP.pretty err) >> exitFailure
     Right _  -> exitSuccess
 
   where
@@ -291,6 +291,6 @@ tct3WithOptions theUpdate theOptions cfg = do
       where cfg' = f cf (modeOptions_ opt)
 
     parseStrategy sds s = case strategyFromString sds s of
-      Left err -> Left $ TctParseError (show err)
+      Left err -> Left $ TctStrategyParseError err
       Right st -> Right st
 
