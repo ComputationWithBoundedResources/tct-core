@@ -80,9 +80,6 @@ evaluate1 :: Strategy i o -> i -> TctM (ProofTree o)
 evaluate1 (Apply p)          prob = apply p prob
 evaluate1 IdStrategy         prob = return (Open prob)
 evaluate1 Abort              _    = return (Failure Aborted)
--- evaluate1 (Force s)          prob = enforce <$> evaluate1 s prob
---   where enforce (Open _) = Failure Aborted
---         enforece pt      = pt
 evaluate1 (Cond g sb st se)  prob = evaluate1 sb prob >>= continue where
   continue pt | g pt         = evaluate st pt
               | otherwise    = evaluate1 se prob
@@ -113,7 +110,6 @@ evaluate (Par s)    t = evaluatePar s t
 evaluate s          t = evaluateSeq s t
 
 evaluateSeq s = substituteM (evaluate1 s)
-
 evaluatePar s t = spawnTree t >>= collect where
   spawnTree = F.traverse (async . evaluate1 s)
   collect = substituteM TctM.wait
@@ -275,7 +271,6 @@ best :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -
 best _   [] = abort
 best cmp ss = foldr1 (cmp .<?>) ss
 
--- MA:TODO
 -- | @('<?>') cmp s1 s2@ applies @ s1@ and @ s2@ in parallel, returning
 -- the (successful) result @r1@ of strategy @s1@ iff @comp r1 r2 == GT@,
 -- otherwise @r2@ is returned. An example for @comp@ is

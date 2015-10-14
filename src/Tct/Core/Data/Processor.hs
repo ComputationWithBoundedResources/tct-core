@@ -2,6 +2,7 @@
 -- 'Processor' instances define transformations from problems to a (possible empty) set of subproblems.
 module Tct.Core.Data.Processor
   ( Processor (..)
+  , Return (..)
   , Fork
   , ProofData
   , CertificateFn

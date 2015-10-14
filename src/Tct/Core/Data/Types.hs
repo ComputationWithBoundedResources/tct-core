@@ -112,7 +112,6 @@ data Strategy i o where
   Apply       :: (Processor p) => p -> Strategy (In p) (Out p)
   IdStrategy  :: Strategy i i
   Abort       :: Strategy i o
-  -- MA: can we avoid the first argument?
   Cond        :: (ProofTree q -> Bool) -> Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
   -- | Parallel Application
   Par         :: Strategy i o -> Strategy i o
