@@ -9,13 +9,12 @@ module Tct.Core.Parse
   , strategyFromString
   ) where
 
-import Control.Applicative ((<$>))
+
 import           Data.Data                 (Typeable)
 import           Data.Dynamic              (fromDynamic, toDyn)
 import           Data.List                 (sortBy)
 import           Data.Maybe                (fromMaybe)
 import qualified Text.Parsec.Expr          as PE
-
 import qualified Tct.Core.Data.Declaration as D
 import qualified Tct.Core.Data.Strategy    as S
 import           Tct.Core.Data.Types

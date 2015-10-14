@@ -14,9 +14,8 @@ module Tct.Core.Data.Processor
   , succeedWithId
   ) where
 
-import           Control.Applicative
-import           Control.Monad.Error    (catchError)
 
+import           Control.Monad.Error    (catchError)
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Data.Forks    as F
 import           Tct.Core.Data.Types

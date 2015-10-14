@@ -44,11 +44,10 @@ module Tct.Core.Data.Strategy
   ) where
 
 
-import           Control.Applicative
+
 import qualified Data.Map                  as M (insert)
 import           Data.Maybe                (fromMaybe)
 import qualified Data.Traversable          as F (traverse)
-
 import qualified Tct.Core.Common.Pretty    as PP
 import           Tct.Core.Data.Certificate (timeUB)
 import           Tct.Core.Data.Processor

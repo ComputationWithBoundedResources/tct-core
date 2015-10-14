@@ -3,13 +3,11 @@
 module Tct.Core.Data.Types where
 
 
-import           Control.Applicative
+
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
-import           Data.Foldable                 as F (Foldable)
 import qualified Data.Map                      as M
-import           Data.Traversable              as T (Traversable)
 import           Data.Typeable
 import qualified System.Time                   as Time
 import           Text.Parsec                   (alphaNum, letter, oneOf)
@@ -17,7 +15,6 @@ import qualified Text.Parsec                   as P ((<|>))
 import qualified Text.Parsec.Language          as PL
 import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
-
 import qualified Tct.Core.Common.Pretty        as PP
 import qualified Tct.Core.Common.Xml           as Xml
 import qualified Tct.Core.Data.Certificate     as C
