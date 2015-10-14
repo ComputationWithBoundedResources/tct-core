@@ -148,11 +148,13 @@ ppProofTree' is _ _ f@(Failure r) =
   ppHeader f is "Failure"
   PP.<$$> PP.indent 2 (PP.pretty r)
 
-ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) = PP.vcat
-  [ ppHeader pt (i,is) "Success"
-  , PP.indent 4 (ppProofNode pn)
-  , PP.indent (if length (take 2 ppts) < 2 then 0 else 2) (PP.vcat ppts) ]
-    where ppts = (\(j,t) -> ppProofTree' (j, is++[i]) ppProb detailed t) `fmap` zip [1..] (F.toList pts)
+ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) =
+  PP.vcat [ ppHeader pt (i,is) "Success", PP.indent 4 (ppProofNode pn), ppSubTrees (F.toList pts) ]
+  where 
+    ppSubTrees []  = PP.empty
+    ppSubTrees [t] = ppProofTree' (i+1,is) ppProb detailed t
+    ppSubTrees ls  = PP.vcat [ ppProofTree' (j,is++[i]) ppProb detailed t
+                             | (j,t) <- zip [1..] ls] 
 
 ppHeader :: ProofTree l -> (Int, [Int]) -> String -> PP.Doc
 ppHeader pt (i,is) s =

@@ -280,7 +280,7 @@ tct3WithOptions theUpdate theOptions cfg = do
         liftIO $ theAnswer r
         liftIO $ theProof r
   case r of
-    Left err -> PP.putPretty (PP.text "ERROR") >> PP.hPutDoc stderr (PP.pretty err) >> exitFailure
+    Left err -> PP.putPretty (PP.text "ERROR") >> PP.hPutDoc stderr (PP.pretty err PP.</> PP.text "") >> exitFailure
     Right _  -> exitSuccess
 
   where
