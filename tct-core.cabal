@@ -28,6 +28,7 @@ library
     Tct.Core
     Tct.Core.Common.Concurrent
     Tct.Core.Common.Error
+    Tct.Core.Common.Options
     Tct.Core.Common.Parser
     Tct.Core.Common.Pretty
     Tct.Core.Common.SemiRing
@@ -46,7 +47,6 @@ library
     Tct.Core.Parse
     Tct.Core.Interactive
     Tct.Core.Main
-    Tct.Core.Main.Options
     Tct.Core.Processor.Assumption
     Tct.Core.Processor.Empty
     Tct.Core.Processor.Transform

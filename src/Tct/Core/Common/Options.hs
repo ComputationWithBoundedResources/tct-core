@@ -1,5 +1,5 @@
 -- | This module provides a wrapper for "OptParse.Applicative" (<http://hackage.haskell.org/package/optparse-applicative>).
-module Tct.Core.Main.Options
+module Tct.Core.Common.Options
   (
   Options
   -- * Builder
