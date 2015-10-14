@@ -88,7 +88,7 @@ evaluate1 (Cond g sb st se)  prob = evaluate1 sb prob >>= continue where
               | otherwise    = evaluate1 se prob
 evaluate1 (Par s)            prob = evaluate1 s prob
 evaluate1 (Race s1 s2)       prob =
-  raceWith (not . isFailure) const (evaluate1 s1 prob) (evaluate1 s2 prob)
+  raceWith (not . isFailure) (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
   uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
     pick r1 r2 | cmp r2 r1 == GT = r2
@@ -176,7 +176,7 @@ try s = s .<|> identity
 force :: Strategy i o -> Strategy i o
 force s = Cond g s identity abort where
   g (Open _) = False
-  g _        = True
+  g pt       = not (isFailure pt)
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.

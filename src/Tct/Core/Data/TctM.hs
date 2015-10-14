@@ -86,28 +86,28 @@ concurrently m1 m2 = do
     liftIO $ Async.withAsync io2 $ \a2 ->
     liftIO $ Async.waitBoth a1 a2
 
--- | @'raceWith' p1 cmp m1 m2@ runs @m1@ and @m2@ in parallel.
+-- | @'raceWith' p1 m1 m2@ runs @m1@ and @m2@ in parallel.
 --
--- * Returns the first result that fulfills @p1@.
--- * Otherwise returns the result of @cmp@.
-raceWith :: (a -> Bool) -> (a -> a -> a) -> TctM a -> TctM a -> TctM a
-raceWith p1 cmp m1 m2 = do
+-- * Returns the first result that satisfies @p1@.
+-- * Otherwise returns the latter result.
+raceWith :: (a -> Bool) -> TctM a -> TctM a -> TctM a
+raceWith p1 m1 m2 = do
   io1 <- toIO m1
   io2 <- toIO m2
-  liftIO $ raceWithIO p1 cmp io1 io2
+  liftIO $ raceWithIO p1 io1 io2
 
-raceWithIO :: (a -> Bool) -> (a -> a -> a) -> IO a -> IO a -> IO a
-raceWithIO p1 cmp m1 m2 =
+raceWithIO :: (a -> Bool) -> IO a -> IO a -> IO a
+raceWithIO p1 m1 m2 =
   Async.withAsync m1 $ \a1 ->
   Async.withAsync m2 $ \a2 -> do
     e <- Async.waitEither a1 a2
     case e of
       Left r1
         | p1 r1     -> Async.cancel a2 >> return r1
-        | otherwise -> Async.wait a2 >>= \r2 -> return (r1 `cmp` r2)
+        | otherwise -> Async.wait a2 >>= return
       Right r2
         | p1 r2     -> Async.cancel a1 >> return r2
-        | otherwise -> Async.wait a1 >>= \r1 -> return (r2 `cmp` r1)
+        | otherwise -> Async.wait a1 >>= return
 
 -- | @'timed' seconds m@ wraps the Tct action in timeout, and locally sets 'stopTime'.
 -- When @seconds@
