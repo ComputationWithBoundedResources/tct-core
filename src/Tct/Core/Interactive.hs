@@ -5,6 +5,8 @@
 -- __WARNING:__ all operations that are directly applied to a problem are __unsafe__. More precisely, the application
 -- of a function to a problem is not type-safe: Given problems of type @i@. We can apply a strategy of type @Strategy
 -- o o@ (where @o@ different from @i@). This can lead to undefined behaviour.
+--
+-- \At the momement user configurations and user options are ignored.\
 module Tct.Core.Interactive
   (
   -- * Load and Modify Problems
@@ -187,12 +189,10 @@ select is = onSt $ \(St l) -> putSt (St (selectLeafs is l)) >> printState
 selectAll :: IO ()
 selectAll = onSt $ \(St l) -> putSt (St (selectAllLeafs l)) >> printState
 
--- MS: TODO check; at some point it worked why do we have undefined here
--- apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (Bool, Return (ProofTree (Selected o)))) -> Strategy i o -> IO ()
 apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (ProofTree (Selected o))) -> Strategy i o -> IO ()
 apply' eval str = onSt $ \st -> do
   let t1 = unSt st
-  t2 <- run undefined (eval str t1)
+  t2 <- runInteractive (eval str t1)
   if not (isFailure t2) && size t2 > size t1
     then putSt (St t2) >> printState >> print "progressed :)"
     else print "no progress :/"

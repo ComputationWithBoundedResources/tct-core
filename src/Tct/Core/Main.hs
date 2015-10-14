@@ -62,7 +62,7 @@ data TctConfig i = TctConfig
   , version         :: String
   }
 
--- | Specifies how interactive mode is executed. See 'runInteractive'.
+-- | Specifies how interactive mode is executed. See 'startInteractive'.
 data InteractiveGHCi = GHCiScript [String] | GHCiCommand String
 
 -- | Default configuration. Minimal requirement 'parseProblem'.
@@ -209,18 +209,25 @@ mkParser ps vers mparser = O.info (versioned <*> listed <*> O.helper <*> interac
 --- * Main -----------------------------------------------------------------------------------------------------------
 
 run :: TctConfig i -> TctM a -> IO a
-run cfg m = do
+run cfg m = run' m $ \st -> st { kvPairs = M.fromList (runtimeOptions cfg) }
+
+-- MS: the interactive mode is not type-safe so we have to ignore all problem specfic options
+runInteractive :: TctM a -> IO a
+runInteractive m = run' m id
+
+run' :: TctM a -> (TctROState -> TctROState) -> IO a
+run' m k = do
   time <- Time.getClockTime
   let
     state tmp = TctROState
       { startTime     = time
       , stopTime      = Nothing
       , tempDirectory = tmp
-      , kvPairs       = M.fromList (runtimeOptions cfg) }
-  withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . state)
+      , kvPairs       = M.empty }
+  withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . k . state)
 
-runInteractive :: InteractiveGHCi -> IO ()
-runInteractive ig = void $ case ig of
+startInteractive :: InteractiveGHCi -> IO ()
+startInteractive ig = void $ case ig of
   GHCiCommand cmd -> system cmd
   GHCiScript  scr -> withSystemTempFile "ghcix" $ \fp hf -> do
     hPutStrLn hf (unlines scr) >> hClose hf
@@ -245,7 +252,7 @@ tct3WithOptions theUpdate theOptions cfg = do
   r <- runErroneousIO $ do
     action <- liftIO $ O.execParser $ mkParser (strategies cfg) (version cfg) theOptions
     case action of
-      RunInteractive -> tryIO $ runInteractive (interactiveGHCi cfg)
+      RunInteractive -> tryIO $ startInteractive (interactiveGHCi cfg)
       Run opts       -> do
         let
           TctOptions
