@@ -144,7 +144,9 @@ ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.
 ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
   [ ppHeader pt is "Open"
   , PP.indent 4 (ppProb l) ]
-ppProofTree' is _ _ f@(Failure _) = ppHeader f is "Failure"
+ppProofTree' is _ _ f@(Failure r) = 
+  ppHeader f is "Failure"
+  PP.<$$> PP.indent 2 (PP.pretty r)
 
 ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) = PP.vcat
   [ ppHeader pt (i,is) "Success"
