@@ -28,7 +28,7 @@ module Tct.Core.Data.ProofTree
 
 
 import           Control.Applicative
-import           Data.Foldable             as F (Foldable, any, foldMap, foldr, sum, toList)
+import           Data.Foldable             as F (any, foldr, sum, toList)
 import           Data.Monoid
 import           Data.Traversable
 import           Prelude                   hiding (any, mapM)

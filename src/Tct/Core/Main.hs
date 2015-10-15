@@ -25,7 +25,7 @@ import qualified Data.Map                as M
 import           Data.Maybe              (fromMaybe)
 import qualified Options.Applicative     as O
 import           System.Exit             (exitFailure, exitSuccess)
-import           System.IO               (hClose, hPrint, hPutStrLn, stderr)
+import           System.IO               (hClose, hPutStrLn, stderr)
 import           System.IO.Temp          (withSystemTempFile, withTempDirectory)
 import           System.Process          (system)
 import qualified System.Time             as Time

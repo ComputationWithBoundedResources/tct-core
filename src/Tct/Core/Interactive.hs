@@ -39,7 +39,6 @@ module Tct.Core.Interactive
   ) where
 
 
-import           Control.Applicative        ((<$>))
 import           Control.Monad
 import qualified Control.Monad.State.Strict as S
 import           Data.Either                (rights)

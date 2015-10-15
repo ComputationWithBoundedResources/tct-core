@@ -21,7 +21,7 @@ module Tct.Core.Data.TctM
   ) where
 
 
-import           Control.Applicative      ((<$>), (<|>))
+import           Control.Applicative      ((<|>))
 import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
