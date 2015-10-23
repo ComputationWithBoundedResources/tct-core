@@ -232,7 +232,7 @@ startInteractive ig = void $ case ig of
     system $ "ghci -ingore-dot-ghci -ghci-script " ++ fp
 
 -- > tct3 = tct3With const unit
-tct3 :: ProofData i => TctConfig i -> IO ()
+tct3 :: (ProofData i, Declared i i, DefaultDeclared i i) => TctConfig i -> IO ()
 tct3 = tct3WithOptions const unit
 
 -- | Default main function.
@@ -245,7 +245,7 @@ tct3 = tct3WithOptions const unit
 -- 4. updates @config@ from standard arguments; in particular answer output and proof output overrides @config@ if given
 -- 5. evaluates strategy with the given timeout
 -- 6. output answer and proof as given in (updated) @config@
-tct3WithOptions :: ProofData i => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
+tct3WithOptions :: (ProofData i, Declared i i, DefaultDeclared i i) => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
 tct3WithOptions theUpdate theOptions cfg = do
   r <- runErroneousIO $ do
     action <- liftIO $ O.execParser $ mkParser (strategies cfg) (version cfg) theOptions
@@ -272,7 +272,7 @@ tct3WithOptions theUpdate theOptions cfg = do
           f <- tryIO $ theParser theProblemFile
           liftEither $ either (Left . TctProblemParseError) Right f
 
-        st <- maybe (return theDefaultStrategy) (liftEither . parseStrategy theStrategies) theStrategyName
+        st <- maybe (return theDefaultStrategy) (liftEither . parseStrategy) theStrategyName
 
         let stt = maybe st (`timeoutIn` st) theTimeout
         r <- liftIO $ run ucfg (evaluate stt (Open prob))
@@ -290,7 +290,7 @@ tct3WithOptions theUpdate theOptions cfg = do
       , putProof  = putProof cfg' `fromMaybe` (putProofFormat <$> proofFormat_ opt) }
       where cfg' = f cf (modeOptions_ opt)
 
-    parseStrategy sds s = case strategyFromString sds s of
+    parseStrategy s = case strategyFromString s of
       Left err -> Left $ TctStrategyParseError err
       Right st -> Right st
 

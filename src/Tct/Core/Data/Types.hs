@@ -303,7 +303,7 @@ class ParsableArgs ats where
 -- | Existential type for declarations specifying a Strategy.
 -- Mainly used for parsing and description.
 data StrategyDeclaration i o where
-  SD :: Declared i o => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
+  SD :: (ParsableArgs args, Declared i o) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
 
 
 --- * Parsing --------------------------------------------------------------------------------------------------------
