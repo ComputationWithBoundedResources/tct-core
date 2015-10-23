@@ -77,90 +77,90 @@ instance DefF (as :-> r) => DefF (Argument 'Required a ': as :-> r) where
 
 
 --- * arguments ------------------------------------------------------------------------------------------------------
-instance Functor (Argument r) where
-  _ `fmap` ar@ReqArg{} =
-    ReqArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar }
-  f `fmap` ar@OptArg{} =
-    OptArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = f (argDefault ar) }
+-- instance Functor (Argument r) where
+--   _ `fmap` ar@ReqArg{} =
+--     ReqArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar }
+--   f `fmap` ar@OptArg{} =
+--     OptArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = f (argDefault ar) }
 
 -- | Generic argument with name "arg" and domain "<arg>".
 arg :: Argument 'Required a
-arg = ReqArg {argName = "arg", argDomain = "<arg>", argHelp = []}
+arg = undefined -- ReqArg {argName = "arg", argDomain = "<arg>", argHelp = []}
 
 -- | Transforms a required argument to an optional by providing a default value.
 optional :: Argument 'Required a -> a -> Argument 'Optional a
-optional ar a = OptArg {argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = a }
+optional ar a = undefined -- OptArg {argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = a }
 
 -- | Wraps an argument into 'Maybe'.
 some :: Argument r a -> Argument r (Maybe a)
-some ar = Just `fmap` ar { argDomain = argDomain ar ++ "|none"}
+some ar = undefined -- Just `fmap` ar { argDomain = argDomain ar ++ "|none"}
 
 -- * instances
 type Nat = Int
 
 -- | Specifies a natural argument with name "nat" and domain "<nat>".
 nat :: Argument 'Required Nat
-nat = arg { argName = "nat", argDomain = "<nat>" }
+nat = undefined -- arg { argName = "nat", argDomain = "<nat>" }
 
 -- | Specifies a bool argument with name "bool" and domain "<bool>".
 bool :: Argument 'Required Bool
-bool = arg { argName = "bool", argDomain = "<bool>" }
+bool = undefined -- arg { argName = "bool", argDomain = "<bool>" }
 
 string :: Argument 'Required String
-string = arg { argName = "string", argDomain = "<string>" }
+string = undefined -- arg { argName = "string", argDomain = "<string>" }
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Argument 'Required (Strategy i o)
-strat = arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
+strat = undefined -- arg { argName = "strategy", argDomain = "<strategy>" , argHelp = ["The sub-strategy to apply."]}
 
 withDomain :: Argument r a -> [String] -> Argument r a
-withDomain ar ns = ar { argDomain = k $ intercalate "|" ns }
-  where k s = '<':s++">"
+withDomain ar ns = undefined -- ar { argDomain = k $ intercalate "|" ns }
+  -- where k s = '<':s++">"
 
-instance WithName (Argument r a) where withName ar n = ar { argName = n }
-instance WithHelp (Argument r a) where withHelp ar n = ar { argHelp = n }
-
+instance WithName (Argument r a) where withName ar n = undefined -- ar { argName = n }
+instance WithHelp (Argument r a) where withHelp ar n = undefined -- ar { argHelp = n }
 
 -- StrategyDeclaration
 
 instance PP.Pretty (StrategyDeclaration i o) where
   pretty (SD s) = PP.pretty s
 
-instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where
-  pretty (Decl n h _ as) = PP.vcat $
-    [ theName
-    , theLine
-    , if null h then PP.empty else PP.indent 4 theHelp PP.<$$> PP.empty
-    , PP.indent 4 theSynopsis
-    , PP.empty ]
-    ++ (if null opts then [] else [PP.indent 2 theOptArgs])
-    ++ (if null reqs then [] else [PP.indent 2 theReqArgs])
-    ++ [PP.empty]
+instance PP.Pretty (Declaration (args :-> c)) where
+  -- pretty (Decl n h _ as) = PP.vcat $
+  --   [ theName
+  --   , theLine
+  --   , if null h then PP.empty else PP.indent 4 theHelp PP.<$$> PP.empty
+  --   , PP.indent 4 theSynopsis
+  --   , PP.empty ]
+  --   ++ (if null opts then [] else [PP.indent 2 theOptArgs])
+  --   ++ (if null reqs then [] else [PP.indent 2 theReqArgs])
+  --   ++ [PP.empty]
 
-    where
-      theName = PP.text "Strategy" PP.<+> PP.text n
-      theLine = PP.text $ replicate (length $ "Strategy " ++ n) '-'
-      theHelp = PP.paragraph (unlines h)
-      theSynopsis = PP.text "Synopsis: " PP.<+> PP.text n PP.<+> PP.hsep (map mkSynopsis info)
-        where
-          mkSynopsis (_ , ad, _, Nothing) = PP.dquotes (PP.text ad)
-          mkSynopsis (an, ad, _, _)       = PP.brackets $ PP.char ':' PP.<> PP.text an PP.<+> PP.text ad
-      theOptArgs = PP.text "Optional:" PP.<$$> PP.indent 2 (PP.vcat (map mkArgsInfo opts))
-      theReqArgs = PP.text "Required:" PP.<$$> PP.indent 2 (PP.vcat (map mkArgsInfo reqs))
+  --   where
+  --     theName = PP.text "Strategy" PP.<+> PP.text n
+  --     theLine = PP.text $ replicate (length $ "Strategy " ++ n) '-'
+  --     theHelp = PP.paragraph (unlines h)
+  --     theSynopsis = PP.text "Synopsis: " PP.<+> PP.text n PP.<+> PP.hsep (map mkSynopsis info)
+  --       where
+  --         mkSynopsis (_ , ad, _, Nothing) = PP.dquotes (PP.text ad)
+  --         mkSynopsis (an, ad, _, _)       = PP.brackets $ PP.char ':' PP.<> PP.text an PP.<+> PP.text ad
+  --     theOptArgs = PP.text "Optional:" PP.<$$> PP.indent 2 (PP.vcat (map mkArgsInfo opts))
+  --     theReqArgs = PP.text "Required:" PP.<$$> PP.indent 2 (PP.vcat (map mkArgsInfo reqs))
 
-      info = argsInfo as
-      (opts,reqs) = foldr k ([],[]) info
-        where
-          k a@(_,_,_,Nothing) (os,rs) = (os,a:rs)
-          k a                 (os,rs) = (a:os,rs)
-      mkArgsInfo (an, _, ah, Nothing) = mkArgsInfo' an ah
-      mkArgsInfo (an, _, ah, Just s)  = mkArgsInfo' an ah PP.<$$> PP.indent 2 (PP.text "default:" PP.<+> PP.text s)
-      mkArgsInfo' an ah               = PP.text an PP.<> if null ah then PP.empty else PP.empty PP.<$$> PP.indent 2 (PP.paragraph $ unlines ah)
+  --     info = argsInfo as
+  --     (opts,reqs) = foldr k ([],[]) info
+  --       where
+  --         k a@(_,_,_,Nothing) (os,rs) = (os,a:rs)
+  --         k a                 (os,rs) = (a:os,rs)
+  --     mkArgsInfo (an, _, ah, Nothing) = mkArgsInfo' an ah
+  --     mkArgsInfo (an, _, ah, Just s)  = mkArgsInfo' an ah PP.<$$> PP.indent 2 (PP.text "default:" PP.<+> PP.text s)
+  --     mkArgsInfo' an ah               = PP.text an PP.<> if null ah then PP.empty else PP.empty PP.<$$> PP.indent 2 (PP.paragraph $ unlines ah)
 
-instance ArgsInfo '[] where
-  argsInfo HNil = []
+-- instance ArgsInfo '[] where
+--   argsInfo HNil = []
 
-instance (Show a, ArgsInfo (as)) => ArgsInfo (Argument r a ': as) where
-  argsInfo (HCons a@ReqArg{} as) = (argName a, argDomain a, argHelp a, Nothing) :argsInfo as
-  argsInfo (HCons a@OptArg{} as) = (argName a, argDomain a, argHelp a, Just (show $ argDefault a)) :argsInfo as
+-- instance (Show a, ArgsInfo (as)) => ArgsInfo (Argument r a ': as) where
+--   argsInfo _ = undefined
+  -- argsInfo (HCons a@ReqArg{} as) = undefined -- (argName a, argDomain a, argHelp a, Nothing) :argsInfo as
+  -- argsInfo (HCons a@OptArg{} as) = undefined -- (argName a, argDomain a, argHelp a, Just (show $ argDefault a)) :argsInfo as
 

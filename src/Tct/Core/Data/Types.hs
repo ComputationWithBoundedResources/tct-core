@@ -1,4 +1,7 @@
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- {-# LANGUAGE ScopedTypeVariables #-}
 -- | This module defines the most important types.
 module Tct.Core.Data.Types where
 
@@ -7,18 +10,19 @@ module Tct.Core.Data.Types where
 import           Control.Monad.Error           (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
+import           Data.List                     (intercalate)
 import qualified Data.Map                      as M
 import           Data.Typeable
 import qualified System.Time                   as Time
+import qualified Tct.Core.Common.Pretty        as PP
+import qualified Tct.Core.Common.Xml           as Xml
+import qualified Tct.Core.Data.Certificate     as C
+import           Tct.Core.Data.Forks           (Id (..))
 import           Text.Parsec                   (alphaNum, letter, oneOf)
 import qualified Text.Parsec                   as P ((<|>))
 import qualified Text.Parsec.Language          as PL
 import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
-import qualified Tct.Core.Common.Pretty        as PP
-import qualified Tct.Core.Common.Xml           as Xml
-import qualified Tct.Core.Data.Certificate     as C
-import           Tct.Core.Data.Forks           (Id (..))
 
 
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
@@ -119,7 +123,6 @@ data Strategy i o where
   Wait        :: RelTimeout -> Strategy i o -> Strategy i o
   WithStatus  :: (TctStatus i -> Strategy i o) -> Strategy i o
   WithState   :: (TctROState -> TctROState) -> Strategy i o -> Strategy i o
-  deriving Typeable
 
 data RelTimeout = TimeoutIn Int | TimeoutUntil Int
 
@@ -196,15 +199,80 @@ type family Ret as f where
 -- | Specifies if the Argument is optional or required.
 -- This mainly affects parsing of strategies and the the default function ('defaultFun') of declarations.
 data ArgFlag = Optional | Required
+data ArgMeta = ArgMeta {argName_ :: String, argHelp_ :: [String]} deriving Show
+
+data Argument (f :: ArgFlag) t where
+  NatArg      :: ArgMeta -> Argument 'Required Int
+  BoolArg     :: ArgMeta -> Argument 'Required Bool
+  StringArg   :: ArgMeta -> Argument 'Required String
+  FlagArg     :: (Show t, Typeable t, Enum t, Bounded t) => ArgMeta -> Argument 'Required t
+  StrategyArg :: Declared i o => ArgMeta -> Argument 'Required (Strategy i o)
+  SomeArg     :: Argument 'Required t -> Argument 'Required (Maybe t)
+  OptArg      :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
+
+
+argName :: Argument f t -> String
+argName (NatArg m)      = argName_ m
+argName (BoolArg m)     = argName_ m
+argName (StringArg m)   = argName_ m
+argName (FlagArg m)     = argName_ m
+argName (StrategyArg m) = argName_ m
+argName (SomeArg a)     = argName a
+argName (OptArg a t)    = argName a
+
+argDomain :: Argument f t -> String
+argDomain (NatArg _)      = "<nat>"
+argDomain (StringArg _)   = "<string>"
+argDomain (BoolArg _)     = "<bool>"
+argDomain (StrategyArg _) = "<strategy>"
+argDomain (FlagArg _)     = "flags"
+  -- k $ intercalate "|" $ map show [minBound ..] where k s = '<':s++">"
+  -- MS: something similar works for parsing
+  -- if not possible; define domain in argmeta and use smart constructors
+  -- where
+  --   en :: (Bounded a, Enum a, Show a) => String
+  --   en = concatMap show [minBound ..]
+argDomain (SomeArg a)     = "<none|" ++ argDomain a ++ ">"
+argDomain (OptArg a _)    = argDomain a
+
+argDefault :: Argument 'Optional t -> t
+argDefault (OptArg _ t) = t
+
+-- instance (t ~ a) => Show (Argument f t) where
+--   show (NatArg _)      = "<nat>"
+--   show (StringArg _)   = "<string>"
+--   show (BoolArg _)     = "<bool>"
+--   show (StrategyArg _) = "<strategy>"
+--   show (FlagArg _)     = show (undefined :: a)
+--   -- show (FlagArg _)     = k $ intercalate "|" $ concatMap show [(minBound :: t)..]
+--   --   where k s = '<':s++">"
+--   show (MaybeArg a)      = "<none|" ++ show a ++ ">"
+--   show (OptionalArg a _) = show a
+
+
+
+-- argsInfo (NatArg m) = (argName m, "<nat>", argHelp m, Nothing)
+-- argsInfo (StringArg m) = (argName m, "<string>", argHelp m, Nothing)
+-- argsInfo (BoolArg m) = (argName m, "<bool>", argHelp m, Nothing)
+
+class DefaultDeclared i o where
+  defaultDecls :: [StrategyDeclaration i o]
+
+class Declared i o where
+  decls         :: [StrategyDeclaration i o]
+  default decls :: DefaultDeclared i o => [StrategyDeclaration i o]
+  decls = defaultDecls
+
+instance {-# OVERLAPPABLE #-} DefaultDeclared i o => Declared i o
 
 -- | Specifies an meta information of an argument.
 -- An argument contains meta information - name, domain and description - for displaying and parsing.
 -- An optional argument additionally requires a default value.
-data Argument :: ArgFlag -> * -> * where
-  ReqArg :: r ~ 'Required =>
-    { argName :: String, argDomain :: String, argHelp :: [String] } -> Argument r a
-  OptArg :: r ~ 'Optional =>
-    { argName :: String, argDomain :: String, argHelp :: [String], argDefault :: a } -> Argument r a
+-- data Argument :: ArgFlag -> * -> * where
+--   ReqArg :: r ~ 'Required =>
+--     { argName :: String, argDomain :: String, argHelp :: [String] } -> Argument r a
+--   OptArg :: r ~ 'Optional =>
+--     { argName :: String, argDomain :: String, argHelp :: [String], argDefault :: a } -> Argument r a
 
 -- | Associates the types to a list of arguments.
 type family ArgsType a where
@@ -222,29 +290,29 @@ declare ::
 declare n desc as p = Decl n desc p (toHList as)
 
 -- | Specifies the construction of a argument parser.
-class ParsableArgs i o ats where
-  mkOptParser :: HList ats -> [SParser i o (String,Dynamic)]
-  mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser i o (HList (ArgsType ats))
+class ParsableArgs ats where
+  mkOptParser :: HList ats -> [SParser (String,Dynamic)]
+  mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser (HList (ArgsType ats))
 
 -- | Collects the meta information of a list of arguments.
-class ArgsInfo as where
-  argsInfo ::
-    HList as ->                                -- A heterogenous list of arguments.
-    [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
+-- class ArgsInfo as where
+--   argsInfo ::
+--     HList as ->                                -- A heterogenous list of arguments.
+--     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
 
 -- | Existential type for declarations specifying a Strategy.
 -- Mainly used for parsing and description.
 data StrategyDeclaration i o where
-  SD :: (ParsableArgs i o args, ArgsInfo args) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
+  SD :: Declared i o => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
 
 
 --- * Parsing --------------------------------------------------------------------------------------------------------
 
-type SPState i o = [StrategyDeclaration i o]
-type SParser i o  = CharParser (SPState i o)
+type SPState = ()
+type SParser = CharParser SPState
 
-class SParsable i o a where
-  parseS :: SParser i o a
+-- class SParsable i o a where
+--   parseS :: SParser i o a
 
 -- | Specified Tokenparser.
 strategyTP :: PT.TokenParser st
