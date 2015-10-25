@@ -32,21 +32,20 @@ declaration (Decl n _ f as) = do
   return (curried f vs)
 
 strategyDeclarations :: [StrategyDeclaration i o] -> SParser (Strategy i o)
-strategyDeclarations decls =
-  choice [ declaration d | SD d <- sortBy k decls ]
+strategyDeclarations ds =
+  choice [ declaration d | SD d <- sortBy k ds ]
     -- MS: there is an issue when declarations have only optional arguments and a common prefix
     -- as decl will always be successfull; so we sort the list in rev. lex order
     where k (SD d1) (SD d2) = compare (D.declName d2) (D.declName d1)
 
-strategy :: Declared i i => SParser (Strategy i i)
-strategy = PE.buildExpressionParser table strat <?> "stratgy"
+strategy :: [StrategyDeclaration i i] -> SParser (Strategy i i)
+strategy ds = PE.buildExpressionParser table strat <?> "stratgy"
   where
     strat =
-      parens strategy
+      parens (strategy ds)
       <|> predefined
       <?> "expression"
-    predefined :: Declared i i => SParser (Strategy i i)
-    predefined = strategyDeclarations decls
+    predefined = strategyDeclarations ds
     -- MA:TODO: todo, add more
     table = [ [unary "try" S.try , unary "force" S.force ]
             , [unary "es"  S.es ]
@@ -81,16 +80,14 @@ parse' :: Declared i o => SParser (Strategy i o)
 parse' = strategyDeclarations decls
 
 reqParser :: Argument 'Required t -> SParser t
-reqParser (NatArg _)        = nat
-reqParser (BoolArg _)       = bool
-reqParser (StringArg _)     = identifier
-reqParser (StrategyArg _)   = parse'
-reqParser (FlagArg _)       = enum
-reqParser (SomeArg a)       = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a) <?> "maybe"
+reqParser (SimpleArg _ p) = p
+reqParser (StrategyArg _) = parse'
+reqParser (FlagArg _)     = enum
+reqParser (SomeArg a)     = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a) <?> "maybe"
 
 optParser :: Argument 'Optional t -> SParser t
 optParser (OptArg a _) = reqParser a
 
-strategyFromString :: Declared i i => String -> Either ParseError (Strategy i i)
-strategyFromString = runParser (do {_ <- whiteSpace; p <- strategy; eof; return p}) () "supplied string"
+strategyFromString :: [StrategyDeclaration i i] ->  String -> Either ParseError (Strategy i i)
+strategyFromString ds = runParser (do {_ <- whiteSpace; p <- strategy ds; eof; return p}) () "supplied string"
 

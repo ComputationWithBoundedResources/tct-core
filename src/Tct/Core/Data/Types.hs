@@ -150,9 +150,6 @@ type family HListOf a :: [*] where
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3)       = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3]
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4)    = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4]
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5) = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5]
-
-
-
   HListOf (OneTuple a)              = '[a]
 
 class ToHList a                            where toHList :: a -> HList (HListOf a)
@@ -199,61 +196,43 @@ type family Ret as f where
 -- | Specifies if the Argument is optional or required.
 -- This mainly affects parsing of strategies and the the default function ('defaultFun') of declarations.
 data ArgFlag = Optional | Required
-data ArgMeta = ArgMeta {argName_ :: String, argHelp_ :: [String]} deriving Show
+
+data ArgMeta = ArgMeta {argName_ :: String, argDomain_ :: String, argHelp_ :: [String]} deriving Show
 
 data Argument (f :: ArgFlag) t where
-  NatArg      :: ArgMeta -> Argument 'Required Int
-  BoolArg     :: ArgMeta -> Argument 'Required Bool
-  StringArg   :: ArgMeta -> Argument 'Required String
-  FlagArg     :: (Show t, Typeable t, Enum t, Bounded t) => ArgMeta -> Argument 'Required t
+  SimpleArg   :: ArgMeta -> SParser t -> Argument 'Required t
+  FlagArg     :: (Show t, Enum t, Bounded t) => ArgMeta -> Argument 'Required t
   StrategyArg :: Declared i o => ArgMeta -> Argument 'Required (Strategy i o)
   SomeArg     :: Argument 'Required t -> Argument 'Required (Maybe t)
   OptArg      :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
 
+setArgMeta :: (ArgMeta -> ArgMeta) -> Argument f t -> Argument f t
+setArgMeta k (SimpleArg a p) = SimpleArg (k a) p
+setArgMeta k (FlagArg a)     = FlagArg (k a)
+setArgMeta k (StrategyArg a) = StrategyArg (k a)
+setArgMeta k (SomeArg a)     = SomeArg (setArgMeta k a)
+setArgMeta k (OptArg a t)    = OptArg (setArgMeta k a) t
+
+argMeta :: Argument f t -> ArgMeta
+argMeta (SimpleArg m _) = m
+argMeta (FlagArg m)     = m
+argMeta (StrategyArg m) = m
+argMeta (SomeArg a)     = argMeta a
+argMeta (OptArg a _)    = argMeta a
 
 argName :: Argument f t -> String
-argName (NatArg m)      = argName_ m
-argName (BoolArg m)     = argName_ m
-argName (StringArg m)   = argName_ m
-argName (FlagArg m)     = argName_ m
-argName (StrategyArg m) = argName_ m
-argName (SomeArg a)     = argName a
-argName (OptArg a t)    = argName a
+argName = argName_ .argMeta 
 
 argDomain :: Argument f t -> String
-argDomain (NatArg _)      = "<nat>"
-argDomain (StringArg _)   = "<string>"
-argDomain (BoolArg _)     = "<bool>"
-argDomain (StrategyArg _) = "<strategy>"
-argDomain (FlagArg _)     = "flags"
-  -- k $ intercalate "|" $ map show [minBound ..] where k s = '<':s++">"
-  -- MS: something similar works for parsing
-  -- if not possible; define domain in argmeta and use smart constructors
-  -- where
-  --   en :: (Bounded a, Enum a, Show a) => String
-  --   en = concatMap show [minBound ..]
-argDomain (SomeArg a)     = "<none|" ++ argDomain a ++ ">"
-argDomain (OptArg a _)    = argDomain a
+argDomain (SomeArg a) = "<none|" ++ argDomain a ++ ">"
+argDomain ar          = argDomain_ (argMeta ar)
+
+argHelp :: Argument f t -> [String]
+argHelp = argHelp_ . argMeta 
 
 argDefault :: Argument 'Optional t -> t
 argDefault (OptArg _ t) = t
 
--- instance (t ~ a) => Show (Argument f t) where
---   show (NatArg _)      = "<nat>"
---   show (StringArg _)   = "<string>"
---   show (BoolArg _)     = "<bool>"
---   show (StrategyArg _) = "<strategy>"
---   show (FlagArg _)     = show (undefined :: a)
---   -- show (FlagArg _)     = k $ intercalate "|" $ concatMap show [(minBound :: t)..]
---   --   where k s = '<':s++">"
---   show (MaybeArg a)      = "<none|" ++ show a ++ ">"
---   show (OptionalArg a _) = show a
-
-
-
--- argsInfo (NatArg m) = (argName m, "<nat>", argHelp m, Nothing)
--- argsInfo (StringArg m) = (argName m, "<string>", argHelp m, Nothing)
--- argsInfo (BoolArg m) = (argName m, "<bool>", argHelp m, Nothing)
 
 class DefaultDeclared i o where
   defaultDecls :: [StrategyDeclaration i o]
@@ -264,15 +243,6 @@ class Declared i o where
   decls = defaultDecls
 
 instance {-# OVERLAPPABLE #-} DefaultDeclared i o => Declared i o
-
--- | Specifies an meta information of an argument.
--- An argument contains meta information - name, domain and description - for displaying and parsing.
--- An optional argument additionally requires a default value.
--- data Argument :: ArgFlag -> * -> * where
---   ReqArg :: r ~ 'Required =>
---     { argName :: String, argDomain :: String, argHelp :: [String] } -> Argument r a
---   OptArg :: r ~ 'Optional =>
---     { argName :: String, argDomain :: String, argHelp :: [String], argDefault :: a } -> Argument r a
 
 -- | Associates the types to a list of arguments.
 type family ArgsType a where
@@ -295,15 +265,15 @@ class ParsableArgs ats where
   mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser (HList (ArgsType ats))
 
 -- | Collects the meta information of a list of arguments.
--- class ArgsInfo as where
---   argsInfo ::
---     HList as ->                                -- A heterogenous list of arguments.
---     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
+class ArgsInfo as where
+  argsInfo ::
+    HList as ->                                -- A heterogenous list of arguments.
+    [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
 
 -- | Existential type for declarations specifying a Strategy.
 -- Mainly used for parsing and description.
 data StrategyDeclaration i o where
-  SD :: (ParsableArgs args, Declared i o) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
+  SD :: (ParsableArgs args, ArgsInfo args, Declared i o) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
 
 
 --- * Parsing --------------------------------------------------------------------------------------------------------

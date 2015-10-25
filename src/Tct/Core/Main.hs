@@ -232,7 +232,7 @@ startInteractive ig = void $ case ig of
     system $ "ghci -ingore-dot-ghci -ghci-script " ++ fp
 
 -- > tct3 = tct3With const unit
-tct3 :: (ProofData i, Declared i i, DefaultDeclared i i) => TctConfig i -> IO ()
+tct3 :: (ProofData i, Declared i i) => TctConfig i -> IO ()
 tct3 = tct3WithOptions const unit
 
 -- | Default main function.
@@ -245,10 +245,13 @@ tct3 = tct3WithOptions const unit
 -- 4. updates @config@ from standard arguments; in particular answer output and proof output overrides @config@ if given
 -- 5. evaluates strategy with the given timeout
 -- 6. output answer and proof as given in (updated) @config@
-tct3WithOptions :: (ProofData i, Declared i i, DefaultDeclared i i) => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
-tct3WithOptions theUpdate theOptions cfg = do
+tct3WithOptions :: (ProofData i, Declared i i) => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
+tct3WithOptions = tct3WithOptions' decls
+
+tct3WithOptions' :: ProofData i => [StrategyDeclaration i i] -> (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
+tct3WithOptions' theStrategies theUpdate theOptions cfg = do
   r <- runErroneousIO $ do
-    action <- liftIO $ O.execParser $ mkParser (strategies cfg) (version cfg) theOptions
+    action <- liftIO $ O.execParser $ mkParser theStrategies (version cfg) theOptions
     case action of
       RunInteractive -> tryIO $ startInteractive (interactiveGHCi cfg)
       Run opts       -> do
@@ -264,7 +267,7 @@ tct3WithOptions theUpdate theOptions cfg = do
             { parseProblem    = theParser
             , putAnswer       = theAnswer
             , putProof        = theProof
-            , strategies      = theStrategies
+            -- , strategies      = theStrategies
             , defaultStrategy = theDefaultStrategy
             } = ucfg
 
@@ -282,7 +285,6 @@ tct3WithOptions theUpdate theOptions cfg = do
   case r of
     Left err -> PP.putPretty (PP.text "ERROR") >> PP.hPutDoc stderr (PP.pretty err PP.</> PP.text "") >> exitFailure
     Right _  -> exitSuccess
-
   where
 
     updateTctConfig f opt cf = cfg'
@@ -290,7 +292,7 @@ tct3WithOptions theUpdate theOptions cfg = do
       , putProof  = putProof cfg' `fromMaybe` (putProofFormat <$> proofFormat_ opt) }
       where cfg' = f cf (modeOptions_ opt)
 
-    parseStrategy s = case strategyFromString s of
+    parseStrategy s = case strategyFromString theStrategies s of
       Left err -> Left $ TctStrategyParseError err
       Right st -> Right st
 
