@@ -103,22 +103,22 @@ type Nat = Int
 
 -- | Specifies a natural argument with domain "<nat>".
 nat :: String -> [String] -> Argument 'Required Nat
-nat n h = arg n "<nat>" h P.nat
+nat n h = arg n "nat" h P.nat
 
 -- | Specifies a bool argument with domain "<bool>".
 bool :: String -> [String] -> Argument 'Required Bool
-bool n h = arg n "<bool>" h P.bool
+bool n h = arg n "bool" h P.bool
 
 string :: String -> [String] -> Argument 'Required String
-string n h = arg n "<string>" h P.identifier
+string n h = arg n "string" h P.identifier
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Declared i o => String -> [String] -> Argument 'Required (Strategy i o)
-strat n h = StrategyArg (ArgMeta { argName_ = n, argDomain_ = "<strategy>", argHelp_ = h }) 
+strat n h = StrategyArg (ArgMeta { argName_ = n, argDomain_ = "strategy", argHelp_ = h }) 
 
 -- TODO: MS: generate domain from bounded instance
 flag :: (Show t, Typeable t, Bounded t, Enum t) => String -> [String] -> Argument 'Required t
-flag n h = FlagArg (ArgMeta { argName_ = n, argDomain_ = "<flag>", argHelp_ = h })
+flag n h = FlagArg (ArgMeta { argName_ = n, argDomain_ = "flag", argHelp_ = h })
 
 withDomain :: Argument r a -> [String] -> Argument r a
 withDomain ar ns = case ar of
@@ -127,7 +127,7 @@ withDomain ar ns = case ar of
   (StrategyArg a) -> StrategyArg (k a)
   (SomeArg a)     -> SomeArg (withDomain a ns) 
   (OptArg a t)    -> OptArg (withDomain a ns) t
-  where k a = a { argDomain_ = let ds = intercalate "|" ns in '<':ds++">" }
+  where k a = a { argDomain_ = intercalate "|" ns }
 
 instance WithName ArgMeta        where withName ar n = ar { argName_ = n }
 instance WithName (Argument r a) where withName ar n = setArgMeta (flip withName n) ar
@@ -157,8 +157,8 @@ instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where
       theHelp = PP.paragraph (unlines h)
       theSynopsis = PP.text "Synopsis: " PP.<+> PP.text n PP.<+> PP.hsep (map mkSynopsis info)
         where
-          mkSynopsis (_ , ad, _, Nothing) = PP.dquotes (PP.text ad)
-          mkSynopsis (an, ad, _, _)       = PP.brackets $ PP.char ':' PP.<> PP.text an PP.<+> PP.text ad
+          mkSynopsis (_ , ad, _, Nothing) = PP.angles (PP.text ad)
+          mkSynopsis (an, ad, _, _)       = PP.brackets $ PP.char ':' PP.<> PP.text an PP.<+> PP.angles (PP.text ad)
       theOptArgs = PP.text "Optional:" PP.<$$> PP.indent 2 (PP.vcat (map mkArgsInfo opts))
       theReqArgs = PP.text "Required:" PP.<$$> PP.indent 2 (PP.vcat (map mkArgsInfo reqs))
 
