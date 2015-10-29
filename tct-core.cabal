@@ -1,5 +1,5 @@
 name:          tct-core
-version:       3.0.0
+version:       3.1.0
 stability:     experimental
 author:
   Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
@@ -43,12 +43,12 @@ library
     Tct.Core.Data.Strategy
     Tct.Core.Data.TctM
     Tct.Core.Data.Types
-    Tct.Core.Declarations
     Tct.Core.Parse
     Tct.Core.Interactive
     Tct.Core.Main
     Tct.Core.Processor.Assumption
     Tct.Core.Processor.Empty
+    Tct.Core.Processor.Failing
     Tct.Core.Processor.Transform
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,

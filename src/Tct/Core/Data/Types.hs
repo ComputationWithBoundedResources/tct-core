@@ -1,28 +1,23 @@
-{-# LANGUAGE DefaultSignatures    #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE UndecidableInstances #-}
--- {-# LANGUAGE ScopedTypeVariables #-}
 -- | This module defines the most important types.
 module Tct.Core.Data.Types where
 
 
-
-import           Control.Monad.Error           (MonadError)
+import           Control.Monad.Except          (MonadError)
 import           Control.Monad.Reader          (MonadIO, MonadReader, ReaderT)
 import           Data.Dynamic                  (Dynamic)
-import           Data.List                     (intercalate)
 import qualified Data.Map                      as M
 import           Data.Typeable
 import qualified System.Time                   as Time
-import qualified Tct.Core.Common.Pretty        as PP
-import qualified Tct.Core.Common.Xml           as Xml
-import qualified Tct.Core.Data.Certificate     as C
-import           Tct.Core.Data.Forks           (Id (..))
 import           Text.Parsec                   (alphaNum, letter, oneOf)
 import qualified Text.Parsec                   as P ((<|>))
 import qualified Text.Parsec.Language          as PL
 import qualified Text.Parsec.Token             as PT
 import           Text.ParserCombinators.Parsec (CharParser)
+
+import qualified Tct.Core.Common.Pretty        as PP
+import qualified Tct.Core.Common.Xml           as Xml
+import qualified Tct.Core.Data.Certificate     as C
+import           Tct.Core.Data.Forks           (Id (..))
 
 
 --- * TctM Monad -----------------------------------------------------------------------------------------------------
@@ -90,8 +85,9 @@ type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
-data Return p =
-  NoProgress Reason
+-- | The return type of an application of a processors.
+data Return p
+  = NoProgress Reason
   | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (Out p)))
 
 -- | Everything that is necessary for defining a processor.
@@ -197,52 +193,16 @@ type family Ret as f where
 -- This mainly affects parsing of strategies and the the default function ('defaultFun') of declarations.
 data ArgFlag = Optional | Required
 
+-- | Meta information of arguments.
 data ArgMeta = ArgMeta {argName_ :: String, argDomain_ :: String, argHelp_ :: [String]} deriving Show
 
 data Argument (f :: ArgFlag) t where
   SimpleArg   :: ArgMeta -> SParser t -> Argument 'Required t
-  FlagArg     :: (Show t, Enum t, Bounded t) => ArgMeta -> Argument 'Required t
-  StrategyArg :: Declared i o => ArgMeta -> Argument 'Required (Strategy i o)
+  FlagArg     :: Show t  => ArgMeta -> [t] -> Argument 'Required t
+  StrategyArg :: ArgMeta -> [StrategyDeclaration i o] -> Argument 'Required (Strategy i o)
+
   SomeArg     :: Argument 'Required t -> Argument 'Required (Maybe t)
   OptArg      :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
-
-setArgMeta :: (ArgMeta -> ArgMeta) -> Argument f t -> Argument f t
-setArgMeta k (SimpleArg a p) = SimpleArg (k a) p
-setArgMeta k (FlagArg a)     = FlagArg (k a)
-setArgMeta k (StrategyArg a) = StrategyArg (k a)
-setArgMeta k (SomeArg a)     = SomeArg (setArgMeta k a)
-setArgMeta k (OptArg a t)    = OptArg (setArgMeta k a) t
-
-argMeta :: Argument f t -> ArgMeta
-argMeta (SimpleArg m _) = m
-argMeta (FlagArg m)     = m
-argMeta (StrategyArg m) = m
-argMeta (SomeArg a)     = argMeta a
-argMeta (OptArg a _)    = argMeta a
-
-argName :: Argument f t -> String
-argName = argName_ .argMeta 
-
-argDomain :: Argument f t -> String
-argDomain (SomeArg a) = "<none|" ++ argDomain a ++ ">"
-argDomain ar          = argDomain_ (argMeta ar)
-
-argHelp :: Argument f t -> [String]
-argHelp = argHelp_ . argMeta 
-
-argDefault :: Argument 'Optional t -> t
-argDefault (OptArg _ t) = t
-
-
-class DefaultDeclared i o where
-  defaultDecls :: [StrategyDeclaration i o]
-
-class Declared i o where
-  decls         :: [StrategyDeclaration i o]
-  default decls :: DefaultDeclared i o => [StrategyDeclaration i o]
-  decls = defaultDecls
-
-instance {-# OVERLAPPABLE #-} DefaultDeclared i o => Declared i o
 
 -- | Associates the types to a list of arguments.
 type family ArgsType a where
@@ -253,11 +213,6 @@ type family ArgsType a where
 data Declaration :: * -> * where
   Decl :: (f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)) =>
     String -> [String] -> f -> HList args -> Declaration (args :-> Ret (ArgsType args) f)
-
-declare ::
-  (ToHList a, HListOf a ~ args, Uncurry (ArgsType args :-> Ret (ArgsType args) f) ~ f) =>
-    String -> [String] -> a -> f -> Declaration (args :-> Ret (ArgsType args) f)
-declare n desc as p = Decl n desc p (toHList as)
 
 -- | Specifies the construction of a argument parser.
 class ParsableArgs ats where
@@ -270,6 +225,11 @@ class ArgsInfo as where
     HList as ->                                -- A heterogenous list of arguments.
     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
 
+
+-- | Open type for declarations. Allows to provide problem specific declarations in executables.
+class Declared i o where
+  decls :: [StrategyDeclaration i o]
+
 -- | Existential type for declarations specifying a Strategy.
 -- Mainly used for parsing and description.
 data StrategyDeclaration i o where
@@ -280,9 +240,6 @@ data StrategyDeclaration i o where
 
 type SPState = ()
 type SParser = CharParser SPState
-
--- class SParsable i o a where
---   parseS :: SParser i o a
 
 -- | Specified Tokenparser.
 strategyTP :: PT.TokenParser st

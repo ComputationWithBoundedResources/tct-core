@@ -72,7 +72,9 @@ spawn' cmd args = C.bracketOnError create release run where
   run (outh, errh, ph) = do
     outs <- hGetContents outh
     errs <- hGetContents errh
-    _ <- forkIO $ void $ C.evaluate (rnf outs)
+    outMVar <- newEmptyMVar
+    _ <- forkIO $ C.evaluate (rnf outs) >> putMVar outMVar ()
+    takeMVar outMVar
     ex <- waitForProcess ph
     return $ case ex of
       ExitFailure i -> Left ("Tct.Core.Common.Concurrent.spawn: Exitcode: " ++ show i ++ ": " ++ errs)

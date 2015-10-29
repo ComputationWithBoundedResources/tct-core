@@ -5,15 +5,12 @@ module Tct.Core.Data.Certificate
   Complexity (..)
   , constant
   , linear
-
   -- * Semiring/Composition
   , compose
   -- , iter
-
   -- * Certificates
   , Certificate (..)
   , unbounded
-
   -- * Setter/Getter
   , spaceUBCert
   , spaceLBCert
@@ -26,7 +23,7 @@ module Tct.Core.Data.Certificate
   ) where
 
 
-import           Data.Monoid
+import           Data.Monoid              ((<>))
 
 import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
@@ -50,11 +47,11 @@ data Complexity
   | Unknown          -- ^ Unknown.
   deriving (Eq, Show)
 
--- | prop> constant = Poly (Just 0)
+-- | > constant = Poly (Just 0)
 constant :: Complexity
 constant = Poly (Just 0)
 
--- | prop> linear = Poly (Just 1)
+-- | > linear = Poly (Just 1)
 linear :: Complexity
 linear = Poly (Just 1)
 
@@ -87,8 +84,7 @@ instance Multiplicative Complexity where
   a               `mul` b               = max a b
   one = Poly (Just 0)
 
-
--- | Composition of asymptotic complexity.
+-- | Composition of asymptotic complexities.
 compose :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `compose` a
   | n == 0 = Poly (Just 0)
@@ -105,7 +101,6 @@ a `compose` (Poly (Just m))
 (Exp Nothing)   `compose` (Exp _)         = Exp Nothing
 (Exp _)         `compose` (Exp Nothing)   = Exp Nothing
 a               `compose` b               = maximum [Primrec, a, b]
-
 
 {-
 iter :: Complexity -> Complexity -> Complexity

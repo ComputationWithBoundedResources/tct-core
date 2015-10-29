@@ -1,10 +1,8 @@
 -- | This module provides the main function and the command-line interface.
 module Tct.Core.Main
   (
-  module M
   -- * Tct Configuration
-  -- |
-  , TctConfig (..)
+  TctConfig (..)
   , defaultTctConfig
   , InteractiveGHCi (..)
   -- * Tct Initialisation
@@ -19,7 +17,6 @@ module Tct.Core.Main
 
 
 import           Control.Applicative     ((<|>))
-import           Control.Monad           (void)
 import           Control.Monad.Reader    (runReaderT)
 import qualified Data.Map                as M
 import           Data.Maybe              (fromMaybe)
@@ -29,12 +26,11 @@ import           System.IO               (hClose, hPutStrLn, stderr)
 import           System.IO.Temp          (withSystemTempFile, withTempDirectory)
 import           System.Process          (system)
 import qualified System.Time             as Time
+
 import           Tct.Core.Common.Error
-import           Tct.Core.Common.Options as M
+import           Tct.Core.Common.Options
 import qualified Tct.Core.Common.Pretty  as PP
-import           Tct.Core.Data           as M (ProofTree)
 import           Tct.Core.Data
-import           Tct.Core.Declarations   (declarations)
 import           Tct.Core.Parse          (strategyFromString)
 
 
@@ -51,11 +47,9 @@ data TctConfig i = TctConfig
   , putAnswer       :: ProofTree i -> IO ()
   , putProof        :: ProofTree i -> IO ()
 
-  , strategies      :: [StrategyDeclaration i i]
   , defaultStrategy :: Strategy i i
 
   , runtimeOptions  :: [(String, [String])]
-
   , interactiveGHCi :: InteractiveGHCi
   , version         :: String
   }
@@ -69,25 +63,24 @@ defaultTctConfig p = TctConfig
   { parseProblem    = p
   , putAnswer       = PP.putPretty . prettyDefaultAnswer
   , putProof        = PP.putPretty . prettyDefaultProof
-  , strategies      = declarations
   , defaultStrategy = abort
   , runtimeOptions  = []
   , interactiveGHCi = GHCiScript
       [ ":set prompt \"tct>\""
       , ":module +Tct.Core.Interactive" ]
-  , version         = "3.1.0.0"
+  , version         = "3.1.0"
   }
 
 
 prettySilentAnswer, prettyDefaultAnswer, prettyTTTacAnswer :: ProofTree i -> PP.Doc
-prettySilentAnswer  _        = PP.empty
-prettyDefaultAnswer r        = PP.pretty (termcomp (certificate r))
-prettyTTTacAnswer   r        = PP.pretty (tttac (certificate r))
+prettySilentAnswer  _ = PP.empty
+prettyDefaultAnswer r = PP.pretty (termcomp (certificate r))
+prettyTTTacAnswer   r = PP.pretty (tttac (certificate r))
 
 prettySilentProof, prettyDefaultProof, prettyVerboseProof :: PP.Pretty i => ProofTree i -> PP.Doc
-prettySilentProof _          = PP.empty
-prettyDefaultProof r         = PP.pretty (ppProofTree PP.pretty r)
-prettyVerboseProof r         = PP.pretty (ppDetailedProofTree PP.pretty r)
+prettySilentProof _  = PP.empty
+prettyDefaultProof r = PP.pretty (ppProofTree PP.pretty r)
+prettyVerboseProof r = PP.pretty (ppDetailedProofTree PP.pretty r)
 -- prettyXmlProof r             = error "missing: toXml proofTree" -- TODO
 
 putAnswerFormat :: AnswerFormat -> ProofTree i -> IO ()
@@ -102,16 +95,10 @@ putProofFormat VerboseProofFormat = PP.putPretty . prettyVerboseProof
 -- putXmlFormat XmlProofFormat = PP.putPretty prettyXmlProof
 
 -- | Format of answer output.
-data AnswerFormat
-  = SilentAnswerFormat
-  | DefaultAnswerFormat
-  | TTTACAnswerFormat
+data AnswerFormat = SilentAnswerFormat | DefaultAnswerFormat | TTTACAnswerFormat
 
 -- | Format of proof output. Printed after answer in main.
-data ProofFormat
-  = SilentProofFormat
-  | DefaultProofFormat
-  | VerboseProofFormat
+data ProofFormat = SilentProofFormat | DefaultProofFormat | VerboseProofFormat
   -- | XmlProofFormat
 
 writeAnswerFormat :: AnswerFormat -> String
@@ -209,7 +196,7 @@ mkParser ps vers mparser = O.info (versioned <*> listed <*> O.helper <*> interac
 run :: TctConfig i -> TctM a -> IO a
 run cfg m = run' m $ \st -> st { kvPairs = M.fromList (runtimeOptions cfg) }
 
--- MS: the interactive mode is not type-safe so we have to ignore all problem specfic options
+-- MS: the interactive mode is not type-safe so we ignore all problem specfic options
 runInteractive :: TctM a -> IO a
 runInteractive m = run' m id
 
@@ -267,7 +254,6 @@ tct3WithOptions' theStrategies theUpdate theOptions cfg = do
             { parseProblem    = theParser
             , putAnswer       = theAnswer
             , putProof        = theProof
-            -- , strategies      = theStrategies
             , defaultStrategy = theDefaultStrategy
             } = ucfg
 

@@ -13,7 +13,6 @@ module Tct.Core.Data.ProofTree
   -- * Certification
   , certificate
   , certificateWith
-
   -- * Properites
   , isOpen
   , isFailure
@@ -26,27 +25,22 @@ module Tct.Core.Data.ProofTree
   ) where
 
 
-
-import           Control.Applicative
-import           Data.Foldable             as F (any, foldr, sum, toList)
-import           Data.Monoid
-import           Data.Traversable
-import           Prelude                   hiding (any, mapM)
-
+import qualified Data.Foldable             as F (toList)
 
 import qualified Tct.Core.Common.Pretty    as PP
 import           Tct.Core.Data.Certificate (Certificate, timeLB, timeUB, unbounded)
 import           Tct.Core.Data.Types
 
+
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
-open = F.foldr (:) []
+open = foldr (:) []
 
 -- | Returns the number of nodes of a 'ProofTree'.
 size :: ProofTree l -> Int
 size (Open _)          = 1
 size (Failure _)       = 1
-size (Success _ _ pts) = 1 + F.sum (size <$> pts)
+size (Success _ _ pts) = 1 + sum (size <$> pts)
 
 -- | Substitute the open leaves of a proof tree according to the given function
 substituteM :: (Functor m, Monad m) => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)
@@ -87,7 +81,7 @@ certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 -- | Checks if the 'ProofTree' contains a 'Failure' node.
 isFailure :: ProofTree l -> Bool
 isFailure Failure{}         = True
-isFailure (Success _ _ pts) = F.any isFailure pts
+isFailure (Success _ _ pts) = any isFailure pts
 isFailure _                 = False
 
 -- | Checks that the 'ProofTree' does not contain a 'Failure' node
@@ -134,27 +128,21 @@ ppProofNode (ProofNode p prob po) = PP.vcat
   , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
   where ind = PP.indent 2
 
--- ppNodeShort :: (PP.Pretty (ProofObject a), Show a) => ProofNode a -> PP.Doc
--- ppNodeShort (ProofNode p _ po) = PP.vcat
---   [ PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
---   , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
---   where ind = PP.indent 2
-
 ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
 ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
   [ ppHeader pt is "Open"
   , PP.indent 4 (ppProb l) ]
-ppProofTree' is _ _ f@(Failure r) = 
+ppProofTree' is _ _ f@(Failure r) =
   ppHeader f is "Failure"
   PP.<$$> PP.indent 2 (PP.pretty r)
 
 ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) =
   PP.vcat [ ppHeader pt (i,is) "Success", PP.indent 4 (ppProofNode pn), ppSubTrees (F.toList pts) ]
-  where 
+  where
     ppSubTrees []  = PP.empty
     ppSubTrees [t] = ppProofTree' (i+1,is) ppProb detailed t
     ppSubTrees ls  = PP.vcat [ ppProofTree' (j,is++[i]) ppProb detailed t
-                             | (j,t) <- zip [1..] ls] 
+                             | (j,t) <- zip [1..] ls]
 
 ppHeader :: ProofTree l -> (Int, [Int]) -> String -> PP.Doc
 ppHeader pt (i,is) s =

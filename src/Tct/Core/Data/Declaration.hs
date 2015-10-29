@@ -1,55 +1,67 @@
 -- | A declaration associates meta-information such as name and description, to a function.
 module Tct.Core.Data.Declaration
   (
-  declName
+  -- * Declaration
+  Declaration (..)
+  , declare
+  , OneTuple (..)
+  , declName
   , declHelp
   , declFun
   , declArgs
   , deflFun
-
-  -- * StrategyDeclaration
-  , StrategyDeclaration
-
   -- * Arguments
   , Argument (..)
   , ArgFlag (..)
-  , OneTuple (..)
+  , ArgMeta (..)
+  , setArgMeta
+  , argMeta
+  , argName
+  , argDomain
+  , argHelp
+  , argDefault
+  , ArgsInfo (..)
+  -- ** Argument Constructors
   , arg
-  , optional
-  , some
-  , withDomain
-
-  -- * Instances
   , Nat
   , nat
   , bool
   , string
   , strat
   , flag
+  -- ** Argument Modifiers
+  , optional
+  , some
+  , withDomain
   ) where
 
 
-import Data.Typeable
 import           Data.List              (intercalate)
+import           Data.Typeable
 
+import qualified Tct.Core.Common.Parser as P
 import qualified Tct.Core.Common.Pretty as PP
 import           Tct.Core.Data.Types
-import qualified Tct.Core.Common.Parser as P
 
 
--- | Returns the name of a 'Declarationi'.
+declare ::
+  (ToHList a, HListOf a ~ args, Uncurry (ArgsType args :-> Ret (ArgsType args) f) ~ f) =>
+    String -> [String] -> a -> f -> Declaration (args :-> Ret (ArgsType args) f)
+declare n desc as p = Decl n desc p (toHList as)
+
+-- | Returns the name of a 'Declaration'.
 declName :: Declaration c -> String
 declName (Decl n _ _  _) = n
 
--- | Returns the description of a 'Declarationi'.
+-- | Returns the description of a 'Declaration'.
 declHelp :: Declaration c -> [String]
 declHelp (Decl _ h _  _) = h
 
--- | Returns the function of a 'Declarationi'.
+-- | Returns the function of a 'Declaration'.
 declFun :: Declaration (args :-> r) -> Uncurry (ArgsType args :-> r)
 declFun (Decl _ _ f  _) = f
 
--- | Returns the arguments of a 'Declarationi'.
+-- | Returns the arguments of a 'Declaration'.
 declArgs :: Declaration (args :-> r) -> HList args
 declArgs (Decl _ _ _ as) = as
 
@@ -80,11 +92,6 @@ instance DefF (as :-> r) => DefF (Argument 'Required a ': as :-> r) where
 
 
 --- * arguments ------------------------------------------------------------------------------------------------------
--- instance Functor (Argument r) where
---   _ `fmap` ar@ReqArg{} =
---     ReqArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar }
---   f `fmap` ar@OptArg{} =
---     OptArg { argName = argName ar, argDomain = argDomain ar, argHelp = argHelp ar, argDefault = f (argDefault ar) }
 
 -- | Generic argument with name "arg" and domain "<arg>".
 arg :: String -> String -> [String] -> SParser t -> Argument 'Required t
@@ -114,19 +121,21 @@ string n h = arg n "string" h P.identifier
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Declared i o => String -> [String] -> Argument 'Required (Strategy i o)
-strat n h = StrategyArg (ArgMeta { argName_ = n, argDomain_ = "strategy", argHelp_ = h }) 
+strat n h = StrategyArg (ArgMeta { argName_ = n, argDomain_ = "strategy", argHelp_ = h }) decls
 
--- TODO: MS: generate domain from bounded instance
-flag :: (Show t, Typeable t, Bounded t, Enum t) => String -> [String] -> Argument 'Required t
-flag n h = FlagArg (ArgMeta { argName_ = n, argDomain_ = "flag", argHelp_ = h })
+flag :: (Show t, Bounded t, Enum t) => String -> [String] -> Argument 'Required t
+flag n h = FlagArg (ArgMeta { argName_ = n, argDomain_ = ds, argHelp_ = h }) es
+  where 
+    es = [minBound]
+    ds = intercalate "|" (map show es)
 
 withDomain :: Argument r a -> [String] -> Argument r a
 withDomain ar ns = case ar of
-  (SimpleArg a p) -> SimpleArg (k a) p
-  (FlagArg a)     -> FlagArg (k a)
-  (StrategyArg a) -> StrategyArg (k a)
-  (SomeArg a)     -> SomeArg (withDomain a ns) 
-  (OptArg a t)    -> OptArg (withDomain a ns) t
+  (SimpleArg a p)    -> SimpleArg (k a) p
+  (FlagArg a fs)     -> FlagArg (k a) fs
+  (StrategyArg a ds) -> StrategyArg (k a) ds
+  (SomeArg a)        -> SomeArg (withDomain a ns)
+  (OptArg a t)       -> OptArg (withDomain a ns) t
   where k a = a { argDomain_ = intercalate "|" ns }
 
 instance WithName ArgMeta        where withName ar n = ar { argName_ = n }
@@ -135,10 +144,44 @@ instance WithName (Argument r a) where withName ar n = setArgMeta (flip withName
 instance WithHelp ArgMeta        where withHelp ar n = ar { argHelp_ = n }
 instance WithHelp (Argument r a) where withHelp ar n = setArgMeta (flip withHelp n) ar
 
--- StrategyDeclaration
+setArgMeta :: (ArgMeta -> ArgMeta) -> Argument f t -> Argument f t
+setArgMeta k (SimpleArg a p)    = SimpleArg (k a) p
+setArgMeta k (FlagArg a fs)     = FlagArg (k a) fs
+setArgMeta k (StrategyArg a ds) = StrategyArg (k a) ds
+setArgMeta k (SomeArg a)        = SomeArg (setArgMeta k a)
+setArgMeta k (OptArg a t)       = OptArg (setArgMeta k a) t
 
-instance PP.Pretty (StrategyDeclaration i o) where
-  pretty (SD s) = PP.pretty s
+argMeta :: Argument f t -> ArgMeta
+argMeta (SimpleArg m _)   = m
+argMeta (FlagArg m _)     = m
+argMeta (StrategyArg m _) = m
+argMeta (SomeArg a)       = argMeta a
+argMeta (OptArg a _)      = argMeta a
+
+argName :: Argument f t -> String
+argName = argName_ . argMeta
+
+argDomain :: Argument f t -> String
+argDomain (SomeArg a) = "<none|" ++ argDomain a ++ ">"
+argDomain ar          = argDomain_ (argMeta ar)
+
+argHelp :: Argument f t -> [String]
+argHelp = argHelp_ . argMeta
+
+argDefault :: Argument 'Optional t -> t
+argDefault (OptArg _ t) = t
+
+
+instance ArgsInfo '[] where
+  argsInfo HNil = []
+
+instance (Show a, ArgsInfo as) => ArgsInfo (Argument r a ': as) where
+  argsInfo (HCons a as) = argsInfo' a :argsInfo as where
+    argsInfo' :: Show t => Argument f t -> (String, String, [String], Maybe String)
+    argsInfo' (OptArg b t) = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Just $ show t)
+    argsInfo' b            = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Nothing)
+
+--- * proof data -----------------------------------------------------------------------------------------------------
 
 instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where
   pretty (Decl n h _ as) = PP.vcat $
@@ -170,13 +213,4 @@ instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where
       mkArgsInfo (an, _, ah, Nothing) = mkArgsInfo' an ah
       mkArgsInfo (an, _, ah, Just s)  = mkArgsInfo' an ah PP.<$$> PP.indent 2 (PP.text "default:" PP.<+> PP.text s)
       mkArgsInfo' an ah               = PP.text an PP.<> if null ah then PP.empty else PP.empty PP.<$$> PP.indent 2 (PP.paragraph $ unlines ah)
-
-instance ArgsInfo '[] where
-  argsInfo HNil = []
-
-instance (Show a, ArgsInfo as) => ArgsInfo (Argument r a ': as) where
-  argsInfo (HCons a as) = argsInfo' a :argsInfo as where
-    argsInfo' :: Show t => Argument f t -> (String, String, [String], Maybe String)
-    argsInfo' (OptArg b t) = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Just $ show t)
-    argsInfo' b            = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Nothing)
 

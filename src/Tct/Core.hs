@@ -1,25 +1,20 @@
-{- | This module re-exports top-level definition for
+{- | This module re-exports useful top-level definitions for
 
     * configuring Tct,
     * instantiating TcT, and
-    * declaring customised Strategies.
+    * declaring customised Strategies,
 
-  TODO: description
-
+and is intended to be imported unqualified.
 -}
 module Tct.Core
   (
   -- * Configuring Tct
   TctConfig (..)
   , defaultTctConfig
-  , AnswerFormat (..)
-  , ProofFormat (..)
-  -- * Initialising Tct
-  , addStrategies
   , withDefaultStrategy
   , appendGHCiScript
   , addRuntimeOption
-  -- * Processor / Strategy
+  -- * Processor
   , ProofData
   , abortWith
   , succeedWith
@@ -29,32 +24,31 @@ module Tct.Core
   -- ** Argument
   , Argument
   , ArgFlag (..)
-  , arg
   , nat
   , bool
   , strat
+  , flag
   , string
   , some
-  , withDomain
   , optional
+  , withDomain
   -- ** Declaration
-  , StrategyDeclaration (..)
   , OneTuple (..)
   -- ** Argument and Declaration Modifyer
   , withName
   , withHelp
-  -- ** Combinators
+  -- ** Strategy and Combinators
   , module Tct.Core.Data.Strategy
+  , close
+  , failing
   ) where
 
 
 import Tct.Core.Data
 import Tct.Core.Main
 import Tct.Core.Data.Strategy
+import Tct.Core.Processor.Failing
 
--- | Adds a list of 'StrategyDeclaraton' to the existing ones.
-addStrategies :: TctConfig i -> [StrategyDeclaration i i] -> TctConfig i
-addStrategies cfg sds = cfg { strategies = (strategies cfg) ++ sds }
 
 -- | Sets the default Strategy.
 withDefaultStrategy :: TctConfig i -> Strategy i i -> TctConfig i

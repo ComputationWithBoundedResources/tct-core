@@ -1,6 +1,7 @@
--- | This module provides standard output formats for certificates.
+-- | This module provides standard output formats for a 'Certificate'.
 module Tct.Core.Data.Answer
   (
+  -- * Generic timebound format.
   Timebounds (..)
   , timebounds
   -- * tttac / termcomp (prior 2015) format

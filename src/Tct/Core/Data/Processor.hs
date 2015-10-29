@@ -15,11 +15,16 @@ module Tct.Core.Data.Processor
   ) where
 
 
-import           Control.Monad.Error    (catchError)
+
+
+import           Tct.Core.Common.Error  (catchError)
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Data.Forks    as F
 import           Tct.Core.Data.Types
 
+
+-- | Applies a processor. Transforms the result of an application, 'Return',  to a 'ProofTree'.
+-- Always creates a node.
 apply :: Processor p => p -> In p -> TctM (ProofTree (Out p))
 apply p i = toProofTree <$> (execute p i `catchError` handler)
   where

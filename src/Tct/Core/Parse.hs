@@ -60,12 +60,12 @@ instance ParsableArgs '[] where
   mkArgParser _ _ = return HNil
 
 instance (Typeable a, ParsableArgs as) => ParsableArgs (Argument 'Optional a ': as) where
-  mkOptParser (HCons (a@OptArg{}) as) = ( (\ v -> (argName a, toDyn v)) <$> pa a ) : mkOptParser as
+  mkOptParser (HCons (a@OptArg{}) as) = ( (\ v -> (D.argName a, toDyn v)) <$> pa a ) : mkOptParser as
     where
       pa :: Argument 'Optional a -> SParser a
-      pa t = symbol (':' : argName t) >> optParser t
+      pa t = symbol (':' : D.argName t) >> optParser t
   mkArgParser (HCons a as) ls = do
-    let v = fromMaybe (argDefault a) (lookup (argName a) ls >>= fromDynamic)
+    let v = fromMaybe (D.argDefault a) (lookup (D.argName a) ls >>= fromDynamic)
     vs <- mkArgParser as ls
     return (HCons v  vs)
 
@@ -76,14 +76,12 @@ instance (ParsableArgs as) => ParsableArgs (Argument 'Required a ': as) where
     vs <- mkArgParser as ls
     return (HCons v vs)
 
-parse' :: Declared i o => SParser (Strategy i o)
-parse' = strategyDeclarations decls
-
 reqParser :: Argument 'Required t -> SParser t
-reqParser (SimpleArg _ p) = p
-reqParser (StrategyArg _) = parse'
-reqParser (FlagArg _)     = enum
-reqParser (SomeArg a)     = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a) <?> "maybe"
+reqParser (SimpleArg _ p)    = p
+reqParser (StrategyArg _ ds) = strategyDeclarations ds
+reqParser (FlagArg _ fs)     = choice $ map k fs
+  where k b = try $ symbol (show b) >> return b
+reqParser (SomeArg a)        = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a) <?> "maybe"
 
 optParser :: Argument 'Optional t -> SParser t
 optParser (OptArg a _) = reqParser a

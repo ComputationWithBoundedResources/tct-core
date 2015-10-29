@@ -10,7 +10,6 @@ module Tct.Core.Data.TctM
   , setKvPair
   , getKvPair
   , askStatus
-
   -- * Lifted IO functions
   , async
   , wait
@@ -49,6 +48,7 @@ setKvPair (k,v) = local $ \st -> st { kvPairs = M.insert k v (kvPairs st) }
 getKvPair :: String -> TctM [String]
 getKvPair s = (get . kvPairs) <$> ask
   where get m = [] `fromMaybe` M.lookup s m
+
 -- | Returns 'TctStatus' which is obtained from 'TctROState' during runtime.
 --
 -- > runningTime   = now - startTime
@@ -61,7 +61,6 @@ askStatus prob = do
     { currentProblem = prob
     , runningTime    = Time.tdSec (Time.diffClockTimes now (startTime st))
     , remainingTime  = (max 0 . Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
-
 
 toIO :: TctM a -> TctM (IO a)
 toIO m = runReaderT (runTct m) `fmap` askState

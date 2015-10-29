@@ -7,7 +7,7 @@ module Tct.Core.Data.Strategy
   , abort
   , processor
   , ite
-  , iteProgress -- MS: rename ?
+  , iteProgress
   , (.>>>)
   , (.<|>)
   , try
@@ -44,10 +44,10 @@ module Tct.Core.Data.Strategy
   ) where
 
 
-
 import qualified Data.Map                  as M (insert)
 import           Data.Maybe                (fromMaybe)
 import qualified Data.Traversable          as F (traverse)
+
 import qualified Tct.Core.Common.Pretty    as PP
 import           Tct.Core.Data.Certificate (timeUB)
 import           Tct.Core.Data.Processor
@@ -55,6 +55,7 @@ import           Tct.Core.Data.ProofTree
 import           Tct.Core.Data.TctM        hiding (wait)
 import qualified Tct.Core.Data.TctM        as TctM
 import           Tct.Core.Data.Types
+import           Tct.Core.Data.Declaration (declare)
 
 
 instance Show (Strategy i o) where
@@ -69,8 +70,6 @@ reltimeToTimeout t = do
   let to = max 0 (case t of { TimeoutIn secs -> secs; TimeoutUntil secs -> secs - running })
   remains <- (fromMaybe to . remainingTime) `fmap` askStatus undefined
   return (max 0 (min to (remains - 1)))
-
-
 
 
 -- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
@@ -159,7 +158,6 @@ iteProgress = Cond isProgressing
 (.>>>) :: Strategy i q -> Strategy q o -> Strategy i o
 s1 .>>> s2 = ite s1 s2 abort
 
-
 -- | choice
 (.<|>) :: Strategy i o -> Strategy i o -> Strategy i o
 s1 .<|> s2 = ite s1 identity s2
@@ -224,7 +222,6 @@ timeoutIn,timeoutUntil :: Int -> Strategy i o -> Strategy i o
 timeoutIn secs = Timeout (TimeoutIn secs)
 timeoutUntil secs = Timeout (TimeoutUntil secs)
 
-
 -- | Sets timeout relative to the given percentage.
 -- Useful together with total timeout.
 --
@@ -233,9 +230,6 @@ timeoutUntil secs = Timeout (TimeoutUntil secs)
 timeoutRelative :: (ProofData i, ProofData o) => Maybe Int -> Int -> Strategy i o -> Strategy i o
 timeoutRelative mtotal percent st = maybe st timeout mtotal
   where timeout total = timeoutIn (floor $ (fromIntegral (total*percent :: Int) / 100 :: Double)) st
-
-
-
 
 wait,waitUntil :: Int -> Strategy i o -> Strategy i o
 wait secs = Wait (TimeoutIn secs)
@@ -295,4 +289,10 @@ withProblem g = WithStatus (g . currentProblem)
 -- | Sets a key-value pair for a strategy.
 withKvPair :: (String, [String]) -> Strategy i o -> Strategy i o
 withKvPair (k,v) = WithState $ \st -> st { kvPairs = M.insert k v (kvPairs st) }
+
+
+--- * proof data -----------------------------------------------------------------------------------------------------
+
+instance PP.Pretty (StrategyDeclaration i o) where
+  pretty (SD s) = PP.pretty s
 
