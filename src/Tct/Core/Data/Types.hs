@@ -233,7 +233,7 @@ class Declared i o where
 -- | Existential type for declarations specifying a Strategy.
 -- Mainly used for parsing and description.
 data StrategyDeclaration i o where
-  SD :: (ParsableArgs args, ArgsInfo args, Declared i o) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
+  SD :: (ParsableArgs args, ArgsInfo args) => Declaration (args :-> Strategy i o) -> StrategyDeclaration i o
 
 
 --- * Parsing --------------------------------------------------------------------------------------------------------
