@@ -35,7 +35,9 @@ module Tct.Core
   , optional
   , withDomain
   -- ** Declaration
+  , Declaration
   , Declared (..)
+  , (:->)
   , OneTuple (..)
   -- ** Argument and Declaration Modifyer
   , withName
