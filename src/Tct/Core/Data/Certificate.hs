@@ -1,4 +1,6 @@
 -- | This module provides the 'Complexity' and 'Certificate' type.
+-- The complexity and certificate types are fixed and represent a class of bounding functions for lower and upper
+-- timebounds as well as lower and upper spacebounds.
 module Tct.Core.Data.Certificate
   (
   -- * Complexity Functions

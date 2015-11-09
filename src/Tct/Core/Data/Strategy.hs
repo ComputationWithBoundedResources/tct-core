@@ -88,7 +88,7 @@ evaluate1 (Better cmp s1 s2) prob =
   uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
     pick r1 r2 | cmp r2 r1 == GT = r2
                | otherwise       = r1
-    to st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
+    to st = WithStatus $ \ state -> maybe st (`timeoutIn` st) (remainingTime state)
 evaluate1 (Timeout t s) prob = do
   timeout <- reltimeToTimeout t
   fromMaybe (Failure TimedOut) <$> timed timeout (evaluate1 s prob)
@@ -118,7 +118,7 @@ evaluatePar s t = spawnTree t >>= collect where
 -- |  Constructs a strategy declaration. For example: Assume that @st :: Int -> Maybe Int -> Strategy prob@.
 --
 -- > strategy "name" (nat, some nat) st
--- Similar to declare but specified to Strategies and with no description.
+-- Similar to 'Declaration.declare' but specified to Strategies and with no description.
 strategy ::
   ( ToHList as, HListOf as ~ args
   , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
@@ -219,7 +219,7 @@ when :: Bool -> Strategy i i -> Strategy i i
 when b st = if b then st else identity
 
 timeoutIn,timeoutUntil :: Int -> Strategy i o -> Strategy i o
-timeoutIn secs = Timeout (TimeoutIn secs)
+timeoutIn secs    = Timeout (TimeoutIn secs)
 timeoutUntil secs = Timeout (TimeoutUntil secs)
 
 -- | Sets timeout relative to the given percentage.
@@ -229,10 +229,10 @@ timeoutUntil secs = Timeout (TimeoutUntil secs)
 -- > timeoutRelative Nothing   50 st = st
 timeoutRelative :: (ProofData i, ProofData o) => Maybe Int -> Int -> Strategy i o -> Strategy i o
 timeoutRelative mtotal percent st = maybe st timeout mtotal
-  where timeout total = timeoutIn (floor $ (fromIntegral (total*percent :: Int) / 100 :: Double)) st
+  where timeout total = timeoutIn (floor (fromIntegral (total*percent :: Int) / 100 :: Double)) st
 
 wait,waitUntil :: Int -> Strategy i o -> Strategy i o
-wait secs = Wait (TimeoutIn secs)
+wait secs      = Wait (TimeoutIn secs)
 waitUntil secs = Wait (TimeoutUntil secs)
 
 -- | apply given strategy in parallel to all open problems

@@ -42,12 +42,13 @@ size (Open _)          = 1
 size (Failure _)       = 1
 size (Success _ _ pts) = 1 + sum (size <$> pts)
 
--- | Substitute the open leaves of a proof tree according to the given function
+-- | Monadic version of 'substitute'.
 substituteM :: (Functor m, Monad m) => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)
 substituteM s (Open l)             = s l
 substituteM _ (Failure r)          = return (Failure r)
 substituteM s (Success pn cf pts) = Success pn cf <$> mapM (substituteM s) pts
 
+-- | Substitute the open leaves of a proof tree according to the given function
 substitute :: (l -> ProofTree k) -> ProofTree l -> ProofTree k
 substitute f  (Open l)           = f l
 substitute _ (Failure r)         = Failure r
@@ -99,24 +100,6 @@ isOpen = not . isClosed
 -- prop> isClosed = not . isOpen
 isClosed :: ProofTree l -> Bool
 isClosed = null . open
-
-instance Functor ProofTree where
-  f `fmap` Open l             = Open (f l)
-  _ `fmap` (Failure r)        = Failure r
-  f `fmap` Success pn cns pts = Success pn cns ((f `fmap`) `fmap` pts)
-
-instance Foldable ProofTree where
-  f `foldMap` Open l          = f l
-  _ `foldMap` Failure{}       = mempty
-  f `foldMap` Success _ _ pts = (f `foldMap`) `foldMap` pts
-
-instance Traversable ProofTree where
-  f `traverse` Open l  = Open <$> f l
-  _ `traverse` Failure r = pure (Failure r)
-  f `traverse` Success pn cfn pts = Success pn cfn <$> (f `traverse`) `traverse` pts
-
-instance Show (ProofTree l) where
-  show _ = "showTree"
 
 
 --- * Pretty Printing ------------------------------------------------------------------------------------------------

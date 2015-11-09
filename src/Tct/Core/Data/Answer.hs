@@ -23,7 +23,7 @@ import qualified Tct.Core.Data.Certificate as T
 -- | @Timebounds lower upper@
 data Timebounds = Timebounds T.Complexity T.Complexity
 
--- | Extracts lowwer and upper bounds of a certificate.
+-- | Extracts lower and upper bounds of a certificate.
 timebounds :: T.Certificate -> Timebounds
 timebounds c = Timebounds (T.timeLB c) (T.timeUB c)
 
@@ -46,8 +46,8 @@ newtype TTTAC = TTTAC Timebounds
 -- | Returns the certificate in a /tttac/ compatible format.
 --
 -- > pretty $ tttac unbounded = "MAYBE"
--- > pretty $ tttac (spaceLBCert linear) = "YES(O(n^1),?)"
--- > pretty $ tttac (spaceUBCert linear) = "YES(?,O(n^1))"
+-- > pretty $ tttac (timeLBCert linear) = "YES(O(n^1),?)"
+-- > pretty $ tttac (timeUBCert linear) = "YES(?,O(n^1))"
 tttac :: T.Certificate -> TTTAC
 tttac = TTTAC . timebounds
 
@@ -74,8 +74,8 @@ newtype Termcomp = Termcomp Timebounds
 -- | Returns the certificate in the /termcomp 2015/ format.
 --
 -- > pretty $ termcomp unbounded = "WORST_CASE(?,?)"
--- > pretty $ termcomp (spaceLBCert linear) = "WORSTCASE(Omega(n^1,?)"
--- > pretty $ termcomp (spaceUBCert linear) = "WORSTCASE(?,O(n^1)"
+-- > pretty $ termcomp (timeLBCert linear) = "WORSTCASE(Omega(n^1,?)"
+-- > pretty $ termcomp (timeUBCert linear) = "WORSTCASE(?,O(n^1)"
 termcomp :: T.Certificate -> Termcomp
 termcomp = Termcomp . timebounds
 

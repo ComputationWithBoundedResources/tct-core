@@ -73,6 +73,24 @@ data ProofTree o where
   Failure  :: Reason -> ProofTree o
 
 
+instance Functor ProofTree where
+  f `fmap` Open l             = Open (f l)
+  _ `fmap` (Failure r)        = Failure r
+  f `fmap` Success pn cns pts = Success pn cns ((f `fmap`) `fmap` pts)
+
+instance Foldable ProofTree where
+  f `foldMap` Open l          = f l
+  _ `foldMap` Failure{}       = mempty
+  f `foldMap` Success _ _ pts = (f `foldMap`) `foldMap` pts
+
+instance Traversable ProofTree where
+  f `traverse` Open l  = Open <$> f l
+  _ `traverse` Failure r = pure (Failure r)
+  f `traverse` Success pn cfn pts = Success pn cfn <$> (f `traverse`) `traverse` pts
+
+instance Show (ProofTree l) where
+  show _ = "showTree"
+
 --- * Processor  -----------------------------------------------------------------------------------------------------
 
 -- | 'Fork' is an abstract type that provides the "Foldable", "Functor" and "Traversable" interface.
