@@ -10,6 +10,8 @@ module Tct.Core
   (
   -- * Configuring Tct
   TctConfig (..)
+  , tct3
+  , tct3WithOptions
   , defaultTctConfig
   , withDefaultStrategy
   , appendGHCiScript
@@ -33,6 +35,7 @@ module Tct.Core
   , optional
   , withDomain
   -- ** Declaration
+  , Declared (..)
   , OneTuple (..)
   -- ** Argument and Declaration Modifyer
   , withName
