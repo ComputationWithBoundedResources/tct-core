@@ -10,8 +10,8 @@ module Tct.Core
   (
   -- * Configuring Tct
   TctConfig (..)
-  , tct3
-  , tct3WithOptions
+  , runTct
+  , runTctWithOptions
   , defaultTctConfig
   , withDefaultStrategy
   , appendGHCiScript

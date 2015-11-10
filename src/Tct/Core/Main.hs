@@ -8,8 +8,8 @@ module Tct.Core.Main
   -- * Tct Initialisation
   , run
   , runInteractive
-  , tct3
-  , tct3WithOptions
+  , runTct
+  , runTctWithOptions
   -- * Pretty Print
   , AnswerFormat (..)
   , ProofFormat (..)
@@ -41,7 +41,7 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 -- TctConfig ---------------------------------------------------------------------------------------------------------
 
 -- | The Tct configuration defines global properties.
--- The configuration affects the execution of ('tct3') and sets initial properties ('run') when eva
+-- The configuration affects the execution of ('runTct') and sets initial properties ('run') when eva
 data TctConfig i = TctConfig
   { parseProblem    :: FilePath -> IO (Either String i)
   , putAnswer       :: ProofTree i -> IO ()
@@ -209,7 +209,7 @@ run' m k = do
       , stopTime      = Nothing
       , tempDirectory = tmp
       , kvPairs       = M.empty }
-  withTempDirectory "/tmp" "tctx" (runReaderT (runTct m) . k . state)
+  withTempDirectory "/tmp" "tctx" (runReaderT (runTctM m) . k . state)
 
 startInteractive :: InteractiveGHCi -> IO ()
 startInteractive ig = void $ case ig of
@@ -218,13 +218,13 @@ startInteractive ig = void $ case ig of
     hPutStrLn hf (unlines scr) >> hClose hf
     system $ "ghci -ingore-dot-ghci -ghci-script " ++ fp
 
--- > tct3 = tct3With const unit
-tct3 :: (ProofData i, Declared i i) => TctConfig i -> IO ()
-tct3 = tct3WithOptions const unit
+-- > runTct = runTctWith const unit
+runTct :: (ProofData i, Declared i i) => TctConfig i -> IO ()
+runTct = runTctWithOptions const unit
 
 -- | Default main function.
 --
--- @tct3WithOptions update options config@
+-- @runTctWithOptions update options config@
 --
 -- 1. builds a strategy parser from the strategies defined in @config@
 -- 2. parses the command line arguments including arguments defined in @options@
@@ -232,11 +232,11 @@ tct3 = tct3WithOptions const unit
 -- 4. updates @config@ from standard arguments; in particular answer output and proof output overrides @config@ if given
 -- 5. evaluates strategy with the given timeout
 -- 6. output answer and proof as given in (updated) @config@
-tct3WithOptions :: (ProofData i, Declared i i) => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
-tct3WithOptions = tct3WithOptions' decls
+runTctWithOptions :: (ProofData i, Declared i i) => (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
+runTctWithOptions = runTctWithOptions' decls
 
-tct3WithOptions' :: ProofData i => [StrategyDeclaration i i] -> (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
-tct3WithOptions' theStrategies theUpdate theOptions cfg = do
+runTctWithOptions' :: ProofData i => [StrategyDeclaration i i] -> (TctConfig i -> opt -> TctConfig i) -> Options opt -> TctConfig i -> IO ()
+runTctWithOptions' theStrategies theUpdate theOptions cfg = do
   r <- runErroneousIO $ do
     action <- liftIO $ O.execParser $ mkParser theStrategies (version cfg) theOptions
     case action of

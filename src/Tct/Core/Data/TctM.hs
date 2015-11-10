@@ -63,7 +63,7 @@ askStatus prob = do
     , remainingTime  = (max 0 . Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
 
 toIO :: TctM a -> TctM (IO a)
-toIO m = runReaderT (runTct m) `fmap` askState
+toIO m = runReaderT (runTctM m) `fmap` askState
 
 -- | Lifts 'Async.async'.
 async :: TctM a -> TctM (Async.Async a)

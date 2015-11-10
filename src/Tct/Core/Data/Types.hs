@@ -32,7 +32,7 @@ data TctROState = TctROState
   }
 
 -- | The Tct monad.
-newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
+newtype TctM r = TctM { runTctM :: ReaderT TctROState IO r }
   deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
 -- | Defines the (read-only) runtime status of 'TctROState'.
