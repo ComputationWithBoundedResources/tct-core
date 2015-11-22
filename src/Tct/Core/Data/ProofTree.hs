@@ -6,7 +6,6 @@ module Tct.Core.Data.ProofTree
   ProofNode (..)
   , ProofTree (..)
   , open
-  , size
   , flatten
   , substitute
   , substituteM
@@ -35,12 +34,6 @@ import           Tct.Core.Data.Types
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
 open = foldr (:) []
-
--- | Returns the number of nodes of a 'ProofTree'.
-size :: ProofTree l -> Int
-size (Open _)          = 1
-size (Failure _)       = 1
-size (Success _ _ pts) = 1 + sum (size <$> pts)
 
 -- | Monadic version of 'substitute'.
 substituteM :: (Functor m, Monad m) => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)

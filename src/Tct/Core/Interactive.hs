@@ -195,6 +195,11 @@ apply' eval str = onSt $ \st -> do
   if not (isFailure t2) && size t2 > size t1
     then putSt (St t2) >> printState >> print "progressed :)"
     else print "no progress :/"
+  where
+    size :: ProofTree l -> Int
+    size (Open _)          = 0
+    size (Failure _)       = 0
+    size (Success _ _ pts) = 1 + sum (size <$> pts)
 
 -- | Applies a strategy on all sub-problems.
 apply :: ProofData o => Strategy i o -> IO ()
