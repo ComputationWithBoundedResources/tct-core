@@ -31,6 +31,8 @@ declaration (Decl n _ f as) = do
   vs   <- mkArgParser as opts
   return (curried f vs)
 
+-- MS: parser for declarations has more general type than the one for strategy; thus can not parse combinators such as
+-- (>>>), (<|>) ...
 strategyDeclarations :: [StrategyDeclaration i o] -> SParser (Strategy i o)
 strategyDeclarations ds =
   choice [ declaration d | SD d <- sortBy k ds ]

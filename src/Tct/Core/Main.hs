@@ -26,6 +26,7 @@ import           System.IO               (hClose, hPutStrLn, stderr)
 import           System.IO.Temp          (withSystemTempFile, withTempDirectory)
 import           System.Process          (system)
 import qualified System.Time             as Time
+import System.Directory (getTemporaryDirectory)
 
 import           Tct.Core.Common.Error
 import           Tct.Core.Common.Options
@@ -203,13 +204,14 @@ runInteractive m = run' m id
 run' :: TctM a -> (TctROState -> TctROState) -> IO a
 run' m k = do
   time <- Time.getClockTime
+  tdir <- getTemporaryDirectory
   let
     state tmp = TctROState
       { startTime     = time
       , stopTime      = Nothing
       , tempDirectory = tmp
       , kvPairs       = M.empty }
-  withTempDirectory "/tmp" "tctx" (runReaderT (runTctM m) . k . state)
+  withTempDirectory tdir "tctx" (runReaderT (runTctM m) . k . state)
 
 startInteractive :: InteractiveGHCi -> IO ()
 startInteractive ig = void $ case ig of
