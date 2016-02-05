@@ -32,10 +32,14 @@ import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Xml      as Xml
 
 
+type MPoly = [(Int,[(String,Int)])]
+
 -- | Type for asymptotic complexity.
 -- The 'Ord' and 'SemiRing' instances are the expected one for asymptotic complexity.
 data Complexity
-  = Poly (Maybe Int) -- ^ Polynomial. If argument is @Just k@, then
+  = MPoly MPoly      -- ^ HACK: MS: add support for multivariate polynomial for tct-its; 
+                     -- is 'Unknown' for any comparison and arithmetical operation
+  | Poly (Maybe Int) -- ^ Polynomial. If argument is @Just k@, then
                      --   @k@ gives the degree of the polynomial
   | Exp (Maybe Int)  -- ^ Exponential. If argument is @Nothing@, then
                      --   represented bounding function is elementary. If argument
@@ -58,6 +62,7 @@ linear :: Complexity
 linear = Poly (Just 1)
 
 rank :: Complexity -> (Int, Int)
+rank (MPoly _)       = rank Unknown
 rank (Poly (Just r)) = (42,r)
 rank (Poly _)        = (43,0)
 rank (Exp (Just r))  = (44,r)
@@ -178,6 +183,11 @@ updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
 
 instance PP.Pretty Complexity where
   pretty c = case c of
+    (MPoly [])      -> PP.int 0
+    (MPoly ms)      -> PP.cat $ PP.punctuate (PP.text " + ") (ppm `fmap` ms)
+      where
+        ppm (i,ps) = PP.cat $ PP.punctuate (PP.char '*') (PP.int i: (ppp `fmap` ps))
+        ppp (v,i)  = PP.text v <> PP.char '^' <> PP.int i
     (Poly (Just 0)) -> asym $ PP.text "1"
     (Poly (Just k)) -> asym $ PP.text "n" <> PP.char '^' <> PP.int k
     (Poly Nothing)  -> PP.text "POLY"
@@ -198,6 +208,7 @@ instance PP.Pretty Certificate where
 
 instance Xml.Xml Complexity where
   toXml c = case c of
+    (MPoly _)       -> Xml.elt "polynomial" []
     (Poly Nothing)  -> Xml.elt "polynomial" []
     (Poly (Just k)) -> Xml.elt "polynomial" [Xml.int k]
     (Exp Nothing)   -> Xml.elt "exponential" []
