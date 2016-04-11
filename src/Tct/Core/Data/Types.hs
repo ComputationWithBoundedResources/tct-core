@@ -98,7 +98,7 @@ type Fork t = (Foldable t, Functor t, Traversable t)
 
 -- | Provides the interface for the proof construction.
 -- All types which occur in the proof construction have to implement 'ProofData'.
-type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
+type ProofData d = (Show d, PP.Pretty d, Xml.Xml d, Typeable d)
 
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
