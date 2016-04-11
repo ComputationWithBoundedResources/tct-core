@@ -38,7 +38,7 @@ module Tct.Core.Data.Declaration
 
 import           Data.List              (intercalate)
 import           Data.Typeable
-
+import qualified Text.Parsec as Parsec
 import qualified Tct.Core.Common.Parser as P
 import qualified Tct.Core.Common.Pretty as PP
 import           Tct.Core.Data.Types
@@ -102,7 +102,7 @@ arg :: String -> String -> [String] -> SParser t -> Argument 'Required t
 arg n d h = SimpleArg ArgMeta{argName_ = n, argDomain_ = d, argHelp_ = h}
 
 -- | Transforms a required argument to an optional by providing a default value.
-optional :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
+optional :: (Show t, Typeable t) => Argument 'Required t -> t -> Argument 'Optional t
 optional = OptArg
 
 -- | Wraps an argument into 'Maybe'.
@@ -118,11 +118,13 @@ nat n h = arg n "nat" h P.nat
 
 -- | Specifies a bool argument.
 bool :: String -> [String] -> Argument 'Required Bool
-bool n h = arg n "bool" h P.bool
+bool = flag
 
 -- | Specifies a string argument.
 string :: String -> [String] -> Argument 'Required String
-string n h = arg n "string" h P.identifier
+string n h = arg n "string" h parser where 
+ parser = Parsec.try (quoted '\'') Parsec.<|> Parsec.try (quoted '"') Parsec.<|> P.identifier 
+ quoted q = P.lexeme (Parsec.between (Parsec.char q) (Parsec.char q) (Parsec.many (Parsec.noneOf [q])))
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Declared i o => String -> [String] -> Argument 'Required (Strategy i o)
@@ -180,14 +182,15 @@ argDefault (OptArg _ t) = t
 
 instance ArgsInfo '[] where
   argsInfo HNil = []
+  toArgList HNil = []
 
 instance (Show a, ArgsInfo as) => ArgsInfo (Argument r a ': as) where
   argsInfo (HCons a as) = argsInfo' a :argsInfo as where
     argsInfo' :: Show t => Argument f t -> (String, String, [String], Maybe String)
     argsInfo' (OptArg b t) = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Just $ show t)
     argsInfo' b            = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Nothing)
-
-
+  toArgList (HCons a as) = SomeArgument a : toArgList as
+                                                      
 --- * proof data -----------------------------------------------------------------------------------------------------
 
 instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where

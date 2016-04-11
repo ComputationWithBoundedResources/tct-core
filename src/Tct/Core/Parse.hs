@@ -83,7 +83,7 @@ reqParser (SimpleArg _ p)    = p
 reqParser (StrategyArg _ ds) = strategyDeclarations ds
 reqParser (FlagArg _ fs)     = choice $ map k fs
   where k b = try $ symbol (show b) >> return b
-reqParser (SomeArg a)        = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a) <?> "maybe"
+reqParser (SomeArg a)        = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a)
 
 optParser :: Argument 'Optional t -> SParser t
 optParser (OptArg a _) = reqParser a

@@ -227,7 +227,7 @@ data Argument (f :: ArgFlag) t where
   StrategyArg :: ArgMeta -> [StrategyDeclaration i o] -> Argument 'Required (Strategy i o)
 
   SomeArg     :: Argument 'Required t -> Argument 'Required (Maybe t)
-  OptArg      :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
+  OptArg      :: (Show t, Typeable t) => Argument 'Required t -> t -> Argument 'Optional t
 
 -- | Associates the types to a list of arguments.
 type family ArgsType a where
@@ -244,12 +244,15 @@ class ParsableArgs ats where
   mkOptParser :: HList ats -> [SParser (String,Dynamic)]
   mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser (HList (ArgsType ats))
 
+data SomeArgument where
+  SomeArgument :: Argument f t -> SomeArgument
+
 -- | Collects the meta information of a list of arguments.
 class ArgsInfo as where
   argsInfo ::
     HList as ->                                -- A heterogenous list of arguments.
     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
-
+  toArgList :: HList as -> [SomeArgument]
 
 -- | Open type for declarations. Allows to provide problem specific declarations in executables.
 class Declared i o where

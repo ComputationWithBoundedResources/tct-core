@@ -29,7 +29,7 @@ import qualified Data.Foldable             as F (toList)
 import qualified Tct.Core.Common.Pretty    as PP
 import           Tct.Core.Data.Certificate (Certificate, timeLB, timeUB, unbounded)
 import           Tct.Core.Data.Types
-
+import           Tct.Core.Data.Answer (termcomp)
 
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
@@ -111,6 +111,9 @@ inc (Path i is) = Path (succ i) is
 split :: Path -> Int -> Path
 split (Path i is) j = Path 1 ((i,j):is)
 
+pathLength :: Path -> Int 
+pathLength (Path _ is) = 1 + length is
+
 ppPath :: Path -> PP.Doc
 ppPath (Path i is) = PP.cat $ PP.punctuate PP.colon . reverse $ PP.int i : f `fmap` is
   where
@@ -120,36 +123,34 @@ ppPath (Path i is) = PP.cat $ PP.punctuate PP.colon . reverse $ PP.int i : f `fm
 
 ppProofNode :: Processor p => ProofNode p -> PP.Doc
 ppProofNode (ProofNode p prob po) = PP.vcat
-  [ PP.text "Considered Problem:" PP.<$$> ind (PP.pretty prob)
-  , PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
-  , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
-  where ind = PP.indent 2
+  [ block "Considered Problem" (PP.pretty prob)
+  , block "Applied Processor"  (PP.text $ show p)
+  , block "Details"              (PP.pretty po) ]
+  where block n e = PP.nest 4 (PP.text "+" PP.<+> PP.text n PP.<> PP.char ':' PP.<$$> e)
 
 ppProofTree' :: Path -> (prob -> PP.Doc) -> ProofTree prob -> PP.Doc
 ppProofTree' is ppProb pt@(Open l) = PP.vcat
-  [ ppHeader pt is "Open"
+  [ ppHeader pt is (PP.text "Open")
   , PP.indent 4 (ppProb l) ]
 ppProofTree' is _ f@(Failure r) =
-  ppHeader f is "Failure"
-  PP.<$$> PP.indent 2 (PP.pretty r)
+   ppHeader f is (PP.text "Failure")
+   PP.<$$> PP.indent 2 (PP.pretty r)
 
 ppProofTree' path ppProb pt@(Success pn _ pts) =
-  PP.vcat [ ppHeader pt path "Success", PP.indent 4 (ppProofNode pn), ppSubTrees (F.toList pts) ]
+  PP.vcat [ ppHeader pt path (PP.text (takeWhile (`notElem` " {") (show (appliedProcessor pn))))
+          , PP.indent 4 (ppProofNode pn)
+          , ppSubTrees (F.toList pts) ]
   where
     ppSubTrees []  = PP.empty
     ppSubTrees [t] = ppProofTree' (inc path) ppProb t
     ppSubTrees ls  = PP.vcat [ ppProofTree' (split path j) ppProb t | (j,t) <- zip [1..] ls]
 
 
-ppHeader :: ProofTree l -> Path -> String -> PP.Doc
+ppHeader :: ProofTree l -> Path -> PP.Doc -> PP.Doc
 ppHeader pt p s =
-  PP.text "***"
-  PP.<+> ppPath p
-  PP.<+> PP.text s
-  PP.<+> PP.brackets (PP.pretty (cert $ certificate pt))
-  PP.<+> PP.text " ***"
-  where
-    cert c = (timeLB c, timeUB c)
+  PP.text (replicate (pathLength p) '*') PP.<+> PP.text "Step" PP.<+> ppPath p PP.<> PP.char ':'
+  PP.<+> s
+  PP.<+> PP.group (PP.pretty (termcomp (certificate pt)))
 
 ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
 ppProofTree pp pt =
