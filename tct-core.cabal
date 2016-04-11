@@ -59,7 +59,7 @@ library
     directory            == 1.2.*,
     mtl                  >= 2.1 && < 2.3,
     old-time             == 1.1.*,
-    optparse-applicative == 0.11.*,
+    optparse-applicative == 0.12.*,
     parsec               == 3.1.*,
     process              == 1.2.*,
     temporary            == 1.2.*,
