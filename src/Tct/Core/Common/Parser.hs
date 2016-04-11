@@ -94,5 +94,5 @@ changeState forward backward = mkPT . transform . runParsecT
 
 -- | Apply a parser with a different state.
 withState :: (Functor m, Monad m) => v -> ParsecT s v m a -> ParsecT s u m a
-withState v p = getState >>= \u -> changeState (const u) (const v) p 
+withState v p = getState >>= \u -> changeState (const u) (const v) p
 

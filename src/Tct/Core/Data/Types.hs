@@ -125,9 +125,16 @@ class (Show p, ProofData (ProofObject p), ProofData (In p), Fork (Forking p)) =>
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
   Apply       :: (Processor p) => p -> Strategy (In p) (Out p)
+
+  Seq         :: Strategy i q -> Strategy q o -> Strategy i o
   IdStrategy  :: Strategy i i
+
+  Alt         :: Strategy i o -> Strategy i o -> Strategy i o
   Abort       :: Strategy i o
-  Cond        :: (ProofTree q -> Bool) -> Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+
+  Force       :: Strategy i o -> Strategy i o
+  Ite         :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+
   -- | Parallel Application
   Par         :: Strategy i o -> Strategy i o
   Race        :: Strategy i o -> Strategy i o -> Strategy i o
@@ -164,9 +171,9 @@ type family HListOf a :: [*] where
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3)       = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3]
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4)    = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4]
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5) = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5]
-  HListOf (OneTuple a)              = '[a]
+  HListOf (OneTuple a)                                   = '[a]
 
-class ToHList a                            where toHList :: a -> HList (HListOf a)
+class ToHList a                                                 where toHList :: a -> HList (HListOf a)
 instance ToHList ()                                             where toHList ()                                             = HNil
 instance ToHList (a1,a2)                                        where toHList (a1,a2)                                        = HCons a1 (HCons a2 HNil)
 instance ToHList (a1,a2,a3)                                     where toHList (a1,a2,a3)                                     = HCons a1 (toHList (a2,a3))
@@ -196,7 +203,7 @@ infix 4 :->
 -- | Uncurried version of a function.
 type family Uncurry a where
   Uncurry ('[] :-> r) = r
-  Uncurry ((a ': as) :-> r) = a -> Uncurry (as :-> r)
+  Uncurry (a ': as :-> r) = a -> Uncurry (as :-> r)
 
 
 -- | Return type of function wrt to its argument list.

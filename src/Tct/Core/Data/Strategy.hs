@@ -7,7 +7,6 @@ module Tct.Core.Data.Strategy
   , abort
   , processor
   , ite
-  , iteProgress
   , (.>>>)
   , (.<|>)
   , try
@@ -71,19 +70,36 @@ reltimeToTimeout t = do
   remains <- (fromMaybe to . remainingTime) `fmap` askStatus undefined
   return (max 0 (min to (remains - 1)))
 
+-- TODO: add Reason to Abort?
 
 -- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
 evaluate1 :: Strategy i o -> i -> TctM (ProofTree o)
 evaluate1 (Apply p)          prob = apply p prob
+
+evaluate1 (Seq s1 s2)        prob = evaluate1 s1 prob >>= continue where
+  continue pt
+    | isFailing pt = evaluate Abort pt
+    | otherwise    = evaluate s2 pt
 evaluate1 IdStrategy         prob = return (Open prob)
+
+evaluate1 (Alt s1 s2)        prob = evaluate1 s1 prob >>= continue where
+  continue pt
+    | isFailing pt = evaluate1 s2 prob
+    | otherwise    = return pt
 evaluate1 Abort              _    = return (Failure Aborted)
-evaluate1 (Cond g sb st se)  prob = evaluate1 sb prob >>= continue where
-  continue pt | g pt         = evaluate st pt
-              | otherwise    = evaluate1 se prob
+
+-- MS: this definition violates force (try s) == force s
+evaluate1 (Force s)         prob = evaluate1 s prob >>= continue where
+  continue (Open _) = evaluate1 Abort prob
+  continue pt       = return pt
+evaluate1 (Ite sb st se)  prob = evaluate1 sb prob >>= continue where
+  continue pt
+    | isProgressing pt = evaluate st pt
+    | otherwise        = evaluate1 se prob
 evaluate1 (Par s)            prob = evaluate1 s prob
 evaluate1 (Race s1 s2)       prob =
-  raceWith (not . isFailure) (evaluate1 s1 prob) (evaluate1 s2 prob)
+  raceWith (not . isFailing) (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
   uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
     pick r1 r2 | cmp r2 r1 == GT = r2
@@ -146,30 +162,26 @@ processor :: (Processor p) => p -> Strategy (In p) (Out p)
 processor = Apply
 
 -- | conditional
--- | prop> ite test s1 s2 == test .>>> s1, if we have a progress after applying test
--- | prop> ite test s1 s2 == s2, otherwise
-ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
-ite = Cond (not . isFailure)
+-- ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+-- ite = Ite Cond (not . isFailure)
 
-iteProgress :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
-iteProgress = Cond isProgressing
+ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+ite = Ite
 
 -- | sequencing
 (.>>>) :: Strategy i q -> Strategy q o -> Strategy i o
-s1 .>>> s2 = ite s1 s2 abort
+s1 .>>> s2 = Seq s1 s2 -- ite s1 s2 abort
 
 -- | choice
 (.<|>) :: Strategy i o -> Strategy i o -> Strategy i o
-s1 .<|> s2 = ite s1 identity s2
+s1 .<|> s2 = Alt s1 s2 -- ite s1 identity s2
 
 -- | @try s@ behaves like @s@, except in case of failure of @s@, @try s@ behaves like @identity@
 try :: Strategy i i -> Strategy i i
 try s = s .<|> identity
 
 force :: Strategy i o -> Strategy i o
-force s = Cond g s identity abort where
-  g (Open _) = False
-  g pt       = not (isFailure pt)
+force = Force
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
@@ -241,7 +253,7 @@ inParallel = Par
 
 -- | parallel sequencing
 (.>||>) :: Strategy i q -> Strategy q o -> Strategy i o
-s1 .>||> s2 = ite s1 (inParallel s2) abort
+s1 .>||> s2 = s1 .>>> inParallel s2
 
 -- | parallel choice
 (.<||>) :: Strategy i o -> Strategy i o -> Strategy i o

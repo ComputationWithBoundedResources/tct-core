@@ -72,7 +72,6 @@ library
   extensions: 
     ConstraintKinds, 
     DataKinds,
-    DeriveDataTypeable,
     DeriveFoldable, 
     DeriveFunctor, 
     DeriveTraversable,

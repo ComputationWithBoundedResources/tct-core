@@ -45,8 +45,8 @@ synopsis = "TcT is a transformer framework for automated complexity analysis."
 -- The configuration affects the execution of ('runTct') and sets initial properties ('run') when eva
 data TctConfig i = TctConfig
   { parseProblem    :: FilePath -> IO (Either String i)
-  , putAnswer       :: ProofTree i -> IO ()
-  , putProof        :: ProofTree i -> IO ()
+  , putAnswer       :: Either AnswerFormat (ProofTree i -> IO ())
+  , putProof        :: Either ProofFormat (ProofTree i -> IO ())
 
   , defaultStrategy :: Strategy i i
 
@@ -56,20 +56,20 @@ data TctConfig i = TctConfig
   }
 
 -- | Specifies how interactive mode is executed. See 'startInteractive'.
-data InteractiveGHCi = GHCiScript [String] | GHCiCommand String
+data InteractiveGHCi = GHCiScript (Maybe (FilePath -> String)) [String] | GHCiCommand String
 
 -- | Default configuration. Minimal requirement 'parseProblem'.
 defaultTctConfig :: ProofData i => (FilePath -> IO (Either String i)) -> TctConfig i
 defaultTctConfig p = TctConfig
   { parseProblem    = p
-  , putAnswer       = PP.putPretty . prettyDefaultAnswer
-  , putProof        = PP.putPretty . prettyDefaultProof
+  , putAnswer       = Left DefaultAnswerFormat
+  , putProof        = Left DefaultProofFormat
   , defaultStrategy = abort
   , runtimeOptions  = []
-  , interactiveGHCi = GHCiScript
+  , interactiveGHCi = GHCiScript Nothing
       [ ":set prompt \"tct>\""
       , ":module +Tct.Core.Interactive" ]
-  , version         = "3.1.0"
+  , version         = "3.2.0"
   }
 
 
@@ -78,10 +78,9 @@ prettySilentAnswer  _ = PP.empty
 prettyDefaultAnswer r = PP.pretty (termcomp (certificate r))
 prettyTTTacAnswer   r = PP.pretty (tttac (certificate r))
 
-prettySilentProof, prettyDefaultProof, prettyVerboseProof :: PP.Pretty i => ProofTree i -> PP.Doc
+prettySilentProof, prettyDefaultProof :: PP.Pretty i => ProofTree i -> PP.Doc
 prettySilentProof _  = PP.empty
 prettyDefaultProof r = PP.pretty (ppProofTree PP.pretty r)
-prettyVerboseProof r = PP.pretty (ppDetailedProofTree PP.pretty r)
 -- prettyXmlProof r             = error "missing: toXml proofTree" -- TODO
 
 putAnswerFormat :: AnswerFormat -> ProofTree i -> IO ()
@@ -92,14 +91,13 @@ putAnswerFormat TTTACAnswerFormat   = PP.putPretty . prettyTTTacAnswer
 putProofFormat :: PP.Pretty i => ProofFormat -> ProofTree i -> IO ()
 putProofFormat SilentProofFormat  = PP.putPretty . prettySilentProof
 putProofFormat DefaultProofFormat = PP.putPretty . prettyDefaultProof
-putProofFormat VerboseProofFormat = PP.putPretty . prettyVerboseProof
 -- putXmlFormat XmlProofFormat = PP.putPretty prettyXmlProof
 
 -- | Format of answer output.
 data AnswerFormat = SilentAnswerFormat | DefaultAnswerFormat | TTTACAnswerFormat
 
 -- | Format of proof output. Printed after answer in main.
-data ProofFormat = SilentProofFormat | DefaultProofFormat | VerboseProofFormat
+data ProofFormat = SilentProofFormat | DefaultProofFormat
   -- | XmlProofFormat
 
 writeAnswerFormat :: AnswerFormat -> String
@@ -117,14 +115,12 @@ readAnswerFormat s
 writeProofFormat :: ProofFormat -> String
 writeProofFormat SilentProofFormat  = "s"
 writeProofFormat DefaultProofFormat = "d"
-writeProofFormat VerboseProofFormat = "v"
 -- writeProofFormat XmlProofFormat     = "x"
 
 readProofFormat :: Monad m => String -> m ProofFormat
 readProofFormat s
   | s == writeProofFormat SilentProofFormat  = return SilentProofFormat
   | s == writeProofFormat DefaultProofFormat = return DefaultProofFormat
-  | s == writeProofFormat VerboseProofFormat = return VerboseProofFormat
   -- | s == writeProofFormat XmlProofFormat     = return XmlProofFormat
   | otherwise = fail $ "Tct.readOutputMode: " ++ s
 
@@ -173,8 +169,7 @@ mkParser ps vers mparser = O.info (versioned <*> listed <*> O.helper <*> interac
         , O.long "proof"
         , O.helpDoc . Just $ PP.vcat
           [ PP.hsep [PP.text (writeProofFormat SilentProofFormat) , PP.text "- silent"]
-          , PP.hsep [PP.text (writeProofFormat DefaultProofFormat), PP.text "- default proof"]
-          , PP.hsep [PP.text (writeProofFormat VerboseProofFormat), PP.text "- verbose proof"] ]]))
+          , PP.hsep [PP.text (writeProofFormat DefaultProofFormat), PP.text "- default proof"] ]]))
           -- , PP.hsep [PP.text (writeProofFormat XmlProofFormat)    , PP.text "- xml proof"] ]]))
       <*> O.optional (O.option O.auto (mconcat
         [ O.short 't'
@@ -215,10 +210,10 @@ run' m k = do
 
 startInteractive :: InteractiveGHCi -> IO ()
 startInteractive ig = void $ case ig of
-  GHCiCommand cmd -> system cmd
-  GHCiScript  scr -> withSystemTempFile "ghcix" $ \fp hf -> do
+  GHCiCommand cmd     -> system cmd
+  GHCiScript mcmd scr -> withSystemTempFile "ghcix" $ \fp hf -> do
     hPutStrLn hf (unlines scr) >> hClose hf
-    system $ "ghci -ingore-dot-ghci -ghci-script " ++ fp
+    system $ fromMaybe ("ghci -ingore-dot-ghci -ghci-script " ++) mcmd fp
 
 -- > runTct = runTctWith const unit
 runTct :: (ProofData i, Declared i i) => TctConfig i -> IO ()
@@ -268,19 +263,24 @@ runTctWithOptions' theStrategies theUpdate theOptions cfg = do
         let stt = maybe st (`timeoutIn` st) theTimeout
         r <- liftIO $ run ucfg (evaluate stt (Open prob))
 
-        liftIO $ theAnswer r
-        liftIO $ theProof r
+        liftIO $ ppAnswer theAnswer r
+        liftIO $ ppProof theProof theAnswer r
   case r of
     Left err -> PP.putPretty (PP.text "ERROR") >> PP.hPutDoc stderr (PP.pretty err PP.</> PP.text "") >> exitFailure
     Right _  -> exitSuccess
   where
-
     updateTctConfig f opt cf = cfg'
-      { putAnswer = putAnswer cfg' `fromMaybe` (putAnswerFormat <$> answerFormat_ opt)
-      , putProof  = putProof cfg' `fromMaybe` (putProofFormat <$> proofFormat_ opt) }
+      { putAnswer = maybe (putAnswer cfg') Left (answerFormat_ opt)
+      , putProof  = maybe (putProof cfg')  Left (proofFormat_ opt) }
       where cfg' = f cf (modeOptions_ opt)
 
     parseStrategy s = case strategyFromString theStrategies s of
       Left err -> Left $ TctStrategyParseError err
       Right st -> Right st
+
+    ppAnswer (Left f)                     = putAnswerFormat f
+    ppAnswer (Right f)                    = f
+    ppProof (Left f@DefaultProofFormat) a = \pt -> putProofFormat f pt >> ppAnswer a pt
+    ppProof (Left f) _                    = putProofFormat f
+    ppProof (Right f) _                   = f
 

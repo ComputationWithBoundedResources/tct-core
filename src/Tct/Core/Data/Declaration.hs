@@ -131,7 +131,7 @@ strat n h = StrategyArg ArgMeta{ argName_ = n, argDomain_ = "strategy", argHelp_
 -- | Specifies a flag argument.
 flag :: (Show t, Bounded t, Enum t) => String -> [String] -> Argument 'Required t
 flag n h = FlagArg ArgMeta{ argName_ = n, argDomain_ = ds, argHelp_ = h } es
-  where 
+  where
     es = [minBound..]
     ds = intercalate "|" (map show es)
 

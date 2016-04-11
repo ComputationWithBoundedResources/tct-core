@@ -9,8 +9,9 @@
 -- \At the momement user configurations and user options are ignored.\
 module Tct.Core.Interactive
   (
+  module M
   -- * Load and Modify Problems
-  load
+  , load
   , load'
   , modifyProblems
   , onProblems
@@ -33,13 +34,22 @@ module Tct.Core.Interactive
   -- * Print State
   -- | For simplicity the output is fixed; And unrelated to user-defined options and configurations. Use 'onProblems',
   -- 'onTree' to perform specific IO actions.
-  , printState
-  , printProof
-  , printDetailedProof
+  , welcome
+  , proof
+  , state
+  , complexity
+  , describe
+  , help
+  , parse
+  , list
   ) where
 
 
+import           Tct.Core.Common.Pretty     as M (putPretty)
+import           Tct.Core.Data.Strategy     as M hiding (Strategy, StrategyDeclaration, evaluate, strategy)
+
 import           Control.Monad
+import qualified Control.Monad              as W (when)
 import qualified Control.Monad.State.Strict as S
 import           Data.Either                (rights)
 import qualified Data.Foldable              as F
@@ -47,11 +57,13 @@ import           Data.IORef
 import qualified Data.Traversable           as F
 import           System.IO.Unsafe
 
-import           Tct.Core.Common.Error
+import           Tct.Core.Common.Error      (TctError (..), liftEither, runErroneousIO, tryIO)
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml
 import           Tct.Core.Data              hiding (apply, proof)
 import           Tct.Core.Main
+import           Tct.Core.Parse             (strategyFromString)
+import           Tct.Core.Processor.Failing (failing)
 
 
 --- * selection ------------------------------------------------------------------------------------------------------
@@ -192,16 +204,33 @@ apply' :: ProofData o => (Strategy i o -> ProofTree (Selected i) -> TctM (ProofT
 apply' eval str = onSt $ \st -> do
   let t1 = unSt st
   t2 <- runInteractive (eval str t1)
-  if not (isFailure t2) && size t2 > size t1
-    then putSt (St t2) >> printState >> print "progressed :)"
-    else print "no progress :/"
+  if not (isFailing t2) && norm t2 > norm t1
+    then do
+      putSt (St t2)
+      printState
+      putStrLn "progress :)"
+      W.when (isClosed t2) $ do
+        putStrLn "solved :D"
+        printComplexity
+    else do
+      putStrLn "no progress :/"
+      W.when (isFailing t2) $ do
+        putStrLn "the reason is:"
+        putStrLn (reason t2)
   where
-    size :: ProofTree l -> Int
-    size (Open _)          = 0
-    size (Failure _)       = 0
-    size (Success _ _ pts) = 1 + sum (size <$> pts)
+    norm :: ProofTree l -> Int
+    norm (Open _)          = 0
+    norm (Failure _)       = 0
+    norm (Success _ _ pts) = 1 + sum (norm <$> pts)
+
+    reason :: ProofTree t -> String
+    reason (Open _)          = mempty
+    reason (Failure e)       = show e ++ "\n"
+    reason (Success _ _ pts) = concatMap reason (F.toList pts)
 
 -- | Applies a strategy on all sub-problems.
+--
+-- > apply a >> apply b == apply $ try a .>>> b
 apply :: ProofData o => Strategy i o -> IO ()
 apply = apply' evaluateAll
 
@@ -227,18 +256,100 @@ reset = reset' >> printState where
       p@(_ :+: Nil) -> modifyState (\st -> st { history_ = p })
       _             -> modifyState (\st -> st { history_ = tail' hst }) >> reset'
 
+
+ppSt :: PP.Pretty a => (ProofTree (Selected i) -> a) -> IO ()
+ppSt pp = onSt $ \(St l) -> PP.putPretty (pp l)
+
 -- | Print the proof.
 printProof :: IO ()
 printProof = onSt (PP.putPretty . pp)
   where pp (St l) = ppProofTree PP.pretty l
 
--- | Print detailed proof (including NoProgress nodes).
-printDetailedProof :: IO ()
-printDetailedProof = onSt (PP.putPretty . pp)
-  where pp (St l) = ppDetailedProofTree PP.pretty l
-
 -- | Print state, ie. a list of selected sub-problems.
 printState :: IO ()
 printState = onSt (PP.putPretty . pp)
   where pp (St l) = ppProofTreeLeafs PP.pretty l
+
+-- | Prints the certificate in termcomp format.
+printComplexity :: IO ()
+printComplexity = ppSt (termcomp . certificate)
+
+
+-- | Print proof, state, certificate.
+proof, state, complexity :: IO()
+proof      = printProof
+state      = printState
+complexity = printComplexity
+
+-- | Print description of given declaration.
+describe :: ArgsInfo args => Declaration (args :-> c) -> IO ()
+describe = PP.putPretty
+
+-- | Parses strategy from  the given string.
+parse :: ProofData i => [StrategyDeclaration i i] -> String -> Strategy i i
+parse ds s = case strategyFromString ds s of
+  Left e   -> failing $ show e
+  Right st -> st
+
+-- | List descriptions of declarations.
+list :: [StrategyDeclaration i o] -> IO ()
+list = PP.putPretty . PP.vcat . map PP.pretty
+
+-- | Welcome.
+welcome :: IO ()
+welcome = putStrLn $ unlines
+  ["  .:                                     "
+  ,"  XWd.                                   "
+  ,"  lMkX0:                            ,d   "
+  ,"  .Md lMWd.                      ;kWMl   "
+  ,"   OW0Nl.lX;'cdO0KK0Oxl      .:ONx:NK    "
+  ,"   ;Md   ;ONkc'.    ..,   .c0XNN' dM.    "
+  ,"    N0 :NO,                c.  cNOMd     "
+  ,"    ;d0N,                       .WX      "
+  ,"     KN.                        lM,      "
+  ,"    cM,                         xd       "
+  ,"    OW                                   "
+  ,"    OW       ..                          "
+  ,"    :M:     .xOXN0kdc                    "
+  ,"     OW.       kW..':        '           "
+  ,"      xWc     .Mo          .KK.          "
+  ,"       ,KXc   oN.        ,ONl            "
+  ,"         'dX0o:'.....;lONk;              "
+  ,"            .,cdxkkkdl;.                 "
+  ]
+
+-- | Prints help
+help :: IO ()
+help = putStrLn $ unlines
+  [ ""
+  , "load <parser> <filepath>      -- load a problem, initialise state"
+  , "load' <tctconfig> <filepath>  -- load a problem, initialise state"
+  , "select <leafs>                -- select <leafs>"
+  , "selectAll                     -- select all problems"
+  , "apply <strategy>              -- apply <strategy> on all problems"
+  , "applySelected <strategy>      -- apply <strategy> on selected problems"
+  , "undo                          -- undo last application"
+  , "reset                         -- reset the history"
+  , "state                         -- print state, lists open problems"
+  , "proof                         -- print proof"
+  , "complexity                    -- print complexity"
+  , "describe <declaration>        -- print description of declaration"
+  , "parse <declarations> <string> -- parses strategy from <string> from <declarations>"
+  , "list <declarations>           -- print description of <declarations>"
+  , "modifyProblems <f>            -- applies <f> on all problems"
+  , "onProblems <ioaction>         -- applies <ioaction> on all problems"
+  , "onTree <ioaction>             -- applies <ioaction> on the current proof tree"
+  , "help                          -- print this help"
+  , "welcome                       -- print welcome message"
+  , ""
+  , "WARNING: The interactive mode is not type-safe. In particular, we can apply"
+  , "strategies that have a different input problem type than the problem type of"
+  , "the current proof state. This can lead to undefined behaviour."
+  , ""
+  , "INFO: *complexity*, *proof* and *state* provide generic (configuration"
+  , "independent) pretty print functions. For special output consider using"
+  , "*onProblems* and *onTree*."
+  , ""
+  , "For detailed information we refer to the documentation."
+  ]
 
