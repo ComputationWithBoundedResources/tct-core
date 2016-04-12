@@ -70,7 +70,10 @@ reltimeToTimeout t = do
   remains <- (fromMaybe to . remainingTime) `fmap` askStatus undefined
   return (max 0 (min to (remains - 1)))
 
--- TODO: add Reason to Abort?
+-- MS: error report is far from optimal.
+-- * generating information from evaluate requires additional ProofData constraints
+-- in principle they are always fullfilled since as basic blocks are processors, but ugly
+-- * alternatively some logging functions when applying processors
 
 -- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
@@ -87,13 +90,12 @@ evaluate1 (Alt s1 s2)        prob = evaluate1 s1 prob >>= continue where
   continue pt
     | isFailing pt = evaluate1 s2 prob
     | otherwise    = return pt
-evaluate1 Abort              _    = return (Failure Aborted)
+evaluate1 Abort              _    = return (Failure $ Aborted "aborted")
 
--- MS: this definition violates force (try s) == force s
-evaluate1 (Force s)         prob = evaluate1 s prob >>= continue where
-  continue (Open _) = evaluate1 Abort prob
+evaluate1 (Force s)          prob = evaluate1 s prob >>= continue where
+  continue (Open _) = return (Failure $ Aborted "no progress")
   continue pt       = return pt
-evaluate1 (Ite sb st se)  prob = evaluate1 sb prob >>= continue where
+evaluate1 (Ite sb st se)     prob = evaluate1 sb prob >>= continue where
   continue pt
     | isProgressing pt = evaluate st pt
     | otherwise        = evaluate1 se prob

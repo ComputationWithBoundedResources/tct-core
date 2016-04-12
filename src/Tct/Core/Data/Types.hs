@@ -47,18 +47,18 @@ data TctStatus prob = TctStatus
 
 -- | Reason for failure of a 'Processor'
 data Reason where
-  IOError    :: IOError -> Reason
-  Aborted    :: Reason
-  TimedOut   :: Reason
-  SomeReason :: (Show r, PP.Pretty r) => r -> Reason
+  IOError  :: IOError -> Reason
+  Aborted  :: String -> Reason
+  TimedOut :: Reason
+  Failed   :: (Show proc, ProofData prob, Show reason, PP.Pretty reason) => proc -> prob -> reason -> Reason
 
 deriving instance Show Reason
 
 instance PP.Pretty Reason where
-  pretty (IOError io)   = PP.text (show io)
-  pretty Aborted        = PP.text "aborted"
-  pretty TimedOut       = PP.text "timed out"
-  pretty (SomeReason r) = PP.pretty r
+  pretty (IOError io)         = PP.text (show io)
+  pretty (Aborted s)          = PP.text s
+  pretty TimedOut             = PP.text "timed out"
+  pretty (Failed proc prob r) = PP.text (show proc) PP.<$$> PP.pretty prob PP.<$$> PP.pretty r
 
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
@@ -103,9 +103,12 @@ type ProofData d = (Show d, PP.Pretty d, Xml.Xml d, Typeable d)
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
+-- | Wrapper for (pretty)printable reason.
+data SomeReason where SomeReason :: (Show r, PP.Pretty r) => r -> SomeReason
+
 -- | The return type of an application of a processors.
 data Return p
-  = NoProgress Reason
+  = NoProgress SomeReason
   | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (Out p)))
 
 -- | Everything that is necessary for defining a processor.

@@ -24,12 +24,12 @@ import           Tct.Core.Data.Types
 
 -- | Applies a processor. Transforms the result of an application, 'Return',  to a 'ProofTree'.
 -- Always creates a node.
-apply :: Processor p => p -> In p -> TctM (ProofTree (Out p))
-apply p i = toProofTree <$> (execute p i `catchError` handler)
+apply :: (Processor p) => p -> In p -> TctM (ProofTree (Out p))
+apply p i = (toProofTree <$> execute p i) `catchError` handler
   where
-    toProofTree (NoProgress r)      = Failure r
-    toProofTree (Progress pn cf ts) = Success (ProofNode p i pn) cf ts
-    handler = return . NoProgress . IOError
+    toProofTree (NoProgress (SomeReason r)) = (Failure $ Failed p i r)
+    toProofTree (Progress pn cf ts)         = Success (ProofNode p i pn) cf ts
+    handler = return . Failure . IOError
 
 -- | Constructs a proof node with the given proof, certificate and output problems.
 -- For a more general version, ie. if you want to provide proof trees instead of output problems, use 'Progress' and

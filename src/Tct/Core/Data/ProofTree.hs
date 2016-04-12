@@ -27,9 +27,9 @@ module Tct.Core.Data.ProofTree
 import qualified Data.Foldable             as F (toList)
 
 import qualified Tct.Core.Common.Pretty    as PP
-import           Tct.Core.Data.Certificate (Certificate, timeLB, timeUB, unbounded)
+import           Tct.Core.Data.Answer      (termcomp)
+import           Tct.Core.Data.Certificate (Certificate, unbounded)
 import           Tct.Core.Data.Types
-import           Tct.Core.Data.Answer (termcomp)
 
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
@@ -43,8 +43,8 @@ size (Success _ _ pts) = 1 + sum (size <$> pts)
 
 -- | Monadic version of 'substitute'.
 substituteM :: (Functor m, Monad m) => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)
-substituteM s (Open l)             = s l
-substituteM _ (Failure r)          = return (Failure r)
+substituteM s (Open l)            = s l
+substituteM _ (Failure r)         = return (Failure r)
 substituteM s (Success pn cf pts) = Success pn cf <$> mapM (substituteM s) pts
 
 -- | Substitute the open leaves of a proof tree according to the given function
@@ -111,22 +111,28 @@ inc (Path i is) = Path (succ i) is
 split :: Path -> Int -> Path
 split (Path i is) j = Path 1 ((i,j):is)
 
-pathLength :: Path -> Int 
+pathLength :: Path -> Int
 pathLength (Path _ is) = 1 + length is
 
 ppPath :: Path -> PP.Doc
 ppPath (Path i is) = PP.cat $ PP.punctuate PP.colon . reverse $ PP.int i : f `fmap` is
   where
     f (j,k) = PP.int j PP.<> PP.dot PP.<> PP.text (g k)
-    g n = if n >= 0 && n < 26 then [toEnum (64+n)] else toEnum n : g (n-26)
+    g n = if n > 0 && n <= 26 then [toEnum (65+n)] else toEnum n : g (n-26)
 
-
-ppProofNode :: Processor p => ProofNode p -> PP.Doc
-ppProofNode (ProofNode p prob po) = PP.vcat
+ppNode :: (Show p, PP.Pretty prob, PP.Pretty po) => p -> prob -> po -> PP.Doc
+ppNode p prob po = PP.vcat
   [ block "Considered Problem" (PP.pretty prob)
   , block "Applied Processor"  (PP.text $ show p)
-  , block "Details"              (PP.pretty po) ]
+  , block "Details"            (PP.pretty po) ]
   where block n e = PP.nest 4 (PP.text "+" PP.<+> PP.text n PP.<> PP.char ':' PP.<$$> e)
+
+ppProofNode :: Processor p => ProofNode p -> PP.Doc
+ppProofNode (ProofNode p prob po) = ppNode p prob po
+
+ppReason :: Reason -> PP.Doc
+ppReason (Failed proc prob reason) = ppNode proc prob reason
+ppReason r                         = PP.pretty r
 
 ppProofTree' :: Path -> (prob -> PP.Doc) -> ProofTree prob -> PP.Doc
 ppProofTree' is ppProb pt@(Open l) = PP.vcat
@@ -134,7 +140,8 @@ ppProofTree' is ppProb pt@(Open l) = PP.vcat
   , PP.indent 4 (ppProb l) ]
 ppProofTree' is _ f@(Failure r) =
    ppHeader f is (PP.text "Failure")
-   PP.<$$> PP.indent 2 (PP.pretty r)
+   PP.<$$> PP.indent 2 (ppReason r)
+
 
 ppProofTree' path ppProb pt@(Success pn _ pts) =
   PP.vcat [ ppHeader pt path (PP.text (takeWhile (`notElem` " {") (show (appliedProcessor pn))))
