@@ -74,6 +74,8 @@ reltimeToTimeout t = do
 -- * generating information from evaluate requires additional ProofData constraints
 -- in principle they are always fullfilled since as basic blocks are processors, but ugly
 -- * alternatively some logging functions when applying processors
+-- * there are also some strange cases one may want to consider
+-- eg assume that s fails; force (try s) vs force s, force (s >>> t) vs force (t >>> s)
 
 -- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
