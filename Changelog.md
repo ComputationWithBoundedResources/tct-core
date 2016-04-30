@@ -1,3 +1,18 @@
+####3.2
+  - parse quoted strings argument in declarations
+  - improved pretty printing of proofs
+  - `Typeable` constraint for `ProofData`
+  - generalised tctconfig
+    - generalised `GHCiScript` to allow user command
+    - generalised `putAnswer` and `putProof` to use built-in primitives
+  - improved interactive mode
+    - now includes `welcome`, `help`, `describe` and other helpful functions
+    - reports reason when failing
+  - improved error reporting
+    - provide problem and processor when application of processor fails
+    - modified strategy DSL that does not replace sub proofs with abort when
+      not necessary
+
 ###3.1
   - make declarations open via `class Declared`; this allows to provide problem
     specific declarations in executables
@@ -6,4 +21,4 @@
     deprecated since `mtl-2.2.1`
 
 ###3.0
-  - initial release
+  - initial release of TcT v3
