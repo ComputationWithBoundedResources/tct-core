@@ -49,7 +49,7 @@ library
     Tct.Core.Processor.Assumption
     Tct.Core.Processor.Empty
     Tct.Core.Processor.Failing
-    Tct.Core.Processor.Sum
+    Tct.Core.Processor.MSum
     Tct.Core.Processor.Transform
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,

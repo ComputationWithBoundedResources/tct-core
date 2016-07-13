@@ -1,13 +1,15 @@
 {-# LANGUAGE MultiWayIf #-}
--- | This module provides the /Sum/ processor.
+-- | This module provides the /MSum/ processor.
 --
--- The /Sum/ processor runs two strategies in parallel and provides a "sum" on the proof level. Fails if both
--- strategies return a 'unbounded' cetificate.
+-- The /MSum/ processor runs two strategies in parallel and provides a "sum" on the resulting proof trees and
+-- certificates. Informally, the processor behaves like a monoid where open (sub)prooftrees and unknown bounds behave
+-- like neutral elements in the proof construction. Closed prooftrees are integrated as left and right child. The
+-- certificates are added where `Unknown` complexity is treated as a neutral element.
 --
--- motivating usage: combine lower upper
-module Tct.Core.Processor.Sum
-  ( summation
-  , summationDeclaration)
+-- Motivating usage: msum lower_bound_strategy upper_bound_strategy
+module Tct.Core.Processor.MSum
+  ( madd
+  , maddDeclaration)
   where
 
 import Tct.Core.Common.SemiRing   (add)
@@ -44,7 +46,6 @@ succeed po = return $ Progress () certf po where
     , timeLB  = timeLB c1  `add'` timeLB c2 }
 
 
-
 instance (ProofData i, ProofData o) => Processor (Sum i o) where
   type ProofObject (Sum i o) = ()
   type In  (Sum i o)         = i
@@ -65,17 +66,17 @@ instance (ProofData i, ProofData o) => Processor (Sum i o) where
       | otherwise                -> abortWith "None"
 
 
-summationDeclaration :: (Declared i o, ProofData i, ProofData o) => Declaration(
+maddDeclaration :: (Declared i o, ProofData i, ProofData o) => Declaration(
   '[ Argument 'Required (Strategy i o)
    , Argument 'Required (Strategy i o)]
    :-> Strategy i o)
-summationDeclaration =
+maddDeclaration =
   declare
     "sum"
     ["This processor runs both strategies in parallel and returns the successful ones."]
     (strat "left" ["The left strategy."], strat "right" ["The right strategy."])
-    summation
+    madd
 
-summation :: (ProofData i, ProofData o, Show p) => Strategy i o -> Strategy i o -> Strategy i p
-summation st1 st2 = processor Sum{left=st1,right=st2} .>>> close
+madd :: (ProofData i, ProofData o, Show p) => Strategy i o -> Strategy i o -> Strategy i p
+madd st1 st2 = processor Sum{left=st1,right=st2} .>>> close
 
