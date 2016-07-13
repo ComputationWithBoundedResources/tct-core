@@ -13,6 +13,7 @@ module Tct.Core.Data.Certificate
   -- * Certificates
   , Certificate (..)
   , unbounded
+  , isUnbounded
   -- * Setter/Getter
   , spaceUBCert
   , spaceLBCert
@@ -25,7 +26,7 @@ module Tct.Core.Data.Certificate
   ) where
 
 
-import           Data.Monoid              ((<>))
+import           Data.Monoid ((<>))
 
 import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
@@ -156,6 +157,15 @@ unbounded = Certificate
   , spaceLB = Unknown
   , timeUB  = Unknown
   , timeLB  = Unknown }
+
+-- | Checks wether all components of the given certificate are 'Unknown'.
+isUnbounded :: Certificate -> Bool
+isUnbounded Certificate
+  { spaceUB = Unknown
+  , spaceLB = Unknown
+  , timeUB  = Unknown
+  , timeLB  = Unknown } = True
+isUnbounded _ = False
 
 -- | Constructs a 'Certificate' from the given 'Complexity'.
 -- Sets only the specified component; all others are set to 'Unknown'.
