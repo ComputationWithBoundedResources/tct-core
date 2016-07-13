@@ -20,6 +20,7 @@ module Tct.Core.Data.Strategy
   , timeoutIn
   , timeoutUntil
   , timeoutRelative
+  , timeoutRemaining
   , wait
   , waitUntil
   -- ** Parallel application
@@ -105,10 +106,9 @@ evaluate1 (Par s)            prob = evaluate1 s prob
 evaluate1 (Race s1 s2)       prob =
   raceWith (not . isFailing) (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
-  uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
+  uncurry pick <$> concurrently (evaluate1 (timeoutRemaining s1) prob) (evaluate1 (timeoutRemaining s2) prob) where
     pick r1 r2 | cmp r2 r1 == GT = r2
                | otherwise       = r1
-    to st = WithStatus $ \ state -> maybe st (`timeoutIn` st) (remainingTime state)
 evaluate1 (Timeout t s) prob = do
   timeout <- reltimeToTimeout t
   fromMaybe (Failure TimedOut) <$> timed timeout (evaluate1 s prob)
@@ -243,9 +243,14 @@ timeoutUntil secs = Timeout (TimeoutUntil secs)
 --
 -- > timeoutRelative (Just 60) 50 st = timeoutIn 30 st
 -- > timeoutRelative Nothing   50 st = st
-timeoutRelative :: (ProofData i, ProofData o) => Maybe Int -> Int -> Strategy i o -> Strategy i o
+timeoutRelative :: Maybe Int -> Int -> Strategy i o -> Strategy i o
 timeoutRelative mtotal percent st = maybe st timeout mtotal
   where timeout total = timeoutIn (floor (fromIntegral (total*percent :: Int) / 100 :: Double)) st
+
+-- | Sets the timeout to the remaining time if set.
+-- Useful for lifting timeout to processors.
+timeoutRemaining :: Strategy i o -> Strategy i o
+timeoutRemaining st = WithStatus $ \ state -> maybe st (`timeoutIn` st) (remainingTime state)
 
 wait,waitUntil :: Int -> Strategy i o -> Strategy i o
 wait secs      = Wait (TimeoutIn secs)
