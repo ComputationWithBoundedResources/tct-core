@@ -4,7 +4,8 @@
 -- The /MSum/ processor runs two strategies in parallel and provides a "sum" on the resulting proof trees and
 -- certificates. Informally, the processor behaves like a monoid where open (sub)prooftrees and unknown bounds behave
 -- like neutral elements in the proof construction. Closed prooftrees are integrated as left and right child. The
--- certificates are added where `Unknown` complexity is treated as a neutral element.
+-- certificates are combined, that is `min` for upper bounds and `max` for lower bounds and `Unknown` complexity is
+-- treated as a neutral element.
 --
 -- Motivating usage: msum lower_bound_strategy upper_bound_strategy
 module Tct.Core.Processor.MSum
@@ -12,7 +13,6 @@ module Tct.Core.Processor.MSum
   , maddDeclaration)
   where
 
-import Tct.Core.Common.SemiRing   (add)
 import Tct.Core.Data
 
 import Tct.Core.Processor.Failing (close)
@@ -33,17 +33,13 @@ bounded = not . isUnbounded
 succeed :: (ProofObject p ~ (), Forking p ~ Gabel, Monad m) => Gabel (ProofTree (Out p)) -> m (Return p)
 succeed po = return $ Progress () certf po where
 
-  Unknown `add'` c2 = c2
-  c2 `add'` Unknown = c2
-  c1 `add'` c2      = c1 `add` c2
-
   certf None        = unbounded
   certf (One c)     = c
   certf (Two c1 c2) = Certificate
-    { spaceUB = spaceUB c1 `add'` spaceUB c2
-    , spaceLB = spaceLB c1 `add'` spaceLB c2
-    , timeUB  = timeUB c1  `add'` timeUB c2
-    , timeLB  = timeLB c1  `add'` timeLB c2 }
+    { spaceUB = spaceUB c1 `min` spaceUB c2
+    , spaceLB = spaceLB c1 `max` spaceLB c2
+    , timeUB  = timeUB c1  `min` timeUB c2
+    , timeLB  = timeLB c1  `max` timeLB c2 }
 
 
 instance (ProofData i, ProofData o) => Processor (Sum i o) where
