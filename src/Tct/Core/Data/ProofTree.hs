@@ -118,7 +118,7 @@ ppPath :: Path -> PP.Doc
 ppPath (Path i is) = PP.cat $ PP.punctuate PP.colon . reverse $ PP.int i : f `fmap` is
   where
     f (j,k) = PP.int j PP.<> PP.dot PP.<> PP.text (g k)
-    g n = if n > 0 && n <= 26 then [toEnum (65+n)] else toEnum n : g (n-26)
+    g n = if n >= 1 && n <= 26 then [toEnum (96+n)] else toEnum n : g (n-26)
 
 ppNode :: (Show p, PP.Pretty prob, PP.Pretty po) => p -> prob -> po -> PP.Doc
 ppNode p prob po = PP.vcat
