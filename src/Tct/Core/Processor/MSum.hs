@@ -37,9 +37,13 @@ succeed po = return $ Progress () certf po where
   certf (One c)     = c
   certf (Two c1 c2) = Certificate
     { spaceUB = spaceUB c1 `min` spaceUB c2
-    , spaceLB = spaceLB c1 `max` spaceLB c2
+    , spaceLB = spaceLB c1 `maz` spaceLB c2
     , timeUB  = timeUB c1  `min` timeUB c2
-    , timeLB  = timeLB c1  `max` timeLB c2 }
+    , timeLB  = timeLB c1  `maz` timeLB c2 }
+
+  Unknown `maz` b       = b
+  b       `maz` Unknown = b
+  a       `maz` b       = a `max` b
 
 
 instance (ProofData i, ProofData o) => Processor (Sum i o) where
