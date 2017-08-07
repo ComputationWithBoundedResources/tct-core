@@ -19,14 +19,16 @@ module Tct.Core.Data.Certificate
   , spaceLBCert
   , timeUBCert
   , timeLBCert
+  , yesNoCert
   , updateSpaceUBCert
   , updateSpaceLBCert
   , updateTimeUBCert
   , updateTimeLBCert
+  , updateYesNoCert
   ) where
 
 
-import           Data.Monoid ((<>))
+import           Data.Monoid              ((<>))
 
 import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
@@ -132,22 +134,29 @@ data Certificate = Certificate
   , spaceLB :: Complexity
   , timeUB  :: Complexity
   , timeLB  :: Complexity
-  } deriving Show
+  } | CertificateYesNo
+  { outcome :: Bool
+  }
+  deriving Show
 
 instance Additive Certificate where
-  add c1 c2 = Certificate
+  add c1@Certificate{} c2@Certificate{} = Certificate
     { spaceUB = spaceUB c1 `add` spaceUB c2
     , spaceLB = spaceLB c1 `add` spaceLB c2
     , timeUB = timeUB c1 `add` timeUB c2
     , timeLB = timeLB c1 `add` timeLB c2 }
+  add (CertificateYesNo c1) (CertificateYesNo c2) = CertificateYesNo (c1 || c2)
+  add _ _ = error "Certificate types cannot be added. Corrupted strategy?!?"
   zero = Certificate zero zero zero zero
 
 instance Multiplicative Certificate where
-  mul c1 c2 = Certificate
+  mul c1@Certificate{} c2@Certificate{} = Certificate
     { spaceUB = spaceUB c1 `mul` spaceUB c2
     , spaceLB = spaceLB c1 `mul` spaceLB c2
     , timeUB = timeUB c1 `mul` timeUB c2
     , timeLB = timeLB c1 `mul` timeLB c2 }
+  mul (CertificateYesNo c1) (CertificateYesNo c2) = CertificateYesNo (c1 && c2)
+  mul _ _ = error "Certificate types cannot be multipled. Corrupted strategy?!?"
   one = Certificate zero zero zero zero
 
 -- | Defines the identity 'Certificate'. Sets all components to 'Unknown'.
@@ -174,6 +183,8 @@ spaceUBCert c = unbounded { spaceUB = c }
 spaceLBCert c = unbounded { spaceLB = c }
 timeUBCert c  = unbounded { timeUB  = c }
 timeLBCert c  = unbounded { timeLB  = c }
+yesNoCert :: Bool -> Certificate
+yesNoCert = CertificateYesNo
 
 -- | Updates a component in the 'Certificate'.
 updateSpaceUBCert, updateSpaceLBCert, updateTimeUBCert, updateTimeLBCert
@@ -182,7 +193,8 @@ updateSpaceUBCert cert f = cert { spaceUB = f $ spaceUB cert }
 updateSpaceLBCert cert f = cert { spaceLB = f $ spaceLB cert }
 updateTimeUBCert  cert f = cert { timeUB  = f $ timeUB  cert }
 updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
-
+updateYesNoCert :: Certificate -> (Bool -> Bool) -> Certificate
+updateYesNoCert cert f = cert { outcome = f $ outcome cert }
 
 --- * ProofData ------------------------------------------------------------------------------------------------------
 
@@ -205,6 +217,8 @@ instance PP.Pretty Certificate where
   pretty (Certificate su sl tu tl) =
     PP.text "TIME (" <> PP.pretty tl <> PP.char ',' <> PP.pretty tu <> PP.char ')' PP.<$$>
     PP.text "SPACE(" <> PP.pretty sl <> PP.char ',' <> PP.pretty su <> PP.char ')'
+  pretty (CertificateYesNo True) = PP.text "YES"
+  pretty (CertificateYesNo False) = PP.text "NO"
 
 instance Xml.Xml Complexity where
   toXml c = case c of

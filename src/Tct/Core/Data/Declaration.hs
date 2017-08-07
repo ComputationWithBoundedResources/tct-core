@@ -122,8 +122,8 @@ bool = flag
 
 -- | Specifies a string argument.
 string :: String -> [String] -> Argument 'Required String
-string n h = arg n "string" h parser where 
- parser = Parsec.try (quoted '\'') Parsec.<|> Parsec.try (quoted '"') Parsec.<|> P.identifier 
+string n h = arg n "string" h parser where
+ parser = Parsec.try (quoted '\'') Parsec.<|> Parsec.try (quoted '"') Parsec.<|> P.identifier
  quoted q = P.lexeme (Parsec.between (Parsec.char q) (Parsec.char q) (Parsec.many (Parsec.noneOf [q])))
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
@@ -190,7 +190,7 @@ instance (Show a, ArgsInfo as) => ArgsInfo (Argument r a ': as) where
     argsInfo' (OptArg b t) = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Just $ show t)
     argsInfo' b            = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Nothing)
   toArgList (HCons a as) = SomeArgument a : toArgList as
-                                                      
+
 --- * proof data -----------------------------------------------------------------------------------------------------
 
 instance ArgsInfo args => PP.Pretty (Declaration (args :-> c)) where
