@@ -49,10 +49,10 @@ module Tct.Core
   ) where
 
 
-import Tct.Core.Data
-import Tct.Core.Main
-import Tct.Core.Data.Strategy
-import Tct.Core.Processor.Failing
+import           Tct.Core.Data
+import           Tct.Core.Data.Strategy
+import           Tct.Core.Main
+import           Tct.Core.Processor.Failing
 
 
 -- | Sets the default Strategy.

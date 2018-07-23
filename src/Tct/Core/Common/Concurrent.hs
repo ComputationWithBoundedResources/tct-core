@@ -89,7 +89,7 @@ withCreateProcess_ fun c action =
     (\(m_in, m_out, m_err, ph) -> action m_in m_out m_err ph)
 
 cleanupProcess :: (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle) -> IO ()
-cleanupProcess (mb_stdin, mb_stdout, mb_stderr, ph@(ProcessHandle _ delegating_ctlc)) = do
+cleanupProcess (mb_stdin, mb_stdout, mb_stderr, ph@(ProcessHandle _ delegating_ctlc _)) = do
   terminateProcess ph
   maybe (return ()) (ignoreSigPipe . hClose) mb_stdin
   maybe (return ()) hClose mb_stdout
@@ -100,5 +100,5 @@ cleanupProcess (mb_stdin, mb_stdout, mb_stderr, ph@(ProcessHandle _ delegating_c
   -- MS: here is actually the only change
   _ <- forkIO $ void (waitForProcess (resetCtlcDelegation ph)) `C.catch` (\e -> void (return (e :: C.SomeException)))
   return ()
-  where resetCtlcDelegation (ProcessHandle m _) = ProcessHandle m False
+  where resetCtlcDelegation (ProcessHandle m _ waitPidLock) = ProcessHandle m False waitPidLock
 

@@ -14,8 +14,8 @@ module Tct.Core.Common.Error
   ) where
 
 
-import           Control.Monad.Except
 import           Control.Exception      (IOException, try)
+import           Control.Monad.Except   hiding (liftEither)
 import           Text.Parsec            (ParseError)
 
 import qualified Tct.Core.Common.Pretty as PP

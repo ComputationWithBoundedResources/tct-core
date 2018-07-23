@@ -13,8 +13,8 @@ license-file:  LICENSE
 category:      Program Analysis
 synopsis:      A Complexity Analysis Framework
 description:
-  The Tyrolean Complexity Tool (TcT for short) is a tool for proving 
-  resource bounds for different formal systems. This package provides 
+  The Tyrolean Complexity Tool (TcT for short) is a tool for proving
+  resource bounds for different formal systems. This package provides
   a general transformation framework.
 build-type:    Simple
 cabal-version: >= 1.8
@@ -53,34 +53,34 @@ library
     Tct.Core.Processor.Transform
   build-depends:
     ansi-wl-pprint       >= 0.6 && < 0.7,
-    async                == 2.*,
+    async                >= 2.0,
     base                 == 4.*,
     bytestring           == 0.10.*,
     containers           >= 0.5 && < 0.6,
-    directory            == 1.2.*,
+    directory            >= 1.2,
     mtl                  >= 2.1 && < 2.3,
-    old-time             == 1.1.*,
-    optparse-applicative == 0.12.*,
-    parsec               == 3.1.*,
-    process              == 1.2.*,
-    temporary            == 1.2.*,
-    text                 == 1.2.*,
-    hexpat               == 0.20.*
-    
+    old-time             >= 1.1.0,
+    optparse-applicative >= 0.12.0,
+    parsec               >= 3.1.0,
+    process              >= 1.2.0,
+    temporary            >= 1.2.0,
+    text                 >= 1.2.0,
+    hexpat               >= 0.20.0
+
   hs-source-dirs: src
   ghc-options:
     -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
-  extensions: 
-    ConstraintKinds, 
+  extensions:
+    ConstraintKinds,
     DataKinds,
-    DeriveFoldable, 
-    DeriveFunctor, 
+    DeriveFoldable,
+    DeriveFunctor,
     DeriveTraversable,
-    FlexibleContexts, 
-    FlexibleInstances, 
-    GADTs, 
+    FlexibleContexts,
+    FlexibleInstances,
+    GADTs,
     GeneralizedNewtypeDeriving,
-    MultiParamTypeClasses, 
+    MultiParamTypeClasses,
     PolyKinds,
     StandaloneDeriving,
     TypeFamilies,
