@@ -1,3 +1,7 @@
+####3.3
+  - add stack-13.20.yaml configuration file
+  - compatibility with ghc-8.6.5
+
 ####3.2
   - parse quoted strings argument in declarations
   - improved pretty printing of proofs
