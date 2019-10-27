@@ -27,7 +27,7 @@ module Tct.Core.Data.ProofTree
 import qualified Data.Foldable             as F (toList)
 
 import qualified Tct.Core.Common.Pretty    as PP
-import           Tct.Core.Data.Answer      (termcomp)
+import           Tct.Core.Data.Answer      (prettyTermcompSep, termcomp)
 import           Tct.Core.Data.Certificate (Certificate, unbounded)
 import           Tct.Core.Data.Types
 
@@ -157,7 +157,9 @@ ppHeader :: ProofTree l -> Path -> PP.Doc -> PP.Doc
 ppHeader pt p s =
   PP.text (replicate (pathLength p) '*') PP.<+> PP.text "Step" PP.<+> ppPath p PP.<> PP.char ':'
   PP.<+> s
-  PP.<+> PP.group (PP.pretty (termcomp (certificate pt)))
+  -- PP.<+> PP.group (PP.pretty (termcomp (certificate pt)))
+  PP.<+> prettyTermcompSep (\a b -> PP.text "WC:" PP.<+> a PP.<+> PP.text " - BC:" PP.<+> b) (termcomp (certificate pt))
+
 
 ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
 ppProofTree pp pt =

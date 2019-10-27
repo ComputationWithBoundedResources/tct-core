@@ -22,8 +22,8 @@ module Tct.Core.Common.Xml
   , child
   , children
   , addChildren
+  , addChild
   ) where
-
 
 
 import qualified Data.ByteString.Lazy  as BS
@@ -106,5 +106,10 @@ children (Xml.Text _)         = []
 addChildren :: XmlContent -> [XmlContent] -> XmlContent
 addChildren (Xml.Element n as es1) es2 = Xml.Element n as (es1 ++ es2)
 addChildren e _                        = e
+
+-- | Add one element below the root element.
+addChild :: XmlContent -> XmlContent -> XmlContent
+addChild (Xml.Element n as es1) es2 = Xml.Element n as (es1 ++ [es2])
+addChild e _                        = e
 
 

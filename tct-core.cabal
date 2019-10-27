@@ -52,13 +52,13 @@ library
     Tct.Core.Processor.MSum
     Tct.Core.Processor.Transform
   build-depends:
-    ansi-wl-pprint       >= 0.6 && < 0.7,
+    ansi-wl-pprint       >= 0.6,
     async                >= 2.0,
     base                 == 4.*,
-    bytestring           == 0.10.*,
-    containers           >= 0.5 && < 0.6,
+    bytestring           >= 0.10,
+    containers           >= 0.5,
     directory            >= 1.2,
-    mtl                  >= 2.1 && < 2.3,
+    mtl                  >= 2.1,
     old-time             >= 1.1.0,
     optparse-applicative >= 0.12.0,
     parsec               >= 3.1.0,
