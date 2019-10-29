@@ -32,6 +32,7 @@ module Tct.Core.Data.Strategy
   , fastestN
   , best
   , cmpTimeUB
+  , cmpTimeBCLB
   -- ** Inspecting the Status
   , withState
   , withProblem
@@ -49,7 +50,7 @@ import           Data.Maybe                (fromMaybe)
 import qualified Data.Traversable          as F (traverse)
 
 import qualified Tct.Core.Common.Pretty    as PP
-import           Tct.Core.Data.Certificate (timeUB)
+import           Tct.Core.Data.Certificate (timeBCLB, timeUB)
 import           Tct.Core.Data.Processor
 import           Tct.Core.Data.ProofTree
 import           Tct.Core.Data.TctM        hiding (wait)
@@ -293,10 +294,15 @@ best cmp ss = foldr1 (cmp .<?>) ss
 (.<?>) :: (ProofTree o -> ProofTree o -> Ordering) -> Strategy i o -> Strategy i o -> Strategy i o
 (.<?>) = Better
 
--- -- | Compares time upperbounds. Useful with 'best'.
+-- | Compares time upperbounds. Useful with 'best'. Selects the smallest bound
 cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering
 cmpTimeUB pt1 pt2 = compare (tu pt2) (tu pt1)
   where tu = timeUB . certificate
+
+-- | Compares time upperbounds. Useful with 'best'. Selects the greatest bound.
+cmpTimeBCLB :: ProofTree i -> ProofTree i -> Ordering
+cmpTimeBCLB pt1 pt2 = compare (tbclb pt1) (tbclb pt2)
+  where tbclb = timeBCLB . certificate
 
 
 -- | Applied strategy depends on run time status.

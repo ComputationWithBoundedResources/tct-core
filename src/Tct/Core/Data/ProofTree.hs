@@ -144,7 +144,7 @@ ppProofTree' is _ f@(Failure r) =
 
 
 ppProofTree' path ppProb pt@(Success pn _ pts) =
-  PP.vcat [ ppHeader pt path (PP.text (takeWhile (`notElem` " {") (show (appliedProcessor pn))))
+  PP.vcat [ ppHeader pt path (PP.text (takeWhile (`notElem` " {") (show (appliedProcessor pn))) PP.<> PP.text ". ")
           , PP.indent 4 (ppProofNode pn)
           , ppSubTrees (F.toList pts) ]
   where
@@ -158,7 +158,7 @@ ppHeader pt p s =
   PP.text (replicate (pathLength p) '*') PP.<+> PP.text "Step" PP.<+> ppPath p PP.<> PP.char ':'
   PP.<+> s
   -- PP.<+> PP.group (PP.pretty (termcomp (certificate pt)))
-  PP.<+> prettyTermcompSep (\a b -> PP.text "WC:" PP.<+> a PP.<+> PP.text " - BC:" PP.<+> b) (termcomp (certificate pt))
+  PP.<+> prettyTermcompSep (\a b -> PP.text "WC:" PP.<+> a PP.<+> PP.text " --  BC:" PP.<+> b) (termcomp (certificate pt))
 
 
 ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
