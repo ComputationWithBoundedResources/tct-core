@@ -204,6 +204,7 @@ timeUBCert c  = unbounded { timeUB  = c }
 timeLBCert c  = unbounded { timeLB  = c }
 timeBCUBCert c  = unbounded { timeBCUB  = c }
 timeBCLBCert c  = unbounded { timeBCLB  = c }
+
 yesNoCert :: Bool -> Certificate
 yesNoCert = CertificateYesNo
 
@@ -215,6 +216,7 @@ updateTimeUBCert    cert f = cert { timeUB    = f $ timeUB   cert }
 updateTimeLBCert    cert f = cert { timeLB    = f $ timeLB   cert }
 updateTimeBCUBCert  cert f = cert { timeBCUB  = f $ timeBCUB cert }
 updateTimeBCLBCert  cert f = cert { timeBCLB  = f $ timeBCLB cert }
+
 updateYesNoCert :: Certificate -> (Bool -> Bool) -> Certificate
 updateYesNoCert cert f = cert { outcome = f $ outcome cert }
 
