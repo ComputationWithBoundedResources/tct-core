@@ -10,6 +10,7 @@ module Tct.Core.Data.Strategy
   , (.>>>)
   , (.<|>)
   , try
+  , optionally
   , force
   , exhaustively , es, te
   , exhaustivelyN
@@ -50,7 +51,7 @@ import           Data.Maybe                (fromMaybe)
 import qualified Data.Traversable          as F (traverse)
 
 import qualified Tct.Core.Common.Pretty    as PP
-import           Tct.Core.Data.Certificate (timeBCLB, timeUB)
+import           Tct.Core.Data.Certificate (constant, Complexity (Unknown), timeBCLB, timeUB)
 import           Tct.Core.Data.Processor
 import           Tct.Core.Data.ProofTree
 import           Tct.Core.Data.TctM        hiding (wait)
@@ -108,8 +109,8 @@ evaluate1 (Race s1 s2)       prob =
   raceWith (not . isFailing) (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
   uncurry pick <$> concurrently (evaluate1 (timeoutRemaining s1) prob) (evaluate1 (timeoutRemaining s2) prob) where
-    pick r1 r2 | cmp r2 r1 == GT = r2
-               | otherwise       = r1
+    pick r1 r2 | cmp r1 r2 == LT = r1
+               | otherwise       = r2
 evaluate1 (Timeout t s) prob = do
   timeout <- reltimeToTimeout t
   fromMaybe (Failure TimedOut) <$> timed timeout (evaluate1 s prob)
@@ -184,6 +185,9 @@ s1 .<|> s2 = Alt s1 s2 -- ite s1 identity s2
 -- | @try s@ behaves like @s@, except in case of failure of @s@, @try s@ behaves like @identity@
 try :: Strategy i i -> Strategy i i
 try s = s .<|> identity
+
+optionally :: Strategy i i -> Strategy i i
+optionally s = s .<|> identity
 
 force :: Strategy i o -> Strategy i o
 force = Force
@@ -286,7 +290,7 @@ best :: (ProofData i, ProofData o) => (ProofTree o -> ProofTree o -> Ordering) -
 best _   [] = abort
 best cmp ss = foldr1 (cmp .<?>) ss
 
--- | @('<?>') cmp s1 s2@ applies @ s1@ and @ s2@ in parallel, returning
+-- | @('<?>') cmp s1 s2@ applies @s1@ and @ s2@ in parallel, returning
 -- the (successful) result @r1@ of strategy @s1@ iff @comp r1 r2 == GT@,
 -- otherwise @r2@ is returned. An example for @comp@ is
 --
@@ -295,14 +299,21 @@ best cmp ss = foldr1 (cmp .<?>) ss
 (.<?>) = Better
 
 -- | Compares time upperbounds. Useful with 'best'. Selects the smallest bound
+-- cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering
+-- cmpTimeUB pt1 pt2 = compare (tu pt2) (tu pt1)
+--   where tu = timeUB . certificate
 cmpTimeUB :: ProofTree i -> ProofTree i -> Ordering
-cmpTimeUB pt1 pt2 = compare (tu pt2) (tu pt1)
+cmpTimeUB pt1 pt2 = compare (tu pt1) (tu pt2)
   where tu = timeUB . certificate
 
 -- | Compares time upperbounds. Useful with 'best'. Selects the greatest bound.
 cmpTimeBCLB :: ProofTree i -> ProofTree i -> Ordering
-cmpTimeBCLB pt1 pt2 = compare (tbclb pt1) (tbclb pt2)
+cmpTimeBCLB pt1 pt2 | complPt1 == Unknown = GT -- Better selects the smallest bound!
+                    | complPt2 == Unknown = LT
+                    | otherwise = compare complPt2 complPt1
   where tbclb = timeBCLB . certificate
+        complPt1 = tbclb pt1
+        complPt2 = tbclb pt2
 
 
 -- | Applied strategy depends on run time status.

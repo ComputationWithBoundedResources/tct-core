@@ -38,6 +38,8 @@ import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Xml      as Xml
 
+-- TODO: Correct version would be:
+-- data Complexity = UnknownComplexity | KnownComplexity ComplexityValue
 
 -- | Type for asymptotic complexity.
 -- The 'Ord' and 'SemiRing' instances are the expected one for asymptotic complexity.
