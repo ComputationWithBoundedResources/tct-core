@@ -105,7 +105,7 @@ writeAnswerFormat SilentAnswerFormat  = "s"
 writeAnswerFormat DefaultAnswerFormat = "d"
 writeAnswerFormat TTTACAnswerFormat   = "t"
 
-readAnswerFormat :: Monad m => String -> m AnswerFormat
+readAnswerFormat :: MonadFail m => String -> m AnswerFormat
 readAnswerFormat s
   | s == writeAnswerFormat SilentAnswerFormat  = return SilentAnswerFormat
   | s == writeAnswerFormat DefaultAnswerFormat = return DefaultAnswerFormat
@@ -117,7 +117,7 @@ writeProofFormat SilentProofFormat  = "s"
 writeProofFormat DefaultProofFormat = "d"
 -- writeProofFormat XmlProofFormat     = "x"
 
-readProofFormat :: Monad m => String -> m ProofFormat
+readProofFormat :: MonadFail m => String -> m ProofFormat
 readProofFormat s
   | s == writeProofFormat SilentProofFormat  = return SilentProofFormat
   | s == writeProofFormat DefaultProofFormat = return DefaultProofFormat
