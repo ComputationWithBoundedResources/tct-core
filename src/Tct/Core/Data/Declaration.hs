@@ -88,11 +88,9 @@ instance DefF ('[] :-> f) where
 
 instance (DefF (as :-> r)) => DefF (Argument 'Optional a ': as :-> r) where
   deflFun (Decl n h f (HCons a as)) = deflFun (Decl n h (f (argDefault a)) as)
-  deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
 instance DefF (as :-> r) => DefF (Argument 'Required a ': as :-> r) where
   deflFun (Decl n h f (HCons _ as)) = \ a' -> deflFun (Decl n h (f a') as)
-  deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
 
 --- * arguments ------------------------------------------------------------------------------------------------------

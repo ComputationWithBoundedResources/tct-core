@@ -1,3 +1,5 @@
 .stack-work/
 TAGS
 dist/
+dist-newstyle
+stack.yaml.lock

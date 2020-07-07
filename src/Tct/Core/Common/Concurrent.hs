@@ -11,7 +11,7 @@ import           Foreign.C
 import           GHC.IO.Exception         (IOErrorType (..), IOException (..))
 import           System.Exit              (ExitCode (..))
 import           System.IO
-import           System.Process           hiding (readCreateProcessWithExitCode)
+import           System.Process           hiding (readCreateProcessWithExitCode, cleanupProcess)
 import           System.Process.Internals
 
 
