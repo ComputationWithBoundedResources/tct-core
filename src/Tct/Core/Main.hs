@@ -87,8 +87,8 @@ defaultTctConfig p = TctConfig
 prettySilentAnswer, prettyDefaultAnswer, prettyTTTacAnswer
   :: ProofTree i -> PP.Doc
 prettySilentAnswer _ = PP.empty
-prettyDefaultAnswer r = PP.pretty (termcomp (certificate r))
-prettyTTTacAnswer r = PP.pretty (tttac (certificate r))
+prettyDefaultAnswer r = PP.pretty (certificate2Default (certificate r))
+prettyTTTacAnswer r = PP.pretty (termcomp (certificate r))
 
 prettySilentProof, prettyDefaultProof :: PP.Pretty i => ProofTree i -> PP.Doc
 prettySilentProof _ = PP.empty
