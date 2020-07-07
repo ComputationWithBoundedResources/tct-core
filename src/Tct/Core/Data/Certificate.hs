@@ -1,32 +1,34 @@
 -- | This module provides the 'Complexity' and 'Certificate' type.
+-- The complexity and certificate types are fixed and represent a class of bounding functions for lower and upper
+-- timebounds as well as lower and upper spacebounds.
 module Tct.Core.Data.Certificate
   (
   -- * Complexity Functions
   Complexity (..)
   , constant
   , linear
-
   -- * Semiring/Composition
   , compose
   -- , iter
-
   -- * Certificates
   , Certificate (..)
   , unbounded
-
+  , isUnbounded
   -- * Setter/Getter
   , spaceUBCert
   , spaceLBCert
   , timeUBCert
   , timeLBCert
+  , yesNoCert
   , updateSpaceUBCert
   , updateSpaceLBCert
   , updateTimeUBCert
   , updateTimeLBCert
+  , updateYesNoCert
   ) where
 
 
-import           Data.Monoid
+import           Data.Monoid              ((<>))
 
 import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
@@ -50,11 +52,11 @@ data Complexity
   | Unknown          -- ^ Unknown.
   deriving (Eq, Show)
 
--- | prop> constant = Poly (Just 0)
+-- | > constant = Poly (Just 0)
 constant :: Complexity
 constant = Poly (Just 0)
 
--- | prop> linear = Poly (Just 1)
+-- | > linear = Poly (Just 1)
 linear :: Complexity
 linear = Poly (Just 1)
 
@@ -87,8 +89,7 @@ instance Multiplicative Complexity where
   a               `mul` b               = max a b
   one = Poly (Just 0)
 
-
--- | Composition of asymptotic complexity.
+-- | Composition of asymptotic complexities.
 compose :: Complexity -> Complexity -> Complexity
 (Poly (Just n)) `compose` a
   | n == 0 = Poly (Just 0)
@@ -105,7 +106,6 @@ a `compose` (Poly (Just m))
 (Exp Nothing)   `compose` (Exp _)         = Exp Nothing
 (Exp _)         `compose` (Exp Nothing)   = Exp Nothing
 a               `compose` b               = maximum [Primrec, a, b]
-
 
 {-
 iter :: Complexity -> Complexity -> Complexity
@@ -134,22 +134,29 @@ data Certificate = Certificate
   , spaceLB :: Complexity
   , timeUB  :: Complexity
   , timeLB  :: Complexity
-  } deriving Show
+  } | CertificateYesNo
+  { outcome :: Bool
+  }
+  deriving Show
 
 instance Additive Certificate where
-  add c1 c2 = Certificate
+  add c1@Certificate{} c2@Certificate{} = Certificate
     { spaceUB = spaceUB c1 `add` spaceUB c2
     , spaceLB = spaceLB c1 `add` spaceLB c2
     , timeUB = timeUB c1 `add` timeUB c2
     , timeLB = timeLB c1 `add` timeLB c2 }
+  add (CertificateYesNo c1) (CertificateYesNo c2) = CertificateYesNo (c1 || c2)
+  add _ _ = error "Certificate types cannot be added. Corrupted strategy?!?"
   zero = Certificate zero zero zero zero
 
 instance Multiplicative Certificate where
-  mul c1 c2 = Certificate
+  mul c1@Certificate{} c2@Certificate{} = Certificate
     { spaceUB = spaceUB c1 `mul` spaceUB c2
     , spaceLB = spaceLB c1 `mul` spaceLB c2
     , timeUB = timeUB c1 `mul` timeUB c2
     , timeLB = timeLB c1 `mul` timeLB c2 }
+  mul (CertificateYesNo c1) (CertificateYesNo c2) = CertificateYesNo (c1 && c2)
+  mul _ _ = error "Certificate types cannot be multipled. Corrupted strategy?!?"
   one = Certificate zero zero zero zero
 
 -- | Defines the identity 'Certificate'. Sets all components to 'Unknown'.
@@ -160,6 +167,15 @@ unbounded = Certificate
   , timeUB  = Unknown
   , timeLB  = Unknown }
 
+-- | Checks wether all components of the given certificate are 'Unknown'.
+isUnbounded :: Certificate -> Bool
+isUnbounded Certificate
+  { spaceUB = Unknown
+  , spaceLB = Unknown
+  , timeUB  = Unknown
+  , timeLB  = Unknown } = True
+isUnbounded _ = False
+
 -- | Constructs a 'Certificate' from the given 'Complexity'.
 -- Sets only the specified component; all others are set to 'Unknown'.
 spaceUBCert, spaceLBCert, timeUBCert, timeLBCert :: Complexity -> Certificate
@@ -167,6 +183,8 @@ spaceUBCert c = unbounded { spaceUB = c }
 spaceLBCert c = unbounded { spaceLB = c }
 timeUBCert c  = unbounded { timeUB  = c }
 timeLBCert c  = unbounded { timeLB  = c }
+yesNoCert :: Bool -> Certificate
+yesNoCert = CertificateYesNo
 
 -- | Updates a component in the 'Certificate'.
 updateSpaceUBCert, updateSpaceLBCert, updateTimeUBCert, updateTimeLBCert
@@ -175,7 +193,8 @@ updateSpaceUBCert cert f = cert { spaceUB = f $ spaceUB cert }
 updateSpaceLBCert cert f = cert { spaceLB = f $ spaceLB cert }
 updateTimeUBCert  cert f = cert { timeUB  = f $ timeUB  cert }
 updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
-
+updateYesNoCert :: Certificate -> (Bool -> Bool) -> Certificate
+updateYesNoCert cert f = cert { outcome = f $ outcome cert }
 
 --- * ProofData ------------------------------------------------------------------------------------------------------
 
@@ -198,6 +217,8 @@ instance PP.Pretty Certificate where
   pretty (Certificate su sl tu tl) =
     PP.text "TIME (" <> PP.pretty tl <> PP.char ',' <> PP.pretty tu <> PP.char ')' PP.<$$>
     PP.text "SPACE(" <> PP.pretty sl <> PP.char ',' <> PP.pretty su <> PP.char ')'
+  pretty (CertificateYesNo True) = PP.text "YES"
+  pretty (CertificateYesNo False) = PP.text "NO"
 
 instance Xml.Xml Complexity where
   toXml c = case c of

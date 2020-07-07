@@ -25,7 +25,6 @@ module Tct.Core.Common.Options
 
 import           Data.Monoid                          ((<>))
 import qualified Options.Applicative                  as O
-import qualified Options.Applicative.Builder.Internal as O
 
 import           Tct.Core.Common.Pretty               (Doc)
 

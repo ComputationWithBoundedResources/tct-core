@@ -15,7 +15,6 @@ instance ProofData i => Processor (Assumption i) where
 
   execute p _ = succeedWith0 () (judgement (assumed p))
 
-
 closeNode :: ProofData prob => Certificate -> prob -> ProofTree prob
 closeNode cert prob = Success pn (judgement cert) Judgement where
   pn = ProofNode
@@ -27,3 +26,4 @@ closeNode cert prob = Success pn (judgement cert) Judgement where
 
 assumeWith :: ProofData prob => Certificate -> ProofTree prob -> ProofTree prob
 assumeWith cert = substitute (closeNode cert)
+

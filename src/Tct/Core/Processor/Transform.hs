@@ -29,7 +29,7 @@ instance (ProofData i, ProofData o) => Processor (Transform i o) where
   type In (Transform i o)          = i
   type Out (Transform i o)         = o
 
-  execute (Transform msg t) prob = case t prob of 
+  execute (Transform msg t) prob = case t prob of
     Left err  -> abortWith err;
     Right new -> succeedWith1 (TransformProof msg prob new) fromId new
 
@@ -50,7 +50,7 @@ instance (PP.Pretty i, PP.Pretty o) => PP.Pretty (TransformProof i o) where
     [ (if null msg then PP.empty else PP.text msg) PP.<+> PP.text "The problem"
     , PP.indent 2 $ PP.pretty i
     , PP.text "is transformed into the problem"
-    , PP.indent 2 $ PP.pretty o ]
+    , PP.indent 2 $ PP.pretty o ] 
 
 instance (Xml.Xml i, Xml.Xml o) => Xml.Xml (TransformProof i o) where
   toXml (TransformFail err)      = Xml.elt "transformation" [ Xml.elt "failed" [Xml.text err]]

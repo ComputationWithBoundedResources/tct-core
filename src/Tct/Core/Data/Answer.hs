@@ -1,6 +1,7 @@
--- | This module provides standard output formats for certificates.
+-- | This module provides standard output formats for a 'Certificate'.
 module Tct.Core.Data.Answer
   (
+  -- * Generic timebound format.
   Timebounds (..)
   , timebounds
   -- * tttac / termcomp (prior 2015) format
@@ -22,9 +23,10 @@ import qualified Tct.Core.Data.Certificate as T
 -- | @Timebounds lower upper@
 data Timebounds = Timebounds T.Complexity T.Complexity
 
--- | Extracts lowwer and upper bounds of a certificate.
+-- | Extracts lower and upper bounds of a certificate.
 timebounds :: T.Certificate -> Timebounds
-timebounds c = Timebounds (T.timeLB c) (T.timeUB c)
+timebounds c@T.Certificate{}    = Timebounds (T.timeLB c) (T.timeUB c)
+timebounds T.CertificateYesNo{} = Timebounds T.Unknown T.Unknown
 
 instance PP.Pretty Timebounds where
   pretty (Timebounds lb  ub) = PP.text "Timebounds" <> PP.tupled [PP.pretty lb, PP.pretty ub]
@@ -40,19 +42,23 @@ instance Xml.Xml Timebounds where
 -- | Newtype wrapper for 'Timebounds'.
 -- The pretty printing instance corresponds to the old (prior 2015) /termcomp/ format and is compatible with the
 -- /tttac/ testing tool.
-newtype TTTAC = TTTAC Timebounds
+data TTTAC = TTTAC Timebounds
+           | TTTACYN Bool
 
 -- | Returns the certificate in a /tttac/ compatible format.
 --
 -- > pretty $ tttac unbounded = "MAYBE"
--- > pretty $ tttac (spaceLBCert linear) = "YES(O(n^1),?)"
--- > pretty $ tttac (spaceUBCert linear) = "YES(?,O(n^1))"
+-- > pretty $ tttac (timeLBCert linear) = "YES(O(n^1),?)"
+-- > pretty $ tttac (timeUBCert linear) = "YES(?,O(n^1))"
 tttac :: T.Certificate -> TTTAC
-tttac = TTTAC . timebounds
+tttac c@T.Certificate{}      = TTTAC (timebounds c)
+tttac (T.CertificateYesNo x) = TTTACYN x
 
 instance PP.Pretty TTTAC where
   pretty (TTTAC (Timebounds lb  ub))
     | lb /= T.Unknown || ub /= T.Unknown = PP.text "YES" <> PP.tupled [PP.pretty lb, PP.pretty ub]
+  pretty (TTTACYN True) = PP.text "YES"
+  pretty (TTTACYN False) = PP.text "NO"
   pretty _ = PP.text "MAYBE"
 
 instance Xml.Xml TTTAC where
@@ -60,6 +66,8 @@ instance Xml.Xml TTTAC where
     | lb /= T.Unknown || ub /= T.Unknown = Xml.elt "certified"
       [ Xml.elt "lowerbound" [Xml.toXml lb]
       , Xml.elt "upperbound" [Xml.toXml ub] ]
+  toXml (TTTACYN True) = Xml.elt "YES" []
+  toXml (TTTACYN False) = Xml.elt "NO" []
   toXml _  = Xml.elt "maybe" []
 
 
@@ -68,15 +76,17 @@ instance Xml.Xml TTTAC where
 -- | Newtype wrapper for 'Timebounds'.
 -- The pretty printing instance corresponds to the /termcomp 2015/ format.
 -- See <http://cbr.uibk.ac.at/competition/rules.php> (September 2015) for more information.
-newtype Termcomp = Termcomp Timebounds
+data Termcomp = Termcomp Timebounds
+              | TermcompYN Bool
 
 -- | Returns the certificate in the /termcomp 2015/ format.
 --
 -- > pretty $ termcomp unbounded = "WORST_CASE(?,?)"
--- > pretty $ termcomp (spaceLBCert linear) = "WORSTCASE(Omega(n^1,?)"
--- > pretty $ termcomp (spaceUBCert linear) = "WORSTCASE(?,O(n^1)"
+-- > pretty $ termcomp (timeLBCert linear) = "WORSTCASE(Omega(n^1,?)"
+-- > pretty $ termcomp (timeUBCert linear) = "WORSTCASE(?,O(n^1)"
 termcomp :: T.Certificate -> Termcomp
-termcomp = Termcomp . timebounds
+termcomp c@T.Certificate{}      = Termcomp (timebounds c)
+termcomp (T.CertificateYesNo x) = TermcompYN x
 
 toTermcomp :: t -> ((t1, t1) -> t) -> (Int -> t1) -> t1 -> (Int -> t1) -> t1 -> t1 -> Termcomp -> t
 toTermcomp maybeA worst omegaA npolyA oA polyA unknownA (Termcomp (Timebounds  lb  ub)) = case (normlb lb, normub ub) of
@@ -92,15 +102,18 @@ toTermcomp maybeA worst omegaA npolyA oA polyA unknownA (Termcomp (Timebounds  l
     tocub _                 = polyA
 
     normlb p@(T.Poly (Just i)) | i > 0 = p
-    normlb e@(T.Exp _)                 = e
-    normlb _                           = T.Unknown
+    normlb e@(T.Exp _)         = e
+    normlb _                   = T.Unknown
 
     normub p@(T.Poly (Just i)) | i >= 0 = p
-    normub p@(T.Poly Nothing)           = p
-    normub _                            = T.Unknown
+    normub p@(T.Poly Nothing)  = p
+    normub _                   = T.Unknown
+toTermcomp _ _ _ _ _ _ _ _ = error "not possible"
 
 instance PP.Pretty Termcomp where
-  pretty =
+  pretty (TermcompYN True)  = PP.text "YES"
+  pretty (TermcompYN False) = PP.text "NO"
+  pretty c@Termcomp{} =
     toTermcomp
       (PP.text "MAYBE")
       (\(lb,ub) -> PP.text "WORST_CASE" <> PP.tupled [lb,ub])
@@ -109,9 +122,12 @@ instance PP.Pretty Termcomp where
       (\i -> PP.char 'O' <> PP.parens (if i == 0 then PP.int 1 else PP.text "n^" <> PP.int i))
       (PP.text "POLY")
       (PP.char '?')
+      c
 
 instance Xml.Xml Termcomp where
-  toXml =
+  toXml (TermcompYN True)  = Xml.elt "YES" []
+  toXml (TermcompYN False) = Xml.elt "NO"  []
+  toXml c@Termcomp{} =
     toTermcomp
       (Xml.elt "maybe" [])
       (\(lb,ub) -> Xml.elt "worst_case" [Xml.elt "lowerbound" [lb], Xml.elt "upperbound" [ub]])
@@ -120,4 +136,5 @@ instance Xml.Xml Termcomp where
       (\i -> Xml.elt "polynomial" [Xml.int i])
       (Xml.text "poly")
       (Xml.text "unknown")
+      c
 
