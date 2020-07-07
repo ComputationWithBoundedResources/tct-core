@@ -4,13 +4,15 @@ module Tct.Core.Data.Answer
   -- * Generic timebound format.
     Timebounds(..)
   , timebounds
-  , prettyTermcompSep
+  , prettyDefaultFormatSep
   -- * tttac / termcomp (prior 2015) format
   , TTTAC(..)
   , tttac
   -- * termcomp 2015 format
   , Termcomp(..)
   , termcomp
+  , DefaultFormat(..)
+  , certificate2Default
   )
 where
 
@@ -46,7 +48,7 @@ instance Xml.Xml Timebounds where
     [Xml.elt "lowerbound" [Xml.toXml lb], Xml.elt "upperbound" [Xml.toXml ub]]
 
 
---- * termcomp -------------------------------------------------------------------------------------------------------
+--- * old termcomp format -------------------------------------------------------------------------------------------------------
 
 -- | Newtype wrapper for 'Timebounds'.
 -- The pretty printing instance corresponds to the old (prior 2015) /termcomp/ format and is compatible with the
@@ -80,13 +82,12 @@ instance Xml.Xml TTTAC where
   toXml _               = Xml.elt "maybe" []
 
 
---- * termcomp -------------------------------------------------------------------------------------------------------
+--- * old termcomp format -------------------------------------------------------------------------------------------------------
 
 -- | Newtype wrapper for 'Timebounds'.
 -- The pretty printing instance corresponds to the /termcomp 2015/ format.
 -- See <http://cbr.uibk.ac.at/competition/rules.php> (September 2015) for more information.
-data Termcomp = Termcomp Timebounds Timebounds
-              | TermcompYN Bool
+type Termcomp = DefaultFormat
 
 -- | Returns the certificate in the /termcomp 2015/ format.
 --
@@ -94,10 +95,30 @@ data Termcomp = Termcomp Timebounds Timebounds
 -- > pretty $ termcomp (timeLBCert linear) = "WORSTCASE(Omega(n^1,?)"
 -- > pretty $ termcomp (timeUBCert linear) = "WORSTCASE(?,O(n^1)"
 termcomp :: T.Certificate -> Termcomp
-termcomp c@T.Certificate{}      = Termcomp (timebounds c) (timeboundsBestCase c)
-termcomp (T.CertificateYesNo x) = TermcompYN x
+termcomp c@T.Certificate{}      = DefaultFormatWC (timebounds c)
+termcomp (T.CertificateYesNo x) = DefaultFormatYN x
 
-toTermcomp
+--- * default output format -------------------------------------------------------------------------------------------------------
+
+-- | Newtype wrapper for 'Timebounds'.
+-- The pretty printing instance corresponds to the default output format, including worst case and best case bounds.
+-- See <http://cbr.uibk.ac.at/competition/rules.php> (September 2015) for more information.
+data DefaultFormat = DefaultFormat Timebounds Timebounds
+                   | DefaultFormatWC Timebounds
+                   | DefaultFormatBC Timebounds
+                   | DefaultFormatYN Bool
+
+-- | Returns the certificate in the default format.
+--
+-- > pretty $ termcomp unbounded = "WORST_CASE(?,?)"
+-- > pretty $ termcomp (timeLBCert linear) = "WORSTCASE(Omega(n^1,?)"
+-- > pretty $ termcomp (timeUBCert linear) = "WORSTCASE(?,O(n^1)"
+certificate2Default :: T.Certificate -> DefaultFormat
+certificate2Default c@T.Certificate{} =
+  DefaultFormat (timebounds c) (timeboundsBestCase c)
+certificate2Default (T.CertificateYesNo x) = DefaultFormatYN x
+
+toDefaultFormat
   :: (t -> t -> t)
   -> t
   -> ((t1, t1) -> t)
@@ -107,10 +128,15 @@ toTermcomp
   -> (Int -> t1)
   -> t1
   -> t1
-  -> Termcomp
+  -> DefaultFormat
   -> t
-toTermcomp sep maybeA worst best omegaA npolyA oA polyA unknownA (Termcomp (Timebounds lb ub) (Timebounds bclb bcub))
-  = output worst (lb, ub) `sep` output best (bclb, bcub)
+toDefaultFormat sep maybeA worst best omegaA npolyA oA polyA unknownA bounds =
+  case bounds of
+    DefaultFormat (Timebounds lb ub) (Timebounds bclb bcub) ->
+      output worst (lb, ub) `sep` output best (bclb, bcub)
+    DefaultFormatWC (Timebounds lb ub) -> output worst (lb, ub)
+    DefaultFormatBC (Timebounds bclb bcub) -> output best (bclb, bcub)
+    DefaultFormatYN _ -> error "This format should already be cached earlier."
  where
   output f (l, u) = case (normlb l, normub u) of
     (T.Unknown, T.Unknown) -> maybeA
@@ -127,17 +153,18 @@ toTermcomp sep maybeA worst best omegaA npolyA oA polyA unknownA (Termcomp (Time
   normub p@(T.Poly (Just i)) | i >= 0 = p
   normub p@(T.Poly Nothing)           = p
   normub _                            = T.Unknown
-toTermcomp _ _ _ _ _ _ _ _ _ _ = error "not possible"
+toDefaultFormat _ _ _ _ _ _ _ _ _ _ = error "not possible"
 
 
-instance PP.Pretty Termcomp where
-  pretty (TermcompYN True ) = PP.text "YES"
-  pretty (TermcompYN False) = PP.text "NO"
-  pretty c@Termcomp{}       = prettyTermcompSep (PP.<$$>) c
+instance PP.Pretty DefaultFormat where
+  pretty (DefaultFormatYN True) = PP.text "YES"
+  pretty (DefaultFormatYN False) = PP.text "NO"
+  pretty defaultFormat = prettyDefaultFormatSep (PP.<$$>) defaultFormat
 
 
-prettyTermcompSep :: (PP.Doc -> PP.Doc -> PP.Doc) -> Termcomp -> PP.Doc
-prettyTermcompSep sep c = toTermcomp
+prettyDefaultFormatSep
+  :: (PP.Doc -> PP.Doc -> PP.Doc) -> DefaultFormat -> PP.Doc
+prettyDefaultFormatSep sep c = toDefaultFormat
   sep
   (PP.text "MAYBE")
   (\(lb, ub) -> PP.text "WORST_CASE" <> PP.tupled [lb, ub])
@@ -151,11 +178,10 @@ prettyTermcompSep sep c = toTermcomp
   (PP.char '?')
   c
 
-
-instance Xml.Xml Termcomp where
-  toXml (TermcompYN True ) = Xml.elt "YES" []
-  toXml (TermcompYN False) = Xml.elt "NO" []
-  toXml c@Termcomp{}       = toTermcomp
+instance Xml.Xml DefaultFormat where
+  toXml (DefaultFormatYN True ) = Xml.elt "YES" []
+  toXml (DefaultFormatYN False) = Xml.elt "NO" []
+  toXml c@DefaultFormat{}       = toDefaultFormat
     Xml.addChild
     (Xml.elt "maybe" [])
     (\(lb, ub) -> Xml.elt
