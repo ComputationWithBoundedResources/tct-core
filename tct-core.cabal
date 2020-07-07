@@ -1,20 +1,18 @@
 name:          tct-core
-version:       3.0.0
+version:       3.3.0
 stability:     experimental
 author:
-  Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
+  Martin Avanzini, Michael Schaper, Manuel Schneckenreither, Georg Moser, Andreas Kochesser, Maria Schett
 maintainer:
   Martin Avanzini <martin.avanzini@uibk.ac.at>,
-  Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
-  Michael Schaper <michael.schaper@uibk.ac.at>,
-  Maria Schett <maria.schett@uibk.ac.at>
+  Michael Schaper <michael.schaper@student.uibk.ac.at>,
 license:       BSD3
 license-file:  LICENSE
 category:      Program Analysis
 synopsis:      A Complexity Analysis Framework
 description:
-  The Tyrolean Complexity Tool (TcT for short) is a tool for proving 
-  resource bounds for different formal systems. This package provides 
+  The Tyrolean Complexity Tool (TcT for short) is a tool for proving
+  resource bounds for different formal systems. This package provides
   a general transformation framework.
 build-type:    Simple
 cabal-version: >= 1.8
@@ -28,6 +26,7 @@ library
     Tct.Core
     Tct.Core.Common.Concurrent
     Tct.Core.Common.Error
+    Tct.Core.Common.Options
     Tct.Core.Common.Parser
     Tct.Core.Common.Pretty
     Tct.Core.Common.SemiRing
@@ -42,48 +41,44 @@ library
     Tct.Core.Data.Strategy
     Tct.Core.Data.TctM
     Tct.Core.Data.Types
-    Tct.Core.Declarations
     Tct.Core.Parse
     Tct.Core.Interactive
     Tct.Core.Main
-    Tct.Core.Main.Mode
-    Tct.Core.Main.Options
     Tct.Core.Processor.Assumption
     Tct.Core.Processor.Empty
+    Tct.Core.Processor.Failing
+    Tct.Core.Processor.MSum
     Tct.Core.Processor.Transform
   build-depends:
-    ansi-wl-pprint       >= 0.6 && < 0.7,
-    async                == 2.*,
-    base                 == 4.*,
-    bytestring           == 0.10.*,
-    containers           >= 0.5 && < 0.6,
-    directory            == 1.2.*,
-    dyre                 == 0.8.*,
-    filepath             >= 1.3,
-    mtl                  >= 2.1 && < 2.3,
-    old-time             == 1.1.*,
-    optparse-applicative == 0.11.*,
-    parsec               == 3.1.*,
-    process              == 1.2.*,
-    temporary            == 1.2.*,
-    text                 == 1.2.*,
-    hexpat               == 0.20.*
-    
+    base >=4.7 && <5,
+    ansi-wl-pprint,
+    async,
+    bytestring,
+    containers,
+    directory,
+    mtl,
+    old-time,
+    optparse-applicative,
+    parsec,
+    process,
+    temporary,
+    text,
+    hexpat
+
   hs-source-dirs: src
   ghc-options:
-    -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
-  extensions: 
-    ConstraintKinds, 
+    -Wall -Wcompat -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+  extensions:
+    ConstraintKinds,
     DataKinds,
-    DeriveDataTypeable,
-    DeriveFoldable, 
-    DeriveFunctor, 
+    DeriveFoldable,
+    DeriveFunctor,
     DeriveTraversable,
-    FlexibleContexts, 
-    FlexibleInstances, 
-    GADTs, 
+    FlexibleContexts,
+    FlexibleInstances,
+    GADTs,
     GeneralizedNewtypeDeriving,
-    MultiParamTypeClasses, 
+    MultiParamTypeClasses,
     PolyKinds,
     StandaloneDeriving,
     TypeFamilies,

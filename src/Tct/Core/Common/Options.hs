@@ -1,5 +1,5 @@
 -- | This module provides a wrapper for "OptParse.Applicative" (<http://hackage.haskell.org/package/optparse-applicative>).
-module Tct.Core.Main.Options
+module Tct.Core.Common.Options
   (
   Options
   -- * Builder
@@ -25,7 +25,6 @@ module Tct.Core.Main.Options
 
 import           Data.Monoid                          ((<>))
 import qualified Options.Applicative                  as O
-import qualified Options.Applicative.Builder.Internal as O
 
 import           Tct.Core.Common.Pretty               (Doc)
 

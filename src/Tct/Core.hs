@@ -1,61 +1,72 @@
-{- | This module re-exports top-level definition for
+{- | This module re-exports useful top-level definitions for
 
     * configuring Tct,
     * instantiating TcT, and
-    * declaring customised Strategies.
+    * declaring customised Strategies,
 
-  TODO: description
-
+and is intended to be imported unqualified.
 -}
 module Tct.Core
   (
   -- * Configuring Tct
   TctConfig (..)
+  , runTct
+  , runTctWithOptions
   , defaultTctConfig
-  , AnswerFormat (..)
-  , ProofFormat (..)
-  -- * Initialising Tct
-  , TctMode
-  , defaultMode
-  , withStrategies
   , withDefaultStrategy
-  , setMode
-  , setModeWith
+  , appendGHCiScript
+  , addRuntimeOption
   -- * Processor
   , ProofData
+  , abortWith
   , succeedWith
   , succeedWith0
   , succeedWith1
-  , abortWith
+  , succeedWithId
   -- ** Argument
   , Argument
   , ArgFlag (..)
   , nat
   , bool
   , strat
+  , flag
+  , string
   , some
   , optional
+  , withDomain
   -- ** Declaration
-  , StrategyDeclaration (..)
-  , strategy
+  , Declaration
+  , Declared (..)
+  , (:->)
   , OneTuple (..)
   -- ** Argument and Declaration Modifyer
   , withName
   , withHelp
-  -- ** Combinators
+  -- ** Strategy and Combinators
   , module Tct.Core.Data.Strategy
+  , close
+  , failing
   ) where
 
 
-import Tct.Core.Data
-import Tct.Core.Main
-import Tct.Core.Data.Strategy
+import           Tct.Core.Data
+import           Tct.Core.Data.Strategy
+import           Tct.Core.Main
+import           Tct.Core.Processor.Failing
 
--- | Adds a list of 'StrategyDeclaraton' to the existing ones.
-withStrategies :: TctMode i o opt -> [StrategyDeclaration i o] -> TctMode i o opt
-withStrategies m sds = m { modeStrategies = modeStrategies m ++ sds }
 
 -- | Sets the default Strategy.
-withDefaultStrategy :: TctMode i o opt -> Strategy i o -> TctMode i o opt
-withDefaultStrategy m st = m { modeDefaultStrategy = st }
+withDefaultStrategy :: TctConfig i -> Strategy i i -> TctConfig i
+withDefaultStrategy cfg st = cfg { defaultStrategy = st }
+
+-- | Sets 'GHCiScript'; and appends the given script.
+appendGHCiScript :: TctConfig i -> [String] -> TctConfig i
+appendGHCiScript cfg ss = cfg { interactiveGHCi = k (interactiveGHCi cfg) ss}
+  where
+    k (GHCiCommand _) xs   = GHCiScript Nothing xs
+    k (GHCiScript m s1) xs = GHCiScript m (s1 ++ xs)
+
+-- | Adds a key-value pair to the runtime options.
+addRuntimeOption :: TctConfig i -> String -> [String] -> TctConfig i
+addRuntimeOption cfg s ss = cfg { runtimeOptions = (s,ss) :runtimeOptions cfg }
 

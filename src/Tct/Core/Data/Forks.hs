@@ -12,10 +12,7 @@ module Tct.Core.Data.Forks
   ) where
 
 
-import Control.Applicative (liftA2, (<$>))
-
-
-
+import Control.Applicative (liftA2)
 
 -- | 'Judgement' representst a node with no successor.
 data Judgement a = Judgement deriving (Foldable,Functor,Traversable)

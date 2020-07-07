@@ -7,8 +7,9 @@ module Tct.Core.Data.TctM
   , TctStatus (..)
   , askState
   , setState
+  , setKvPair
+  , getKvPair
   , askStatus
-
   -- * Lifted IO functions
   , async
   , wait
@@ -24,6 +25,8 @@ import           Control.Concurrent       (threadDelay)
 import qualified Control.Concurrent.Async as Async
 import           Control.Monad            (liftM)
 import           Control.Monad.Reader     (ask, liftIO, local, runReaderT)
+import qualified Data.Map                 as M
+import           Data.Maybe               (fromMaybe)
 import qualified System.Time              as Time
 
 import           Tct.Core.Data.Types
@@ -36,6 +39,15 @@ askState = ask
 -- | Sets (locally) the state of the Monad.
 setState :: (TctROState -> TctROState) -> TctM a -> TctM a
 setState = local
+
+-- | Sets (locally) a key-value pair.
+setKvPair :: (String, [String]) -> TctM a -> TctM a
+setKvPair (k,v) = local $ \st -> st { kvPairs = M.insert k v (kvPairs st) }
+
+-- | Given a key; asks for a value. Returns [] if there is no value.
+getKvPair :: String -> TctM [String]
+getKvPair s = (get . kvPairs) <$> ask
+  where get m = [] `fromMaybe` M.lookup s m
 
 -- | Returns 'TctStatus' which is obtained from 'TctROState' during runtime.
 --
@@ -50,9 +62,8 @@ askStatus prob = do
     , runningTime    = Time.tdSec (Time.diffClockTimes now (startTime st))
     , remainingTime  = (max 0 . Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
 
-
 toIO :: TctM a -> TctM (IO a)
-toIO m = runReaderT (runTct m) `fmap` askState
+toIO m = runReaderT (runTctM m) `fmap` askState
 
 -- | Lifts 'Async.async'.
 async :: TctM a -> TctM (Async.Async a)
@@ -74,28 +85,28 @@ concurrently m1 m2 = do
     liftIO $ Async.withAsync io2 $ \a2 ->
     liftIO $ Async.waitBoth a1 a2
 
--- | @'raceWith' p1 cmp m1 m2@ runs @m1@ and @m2@ in parallel.
+-- | @'raceWith' p1 m1 m2@ runs @m1@ and @m2@ in parallel.
 --
--- * Returns the first result that fulfills @p1@.
--- * Otherwise returns the result of @cmp@.
-raceWith :: (a -> Bool) -> (a -> a -> a) -> TctM a -> TctM a -> TctM a
-raceWith p1 cmp m1 m2 = do
+-- * Returns the first result that satisfies @p1@.
+-- * Otherwise returns the latter result.
+raceWith :: (a -> Bool) -> TctM a -> TctM a -> TctM a
+raceWith p1 m1 m2 = do
   io1 <- toIO m1
   io2 <- toIO m2
-  liftIO $ raceWithIO p1 cmp io1 io2
+  liftIO $ raceWithIO p1 io1 io2
 
-raceWithIO :: (a -> Bool) -> (a -> a -> a) -> IO a -> IO a -> IO a
-raceWithIO p1 cmp m1 m2 =
+raceWithIO :: (a -> Bool) -> IO a -> IO a -> IO a
+raceWithIO p1 m1 m2 =
   Async.withAsync m1 $ \a1 ->
   Async.withAsync m2 $ \a2 -> do
     e <- Async.waitEither a1 a2
     case e of
       Left r1
         | p1 r1     -> Async.cancel a2 >> return r1
-        | otherwise -> Async.wait a2 >>= \r2 -> return (r1 `cmp` r2)
+        | otherwise -> Async.wait a2
       Right r2
         | p1 r2     -> Async.cancel a1 >> return r2
-        | otherwise -> Async.wait a1 >>= \r1 -> return (r2 `cmp` r1)
+        | otherwise -> Async.wait a1
 
 -- | @'timed' seconds m@ wraps the Tct action in timeout, and locally sets 'stopTime'.
 -- When @seconds@

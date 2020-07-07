@@ -59,11 +59,20 @@ bigMul = F.foldl mul one
 
 
 -- int instance
-instance  Additive Int where
+instance Additive Int where
   zero = 0
   add  = (+)
+
+instance Additive Bool where
+  zero = False
+  add  = (||)
 
 instance Multiplicative Int where
   one  = 1
   mul = (*)
+
+instance Multiplicative Bool where
+  one = True
+  mul = (&&)
+
 
