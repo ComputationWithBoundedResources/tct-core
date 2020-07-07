@@ -2,3 +2,4 @@
 TAGS
 dist/
 /stack.yaml.lock
+dist-newstyle
