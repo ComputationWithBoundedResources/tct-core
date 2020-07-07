@@ -63,7 +63,7 @@ askStatus prob = do
     , remainingTime  = (max 0 . Time.tdSec . flip Time.diffClockTimes now) `fmap` stopTime st }
 
 toIO :: TctM a -> TctM (IO a)
-toIO m = runReaderT (runTct m) `fmap` askState
+toIO m = runReaderT (runTctM m) `fmap` askState
 
 -- | Lifts 'Async.async'.
 async :: TctM a -> TctM (Async.Async a)
@@ -103,10 +103,10 @@ raceWithIO p1 m1 m2 =
     case e of
       Left r1
         | p1 r1     -> Async.cancel a2 >> return r1
-        | otherwise -> Async.wait a2 >>= return
+        | otherwise -> Async.wait a2
       Right r2
         | p1 r2     -> Async.cancel a1 >> return r2
-        | otherwise -> Async.wait a1 >>= return
+        | otherwise -> Async.wait a1
 
 -- | @'timed' seconds m@ wraps the Tct action in timeout, and locally sets 'stopTime'.
 -- When @seconds@

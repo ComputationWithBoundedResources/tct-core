@@ -10,6 +10,8 @@ module Tct.Core
   (
   -- * Configuring Tct
   TctConfig (..)
+  , runTct
+  , runTctWithOptions
   , defaultTctConfig
   , withDefaultStrategy
   , appendGHCiScript
@@ -33,6 +35,9 @@ module Tct.Core
   , optional
   , withDomain
   -- ** Declaration
+  , Declaration
+  , Declared (..)
+  , (:->)
   , OneTuple (..)
   -- ** Argument and Declaration Modifyer
   , withName
@@ -44,10 +49,10 @@ module Tct.Core
   ) where
 
 
-import Tct.Core.Data
-import Tct.Core.Main
-import Tct.Core.Data.Strategy
-import Tct.Core.Processor.Failing
+import           Tct.Core.Data
+import           Tct.Core.Data.Strategy
+import           Tct.Core.Main
+import           Tct.Core.Processor.Failing
 
 
 -- | Sets the default Strategy.
@@ -58,8 +63,8 @@ withDefaultStrategy cfg st = cfg { defaultStrategy = st }
 appendGHCiScript :: TctConfig i -> [String] -> TctConfig i
 appendGHCiScript cfg ss = cfg { interactiveGHCi = k (interactiveGHCi cfg) ss}
   where
-    k (GHCiCommand _) xs = GHCiScript xs
-    k (GHCiScript s1) xs = GHCiScript (s1 ++ xs)
+    k (GHCiCommand _) xs   = GHCiScript Nothing xs
+    k (GHCiScript m s1) xs = GHCiScript m (s1 ++ xs)
 
 -- | Adds a key-value pair to the runtime options.
 addRuntimeOption :: TctConfig i -> String -> [String] -> TctConfig i

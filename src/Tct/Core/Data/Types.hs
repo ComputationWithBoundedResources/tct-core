@@ -32,7 +32,7 @@ data TctROState = TctROState
   }
 
 -- | The Tct monad.
-newtype TctM r = TctM { runTct :: ReaderT TctROState IO r }
+newtype TctM r = TctM { runTctM :: ReaderT TctROState IO r }
   deriving (Monad, Applicative, MonadIO, MonadReader TctROState, Functor, MonadError IOError)
 
 -- | Defines the (read-only) runtime status of 'TctROState'.
@@ -47,18 +47,18 @@ data TctStatus prob = TctStatus
 
 -- | Reason for failure of a 'Processor'
 data Reason where
-  IOError    :: IOError -> Reason
-  Aborted    :: Reason
-  TimedOut   :: Reason
-  SomeReason :: (Show r, PP.Pretty r) => r -> Reason
+  IOError  :: IOError -> Reason
+  Aborted  :: String -> Reason
+  TimedOut :: Reason
+  Failed   :: (Show proc, ProofData prob, Show reason, PP.Pretty reason) => proc -> prob -> reason -> Reason
 
 deriving instance Show Reason
 
 instance PP.Pretty Reason where
-  pretty (IOError io)   = PP.text (show io)
-  pretty Aborted        = PP.text "aborted"
-  pretty TimedOut       = PP.text "timed out"
-  pretty (SomeReason r) = PP.pretty r
+  pretty (IOError io)         = PP.text (show io)
+  pretty (Aborted s)          = PP.text s
+  pretty TimedOut             = PP.text "timed out"
+  pretty (Failed proc prob r) = PP.text (show proc) PP.<$$> PP.pretty prob PP.<$$> PP.pretty r
 
 -- | A 'ProofNode' stores the necessary information to construct a (formal) proof from the application of a 'Processor'.
 data ProofNode p = ProofNode
@@ -73,6 +73,24 @@ data ProofTree o where
   Failure  :: Reason -> ProofTree o
 
 
+instance Functor ProofTree where
+  f `fmap` Open l             = Open (f l)
+  _ `fmap` (Failure r)        = Failure r
+  f `fmap` Success pn cns pts = Success pn cns ((f `fmap`) `fmap` pts)
+
+instance Foldable ProofTree where
+  f `foldMap` Open l          = f l
+  _ `foldMap` Failure{}       = mempty
+  f `foldMap` Success _ _ pts = (f `foldMap`) `foldMap` pts
+
+instance Traversable ProofTree where
+  f `traverse` Open l  = Open <$> f l
+  _ `traverse` Failure r = pure (Failure r)
+  f `traverse` Success pn cfn pts = Success pn cfn <$> (f `traverse`) `traverse` pts
+
+instance Show (ProofTree l) where
+  show _ = "showTree"
+
 --- * Processor  -----------------------------------------------------------------------------------------------------
 
 -- | 'Fork' is an abstract type that provides the "Foldable", "Functor" and "Traversable" interface.
@@ -80,14 +98,17 @@ type Fork t = (Foldable t, Functor t, Traversable t)
 
 -- | Provides the interface for the proof construction.
 -- All types which occur in the proof construction have to implement 'ProofData'.
-type ProofData d = (Show d, PP.Pretty d, Xml.Xml d)
+type ProofData d = (Show d, PP.Pretty d, Xml.Xml d, Typeable d)
 
 -- | Type synonym for functions that defines how a 'C.Certificate' is computed from a collection of 'C.Certificate's.
 type CertificateFn p = Forking p C.Certificate -> C.Certificate
 
+-- | Wrapper for (pretty)printable reason.
+data SomeReason where SomeReason :: (Show r, PP.Pretty r) => r -> SomeReason
+
 -- | The return type of an application of a processors.
 data Return p
-  = NoProgress Reason
+  = NoProgress SomeReason
   | Progress (ProofObject p) (CertificateFn p) (Forking p (ProofTree (Out p)))
 
 -- | Everything that is necessary for defining a processor.
@@ -107,9 +128,16 @@ class (Show p, ProofData (ProofObject p), ProofData (In p), Fork (Forking p)) =>
 -- For a detailed description of the combinators see "Tct.Combinators".
 data Strategy i o where
   Apply       :: (Processor p) => p -> Strategy (In p) (Out p)
+
+  Seq         :: Strategy i q -> Strategy q o -> Strategy i o
   IdStrategy  :: Strategy i i
+
+  Alt         :: Strategy i o -> Strategy i o -> Strategy i o
   Abort       :: Strategy i o
-  Cond        :: (ProofTree q -> Bool) -> Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+
+  Force       :: Strategy i o -> Strategy i o
+  Ite         :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+
   -- | Parallel Application
   Par         :: Strategy i o -> Strategy i o
   Race        :: Strategy i o -> Strategy i o -> Strategy i o
@@ -146,9 +174,9 @@ type family HListOf a :: [*] where
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3)       = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3]
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4)    = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4]
   HListOf (a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5) = '[a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5]
-  HListOf (OneTuple a)              = '[a]
+  HListOf (OneTuple a)                                   = '[a]
 
-class ToHList a                            where toHList :: a -> HList (HListOf a)
+class ToHList a                                                 where toHList :: a -> HList (HListOf a)
 instance ToHList ()                                             where toHList ()                                             = HNil
 instance ToHList (a1,a2)                                        where toHList (a1,a2)                                        = HCons a1 (HCons a2 HNil)
 instance ToHList (a1,a2,a3)                                     where toHList (a1,a2,a3)                                     = HCons a1 (toHList (a2,a3))
@@ -178,7 +206,7 @@ infix 4 :->
 -- | Uncurried version of a function.
 type family Uncurry a where
   Uncurry ('[] :-> r) = r
-  Uncurry ((a ': as) :-> r) = a -> Uncurry (as :-> r)
+  Uncurry (a ': as :-> r) = a -> Uncurry (as :-> r)
 
 
 -- | Return type of function wrt to its argument list.
@@ -202,7 +230,7 @@ data Argument (f :: ArgFlag) t where
   StrategyArg :: ArgMeta -> [StrategyDeclaration i o] -> Argument 'Required (Strategy i o)
 
   SomeArg     :: Argument 'Required t -> Argument 'Required (Maybe t)
-  OptArg      :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
+  OptArg      :: (Show t, Typeable t) => Argument 'Required t -> t -> Argument 'Optional t
 
 -- | Associates the types to a list of arguments.
 type family ArgsType a where
@@ -219,12 +247,15 @@ class ParsableArgs ats where
   mkOptParser :: HList ats -> [SParser (String,Dynamic)]
   mkArgParser :: HList ats -> [(String, Dynamic)] -> SParser (HList (ArgsType ats))
 
+data SomeArgument where
+  SomeArgument :: Argument f t -> SomeArgument
+
 -- | Collects the meta information of a list of arguments.
 class ArgsInfo as where
   argsInfo ::
     HList as ->                                -- A heterogenous list of arguments.
     [(String, String, [String], Maybe String)] -- A list of (name, domain, description, default value)
-
+  toArgList :: HList as -> [SomeArgument]
 
 -- | Open type for declarations. Allows to provide problem specific declarations in executables.
 class Declared i o where

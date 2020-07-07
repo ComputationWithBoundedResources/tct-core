@@ -31,6 +31,8 @@ declaration (Decl n _ f as) = do
   vs   <- mkArgParser as opts
   return (curried f vs)
 
+-- MS: parser for declarations has more general type than the one for strategy; thus can not parse combinators such as
+-- (>>>), (<|>) ...
 strategyDeclarations :: [StrategyDeclaration i o] -> SParser (Strategy i o)
 strategyDeclarations ds =
   choice [ declaration d | SD d <- sortBy k ds ]
@@ -81,7 +83,7 @@ reqParser (SimpleArg _ p)    = p
 reqParser (StrategyArg _ ds) = strategyDeclarations ds
 reqParser (FlagArg _ fs)     = choice $ map k fs
   where k b = try $ symbol (show b) >> return b
-reqParser (SomeArg a)        = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a) <?> "maybe"
+reqParser (SomeArg a)        = (try (symbol "none") >> return Nothing) <|> (Just <$> reqParser a)
 
 optParser :: Argument 'Optional t -> SParser t
 optParser (OptArg a _) = reqParser a

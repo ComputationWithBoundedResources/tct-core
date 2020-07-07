@@ -15,22 +15,21 @@ module Tct.Core.Data.ProofTree
   , certificateWith
   -- * Properites
   , isOpen
-  , isFailure
   , isClosed
+  , isFailing
   , isProgressing
   -- * Output
   , ppProofTree
   , ppProofTreeLeafs
-  , ppDetailedProofTree
   ) where
 
 
 import qualified Data.Foldable             as F (toList)
 
 import qualified Tct.Core.Common.Pretty    as PP
-import           Tct.Core.Data.Certificate (Certificate, timeLB, timeUB, unbounded)
+import           Tct.Core.Data.Answer      (termcomp)
+import           Tct.Core.Data.Certificate (Certificate, unbounded)
 import           Tct.Core.Data.Types
-
 
 -- | Returns the 'Open' nodes of a 'ProofTree'.
 open :: ProofTree l -> [l]
@@ -42,12 +41,13 @@ size (Open _)          = 1
 size (Failure _)       = 1
 size (Success _ _ pts) = 1 + sum (size <$> pts)
 
--- | Substitute the open leaves of a proof tree according to the given function
+-- | Monadic version of 'substitute'.
 substituteM :: (Functor m, Monad m) => (l -> m (ProofTree k)) -> ProofTree l -> m (ProofTree k)
-substituteM s (Open l)             = s l
-substituteM _ (Failure r)          = return (Failure r)
+substituteM s (Open l)            = s l
+substituteM _ (Failure r)         = return (Failure r)
 substituteM s (Success pn cf pts) = Success pn cf <$> mapM (substituteM s) pts
 
+-- | Substitute the open leaves of a proof tree according to the given function
 substitute :: (l -> ProofTree k) -> ProofTree l -> ProofTree k
 substitute f  (Open l)           = f l
 substitute _ (Failure r)         = Failure r
@@ -79,16 +79,16 @@ certificateWith pt cert = collectCertificate $ const cert `fmap` pt
 
 
 -- | Checks if the 'ProofTree' contains a 'Failure' node.
-isFailure :: ProofTree l -> Bool
-isFailure Failure{}         = True
-isFailure (Success _ _ pts) = any isFailure pts
-isFailure _                 = False
+isFailing :: ProofTree l -> Bool
+isFailing Failure{}         = True
+isFailing (Success _ _ pts) = any isFailing pts
+isFailing _                 = False
 
 -- | Checks that the 'ProofTree' does not contain a 'Failure' node
 -- and not consist of a single 'Open' node
 isProgressing :: ProofTree l -> Bool
 isProgressing (Open _) = False
-isProgressing p = not (isFailure p)
+isProgressing p        = not (isFailing p)
 
 -- | Checks if there exists 'Open' nodes in the 'ProofTree'.
 isOpen :: ProofTree l -> Bool
@@ -100,70 +100,68 @@ isOpen = not . isClosed
 isClosed :: ProofTree l -> Bool
 isClosed = null . open
 
-instance Functor ProofTree where
-  f `fmap` Open l             = Open (f l)
-  _ `fmap` (Failure r)        = Failure r
-  f `fmap` Success pn cns pts = Success pn cns ((f `fmap`) `fmap` pts)
-
-instance Foldable ProofTree where
-  f `foldMap` Open l          = f l
-  _ `foldMap` Failure{}       = mempty
-  f `foldMap` Success _ _ pts = (f `foldMap`) `foldMap` pts
-
-instance Traversable ProofTree where
-  f `traverse` Open l  = Open <$> f l
-  _ `traverse` Failure r = pure (Failure r)
-  f `traverse` Success pn cfn pts = Success pn cfn <$> (f `traverse`) `traverse` pts
-
-instance Show (ProofTree l) where
-  show _ = "showTree"
-
 
 --- * Pretty Printing ------------------------------------------------------------------------------------------------
 
+data Path = Path Int [(Int,Int)]
+
+inc :: Path -> Path
+inc (Path i is) = Path (succ i) is
+
+split :: Path -> Int -> Path
+split (Path i is) j = Path 1 ((i,j):is)
+
+pathLength :: Path -> Int
+pathLength (Path _ is) = 1 + length is
+
+ppPath :: Path -> PP.Doc
+ppPath (Path i is) = PP.cat $ PP.punctuate PP.colon . reverse $ PP.int i : f `fmap` is
+  where
+    f (j,k) = PP.int j PP.<> PP.dot PP.<> PP.text (g k)
+    g n = if n >= 1 && n <= 26 then [toEnum (96+n)] else toEnum n : g (n-26)
+
+ppNode :: (Show p, PP.Pretty prob, PP.Pretty po) => p -> prob -> po -> PP.Doc
+ppNode p prob po = PP.vcat
+  [ block "Considered Problem" (PP.pretty prob)
+  , block "Applied Processor"  (PP.text $ show p)
+  , block "Details"            (PP.pretty po) ]
+  where block n e = PP.nest 4 (PP.text "+" PP.<+> PP.text n PP.<> PP.char ':' PP.<$$> e)
+
 ppProofNode :: Processor p => ProofNode p -> PP.Doc
-ppProofNode (ProofNode p prob po) = PP.vcat
-  [ PP.text "Considered Problem:" PP.<$$> ind (PP.pretty prob)
-  , PP.text "Applied Processor:"  PP.<$$> ind (PP.text $ show p)
-  , PP.text "Proof:"              PP.<$$> ind (PP.pretty po) ]
-  where ind = PP.indent 2
+ppProofNode (ProofNode p prob po) = ppNode p prob po
 
-ppProofTree' :: (Int,[Int]) -> (prob -> PP.Doc) -> Bool -> ProofTree prob -> PP.Doc
-ppProofTree' is ppProb _ pt@(Open l) = PP.vcat
-  [ ppHeader pt is "Open"
+ppReason :: Reason -> PP.Doc
+ppReason (Failed proc prob reason) = ppNode proc prob reason
+ppReason r                         = PP.pretty r
+
+ppProofTree' :: Path -> (prob -> PP.Doc) -> ProofTree prob -> PP.Doc
+ppProofTree' is ppProb pt@(Open l) = PP.vcat
+  [ ppHeader pt is (PP.text "Open")
   , PP.indent 4 (ppProb l) ]
-ppProofTree' is _ _ f@(Failure r) =
-  ppHeader f is "Failure"
-  PP.<$$> PP.indent 2 (PP.pretty r)
+ppProofTree' is _ f@(Failure r) =
+   ppHeader f is (PP.text "Failure")
+   PP.<$$> PP.indent 2 (ppReason r)
 
-ppProofTree' (i,is) ppProb detailed pt@(Success pn _ pts) =
-  PP.vcat [ ppHeader pt (i,is) "Success", PP.indent 4 (ppProofNode pn), ppSubTrees (F.toList pts) ]
+
+ppProofTree' path ppProb pt@(Success pn _ pts) =
+  PP.vcat [ ppHeader pt path (PP.text (takeWhile (`notElem` " {") (show (appliedProcessor pn))))
+          , PP.indent 4 (ppProofNode pn)
+          , ppSubTrees (F.toList pts) ]
   where
     ppSubTrees []  = PP.empty
-    ppSubTrees [t] = ppProofTree' (i+1,is) ppProb detailed t
-    ppSubTrees ls  = PP.vcat [ ppProofTree' (j,is++[i]) ppProb detailed t
-                             | (j,t) <- zip [1..] ls]
+    ppSubTrees [t] = ppProofTree' (inc path) ppProb t
+    ppSubTrees ls  = PP.vcat [ ppProofTree' (split path j) ppProb t | (j,t) <- zip [1..] ls]
 
-ppHeader :: ProofTree l -> (Int, [Int]) -> String -> PP.Doc
-ppHeader pt (i,is) s =
-  PP.text "***"
-  PP.<+> PP.cat (PP.punctuate PP.dot $ PP.int `fmap` (is++[i]))
-  PP.<+> PP.text s
-  PP.<+> PP.brackets (PP.pretty (cert $ certificate pt))
-  PP.<+> PP.text " ***"
-  where cert c = (timeLB c, timeUB c)
+
+ppHeader :: ProofTree l -> Path -> PP.Doc -> PP.Doc
+ppHeader pt p s =
+  PP.text (replicate (pathLength p) '*') PP.<+> PP.text "Step" PP.<+> ppPath p PP.<> PP.char ':'
+  PP.<+> s
+  PP.<+> PP.group (PP.pretty (termcomp (certificate pt)))
 
 ppProofTree :: (l -> PP.Doc) -> ProofTree l -> PP.Doc
 ppProofTree pp pt =
-  ppProofTree' (1,[]) pp False pt
-  PP.<> if null (F.toList pt) then PP.empty else
-    PP.empty
-    PP.<$$> PP.text "Following problems could not be solved:"
-    PP.<$$> PP.indent 2 (ppProofTreeLeafs pp pt)
-
-ppDetailedProofTree :: (l -> PP.Doc ) -> ProofTree l -> PP.Doc
-ppDetailedProofTree pp pt =
-  ppProofTree' (1,[]) pp True pt
+  ppProofTree' (Path 1 []) pp pt
   PP.<> if null (F.toList pt) then PP.empty else
     PP.empty
     PP.<$$> PP.text "Following problems could not be solved:"

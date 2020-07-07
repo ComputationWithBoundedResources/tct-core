@@ -38,7 +38,7 @@ module Tct.Core.Data.Declaration
 
 import           Data.List              (intercalate)
 import           Data.Typeable
-
+import qualified Text.Parsec as Parsec
 import qualified Tct.Core.Common.Parser as P
 import qualified Tct.Core.Common.Pretty as PP
 import           Tct.Core.Data.Types
@@ -46,7 +46,11 @@ import           Tct.Core.Data.Types
 
 declare ::
   (ToHList a, HListOf a ~ args, Uncurry (ArgsType args :-> Ret (ArgsType args) f) ~ f) =>
-    String -> [String] -> a -> f -> Declaration (args :-> Ret (ArgsType args) f)
+    String      -- ^ name/identifuer
+    -> [String] -- ^ description
+    -> a        -- ^ heterogenous list of arguments
+    -> f        -- ^ function
+    -> Declaration (args :-> Ret (ArgsType args) f)
 declare n desc as p = Decl n desc p (toHList as)
 
 -- | Returns the name of a 'Declaration'.
@@ -84,49 +88,51 @@ instance DefF ('[] :-> f) where
 
 instance (DefF (as :-> r)) => DefF (Argument 'Optional a ': as :-> r) where
   deflFun (Decl n h f (HCons a as)) = deflFun (Decl n h (f (argDefault a)) as)
-  deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
 instance DefF (as :-> r) => DefF (Argument 'Required a ': as :-> r) where
   deflFun (Decl n h f (HCons _ as)) = \ a' -> deflFun (Decl n h (f a') as)
-  deflFun Decl{}                    = error "Tct.Core.Declaration.deflFun: something ubelievable happened"
 
 
 --- * arguments ------------------------------------------------------------------------------------------------------
 
 -- | Generic argument with name "arg" and domain "<arg>".
 arg :: String -> String -> [String] -> SParser t -> Argument 'Required t
-arg n d h p = SimpleArg (ArgMeta {argName_ = n, argDomain_ = d, argHelp_ = h}) p
+arg n d h = SimpleArg ArgMeta{argName_ = n, argDomain_ = d, argHelp_ = h}
 
 -- | Transforms a required argument to an optional by providing a default value.
-optional :: Typeable t => Argument 'Required t -> t -> Argument 'Optional t
-optional ar a = OptArg ar a
+optional :: (Show t, Typeable t) => Argument 'Required t -> t -> Argument 'Optional t
+optional = OptArg
 
 -- | Wraps an argument into 'Maybe'.
 some :: Argument 'Required a -> Argument 'Required (Maybe a)
-some a = SomeArg a
+some = SomeArg
 
 -- * instances
 type Nat = Int
 
--- | Specifies a natural argument with domain "<nat>".
+-- | Specifies a natural number argument.
 nat :: String -> [String] -> Argument 'Required Nat
 nat n h = arg n "nat" h P.nat
 
--- | Specifies a bool argument with domain "<bool>".
+-- | Specifies a bool argument.
 bool :: String -> [String] -> Argument 'Required Bool
-bool n h = arg n "bool" h P.bool
+bool = flag
 
+-- | Specifies a string argument.
 string :: String -> [String] -> Argument 'Required String
-string n h = arg n "string" h P.identifier
+string n h = arg n "string" h parser where
+ parser = Parsec.try (quoted '\'') Parsec.<|> Parsec.try (quoted '"') Parsec.<|> P.identifier
+ quoted q = P.lexeme (Parsec.between (Parsec.char q) (Parsec.char q) (Parsec.many (Parsec.noneOf [q])))
 
 -- | Specifies a strategy argument with name "strategy" and domain "<strategy>".
 strat :: Declared i o => String -> [String] -> Argument 'Required (Strategy i o)
-strat n h = StrategyArg (ArgMeta { argName_ = n, argDomain_ = "strategy", argHelp_ = h }) decls
+strat n h = StrategyArg ArgMeta{ argName_ = n, argDomain_ = "strategy", argHelp_ = h } decls
 
+-- | Specifies a flag argument.
 flag :: (Show t, Bounded t, Enum t) => String -> [String] -> Argument 'Required t
-flag n h = FlagArg (ArgMeta { argName_ = n, argDomain_ = ds, argHelp_ = h }) es
-  where 
-    es = [minBound]
+flag n h = FlagArg ArgMeta{ argName_ = n, argDomain_ = ds, argHelp_ = h } es
+  where
+    es = [minBound..]
     ds = intercalate "|" (map show es)
 
 withDomain :: Argument r a -> [String] -> Argument r a
@@ -139,10 +145,10 @@ withDomain ar ns = case ar of
   where k a = a { argDomain_ = intercalate "|" ns }
 
 instance WithName ArgMeta        where withName ar n = ar { argName_ = n }
-instance WithName (Argument r a) where withName ar n = setArgMeta (flip withName n) ar
+instance WithName (Argument r a) where withName ar n = setArgMeta (`withName` n) ar
 
 instance WithHelp ArgMeta        where withHelp ar n = ar { argHelp_ = n }
-instance WithHelp (Argument r a) where withHelp ar n = setArgMeta (flip withHelp n) ar
+instance WithHelp (Argument r a) where withHelp ar n = setArgMeta (`withHelp` n) ar
 
 setArgMeta :: (ArgMeta -> ArgMeta) -> Argument f t -> Argument f t
 setArgMeta k (SimpleArg a p)    = SimpleArg (k a) p
@@ -174,12 +180,14 @@ argDefault (OptArg _ t) = t
 
 instance ArgsInfo '[] where
   argsInfo HNil = []
+  toArgList HNil = []
 
 instance (Show a, ArgsInfo as) => ArgsInfo (Argument r a ': as) where
   argsInfo (HCons a as) = argsInfo' a :argsInfo as where
     argsInfo' :: Show t => Argument f t -> (String, String, [String], Maybe String)
     argsInfo' (OptArg b t) = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Just $ show t)
     argsInfo' b            = let m = argMeta b in (argName_ m, argDomain_ m, argHelp_ m, Nothing)
+  toArgList (HCons a as) = SomeArgument a : toArgList as
 
 --- * proof data -----------------------------------------------------------------------------------------------------
 

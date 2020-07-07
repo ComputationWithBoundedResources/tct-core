@@ -7,7 +7,6 @@ module Tct.Core.Data.Strategy
   , abort
   , processor
   , ite
-  , iteProgress
   , (.>>>)
   , (.<|>)
   , try
@@ -21,6 +20,7 @@ module Tct.Core.Data.Strategy
   , timeoutIn
   , timeoutUntil
   , timeoutRelative
+  , timeoutRemaining
   , wait
   , waitUntil
   -- ** Parallel application
@@ -71,24 +71,44 @@ reltimeToTimeout t = do
   remains <- (fromMaybe to . remainingTime) `fmap` askStatus undefined
   return (max 0 (min to (remains - 1)))
 
+-- MS: error report is far from optimal.
+-- * generating information from evaluate requires additional ProofData constraints
+-- in principle they are always fullfilled since as basic blocks are processors, but ugly
+-- * alternatively some logging functions when applying processors
+-- * there are also some strange cases one may want to consider
+-- eg assume that s fails; force (try s) vs force s, force (s >>> t) vs force (t >>> s)
 
 -- | @'evaluate1' s prob@ defines the application of @s@ to a problem.
 -- See "Combinators" for a detailed description.
 evaluate1 :: Strategy i o -> i -> TctM (ProofTree o)
 evaluate1 (Apply p)          prob = apply p prob
+
+evaluate1 (Seq s1 s2)        prob = evaluate1 s1 prob >>= continue where
+  continue pt
+    | isFailing pt = evaluate Abort pt
+    | otherwise    = evaluate s2 pt
 evaluate1 IdStrategy         prob = return (Open prob)
-evaluate1 Abort              _    = return (Failure Aborted)
-evaluate1 (Cond g sb st se)  prob = evaluate1 sb prob >>= continue where
-  continue pt | g pt         = evaluate st pt
-              | otherwise    = evaluate1 se prob
+
+evaluate1 (Alt s1 s2)        prob = evaluate1 s1 prob >>= continue where
+  continue pt
+    | isFailing pt = evaluate1 s2 prob
+    | otherwise    = return pt
+evaluate1 Abort              _    = return (Failure $ Aborted "aborted")
+
+evaluate1 (Force s)          prob = evaluate1 s prob >>= continue where
+  continue (Open _) = return (Failure $ Aborted "no progress")
+  continue pt       = return pt
+evaluate1 (Ite sb st se)     prob = evaluate1 sb prob >>= continue where
+  continue pt
+    | isProgressing pt = evaluate st pt
+    | otherwise        = evaluate1 se prob
 evaluate1 (Par s)            prob = evaluate1 s prob
 evaluate1 (Race s1 s2)       prob =
-  raceWith (not . isFailure) (evaluate1 s1 prob) (evaluate1 s2 prob)
+  raceWith (not . isFailing) (evaluate1 s1 prob) (evaluate1 s2 prob)
 evaluate1 (Better cmp s1 s2) prob =
-  uncurry pick <$> concurrently (evaluate1 (to s1) prob) (evaluate1 (to s2) prob) where
+  uncurry pick <$> concurrently (evaluate1 (timeoutRemaining s1) prob) (evaluate1 (timeoutRemaining s2) prob) where
     pick r1 r2 | cmp r2 r1 == GT = r2
                | otherwise       = r1
-    to st = WithStatus $ \ state -> maybe st (flip timeoutIn st) (remainingTime state)
 evaluate1 (Timeout t s) prob = do
   timeout <- reltimeToTimeout t
   fromMaybe (Failure TimedOut) <$> timed timeout (evaluate1 s prob)
@@ -118,7 +138,7 @@ evaluatePar s t = spawnTree t >>= collect where
 -- |  Constructs a strategy declaration. For example: Assume that @st :: Int -> Maybe Int -> Strategy prob@.
 --
 -- > strategy "name" (nat, some nat) st
--- Similar to declare but specified to Strategies and with no description.
+-- Similar to 'Declaration.declare' but specified to Strategies and with no description.
 strategy ::
   ( ToHList as, HListOf as ~ args
   , f ~ Uncurry (ArgsType args :-> Ret (ArgsType args) f)
@@ -146,30 +166,26 @@ processor :: (Processor p) => p -> Strategy (In p) (Out p)
 processor = Apply
 
 -- | conditional
--- | prop> ite test s1 s2 == test .>>> s1, if we have a progress after applying test
--- | prop> ite test s1 s2 == s2, otherwise
-ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
-ite = Cond (not . isFailure)
+-- ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+-- ite = Ite Cond (not . isFailure)
 
-iteProgress :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
-iteProgress = Cond isProgressing
+ite :: Strategy i q -> Strategy q o -> Strategy i o -> Strategy i o
+ite = Ite
 
 -- | sequencing
 (.>>>) :: Strategy i q -> Strategy q o -> Strategy i o
-s1 .>>> s2 = ite s1 s2 abort
+s1 .>>> s2 = Seq s1 s2 -- ite s1 s2 abort
 
 -- | choice
 (.<|>) :: Strategy i o -> Strategy i o -> Strategy i o
-s1 .<|> s2 = ite s1 identity s2
+s1 .<|> s2 = Alt s1 s2 -- ite s1 identity s2
 
 -- | @try s@ behaves like @s@, except in case of failure of @s@, @try s@ behaves like @identity@
 try :: Strategy i i -> Strategy i i
 try s = s .<|> identity
 
 force :: Strategy i o -> Strategy i o
-force s = Cond g s identity abort where
-  g (Open _) = False
-  g pt       = not (isFailure pt)
+force = Force
 
 -- | @'exhaustively' s@ repeatedly applies @s@ until @s@ fails.
 -- Fails if the first application of @s@ fails.
@@ -219,7 +235,7 @@ when :: Bool -> Strategy i i -> Strategy i i
 when b st = if b then st else identity
 
 timeoutIn,timeoutUntil :: Int -> Strategy i o -> Strategy i o
-timeoutIn secs = Timeout (TimeoutIn secs)
+timeoutIn secs    = Timeout (TimeoutIn secs)
 timeoutUntil secs = Timeout (TimeoutUntil secs)
 
 -- | Sets timeout relative to the given percentage.
@@ -227,12 +243,17 @@ timeoutUntil secs = Timeout (TimeoutUntil secs)
 --
 -- > timeoutRelative (Just 60) 50 st = timeoutIn 30 st
 -- > timeoutRelative Nothing   50 st = st
-timeoutRelative :: (ProofData i, ProofData o) => Maybe Int -> Int -> Strategy i o -> Strategy i o
+timeoutRelative :: Maybe Int -> Int -> Strategy i o -> Strategy i o
 timeoutRelative mtotal percent st = maybe st timeout mtotal
-  where timeout total = timeoutIn (floor $ (fromIntegral (total*percent :: Int) / 100 :: Double)) st
+  where timeout total = timeoutIn (floor (fromIntegral (total*percent :: Int) / 100 :: Double)) st
+
+-- | Sets the timeout to the remaining time if set.
+-- Useful for lifting timeout to processors.
+timeoutRemaining :: Strategy i o -> Strategy i o
+timeoutRemaining st = WithStatus $ \ state -> maybe st (`timeoutIn` st) (remainingTime state)
 
 wait,waitUntil :: Int -> Strategy i o -> Strategy i o
-wait secs = Wait (TimeoutIn secs)
+wait secs      = Wait (TimeoutIn secs)
 waitUntil secs = Wait (TimeoutUntil secs)
 
 -- | apply given strategy in parallel to all open problems
@@ -241,7 +262,7 @@ inParallel = Par
 
 -- | parallel sequencing
 (.>||>) :: Strategy i q -> Strategy q o -> Strategy i o
-s1 .>||> s2 = ite s1 (inParallel s2) abort
+s1 .>||> s2 = s1 .>>> inParallel s2
 
 -- | parallel choice
 (.<||>) :: Strategy i o -> Strategy i o -> Strategy i o

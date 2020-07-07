@@ -40,6 +40,6 @@ instance T.ProofData prob => T.Processor (Empty prob) where
     | f prob    = T.succeedWith0 EmptyProblem (T.judgement zero)
     | otherwise = T.abortWith OpenProblem
 
-empty :: T.ProofData i => (i -> Bool) -> T.Strategy i i 
+empty :: T.ProofData i => (i -> Bool) -> T.Strategy i i
 empty = T.processor . Empty
 
