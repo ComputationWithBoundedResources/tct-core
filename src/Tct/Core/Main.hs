@@ -188,11 +188,12 @@ mkParser ps vers mparser = O.info
                     ]
                   , PP.hsep
                     [ PP.text (writeAnswerFormat DefaultAnswerFormat)
-                    , PP.text "- default answer (termcomp 2015)"
+                    , PP.text "- default answer (worst case & best case)"
                     ]
                   , PP.hsep
                     [ PP.text (writeAnswerFormat TTTACAnswerFormat)
-                    , PP.text "- competition answer"
+                    , PP.text
+                      "- competition answer (termcomp 2015; only worst case)"
                     ]
                   ]
                 ]
