@@ -2,12 +2,10 @@ name:          tct-core
 version:       3.3.0
 stability:     experimental
 author:
-  Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
+  Martin Avanzini, Michael Schaper, Manuel Schneckenreither, Georg Moser, Andreas Kochesser, Maria Schett
 maintainer:
   Martin Avanzini <martin.avanzini@uibk.ac.at>,
-  Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
-  Michael Schaper <michael.schaper@uibk.ac.at>,
-  Maria Schett <maria.schett@uibk.ac.at>
+  Michael Schaper <michael.schaper@student.uibk.ac.at>,
 license:       BSD3
 license-file:  LICENSE
 category:      Program Analysis
@@ -69,7 +67,7 @@ library
 
   hs-source-dirs: src
   ghc-options:
-    -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+    -Wall -Wcompat -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
   extensions:
     ConstraintKinds,
     DataKinds,
