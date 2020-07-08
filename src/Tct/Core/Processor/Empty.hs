@@ -32,12 +32,11 @@ instance Xml.Xml EmptyProof where
 
 instance T.ProofData prob => T.Processor (Empty prob) where
   type ProofObject (Empty prob) = EmptyProof
-  type In  (Empty prob)         = prob
-  type Out (Empty prob)         = prob
-  type Forking (Empty prob)     = T.Judgement
-
+  type In (Empty prob) = prob
+  type Out (Empty prob) = prob
+  type Forking (Empty prob) = T.Judgement
   execute (Empty f) prob
-    | f prob    = T.succeedWith0 EmptyProblem (T.judgement zero)
+    | f prob = T.succeedWith0 EmptyProblem (T.judgement $ zero {T.timeBCLB = T.Unknown, T.timeBCUB = T.Unknown})
     | otherwise = T.abortWith OpenProblem
 
 empty :: T.ProofData i => (i -> Bool) -> T.Strategy i i

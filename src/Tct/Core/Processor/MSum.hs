@@ -31,19 +31,22 @@ bounded :: Certificate -> Bool
 bounded = not . isUnbounded
 
 succeed :: (ProofObject p ~ (), Forking p ~ Gabel, Monad m) => Gabel (ProofTree (Out p)) -> m (Return p)
-succeed po = return $ Progress () certf po where
-
-  certf None        = unbounded
-  certf (One c)     = c
-  certf (Two c1 c2) = Certificate
-    { spaceUB = spaceUB c1 `min` spaceUB c2
-    , spaceLB = spaceLB c1 `maz` spaceLB c2
-    , timeUB  = timeUB c1  `min` timeUB c2
-    , timeLB  = timeLB c1  `maz` timeLB c2 }
-
-  Unknown `maz` b       = b
-  b       `maz` Unknown = b
-  a       `maz` b       = a `max` b
+succeed po = return $ Progress () certf po
+  where
+    certf None = unbounded
+    certf (One c) = c
+    certf (Two c1 c2) =
+      Certificate
+        { spaceUB = spaceUB c1 `min` spaceUB c2
+        , spaceLB = spaceLB c1 `maz` spaceLB c2
+        , timeUB = timeUB c1 `min` timeUB c2
+        , timeLB = timeLB c1 `maz` timeLB c2
+        , timeBCUB = timeBCUB c1 `min` timeBCUB c2
+        , timeBCLB = timeBCLB c1 `maz` timeBCLB c2
+        }
+    Unknown `maz` b = b
+    b `maz` Unknown = b
+    a `maz` b = a `max` b
 
 
 instance (ProofData i, ProofData o) => Processor (Sum i o) where

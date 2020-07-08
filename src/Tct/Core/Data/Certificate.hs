@@ -19,11 +19,15 @@ module Tct.Core.Data.Certificate
   , spaceLBCert
   , timeUBCert
   , timeLBCert
+  , timeBCUBCert
+  , timeBCLBCert
   , yesNoCert
   , updateSpaceUBCert
   , updateSpaceLBCert
   , updateTimeUBCert
   , updateTimeLBCert
+  , updateTimeBCUBCert
+  , updateTimeBCLBCert
   , updateYesNoCert
   ) where
 
@@ -34,6 +38,8 @@ import qualified Tct.Core.Common.Pretty   as PP
 import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Xml      as Xml
 
+-- TODO: Correct version would be:
+-- data Complexity = UnknownComplexity | KnownComplexity ComplexityValue
 
 -- | Type for asymptotic complexity.
 -- The 'Ord' and 'SemiRing' instances are the expected one for asymptotic complexity.
@@ -130,34 +136,44 @@ a `iter` b = maximum [Primrec, a, b]
 
 -- | A fixed type for the complexity 'Certificate'.
 data Certificate = Certificate
-  { spaceUB :: Complexity
-  , spaceLB :: Complexity
-  , timeUB  :: Complexity
-  , timeLB  :: Complexity
+  { spaceUB  :: Complexity
+  , spaceLB  :: Complexity
+  , timeUB   :: Complexity      -- ^ Worst-case upper bound
+  , timeLB   :: Complexity      -- ^ Worst-case lower bound
+  , timeBCUB :: Complexity      -- ^ Best-case upper bound
+  , timeBCLB :: Complexity      -- ^ Best-case lower bound
   } | CertificateYesNo
   { outcome :: Bool
   }
   deriving Show
 
 instance Additive Certificate where
-  add c1@Certificate{} c2@Certificate{} = Certificate
-    { spaceUB = spaceUB c1 `add` spaceUB c2
-    , spaceLB = spaceLB c1 `add` spaceLB c2
-    , timeUB = timeUB c1 `add` timeUB c2
-    , timeLB = timeLB c1 `add` timeLB c2 }
+  add c1@Certificate {} c2@Certificate {} =
+    Certificate
+      { spaceUB = spaceUB c1 `add` spaceUB c2
+      , spaceLB = spaceLB c1 `add` spaceLB c2
+      , timeUB = timeUB c1 `add` timeUB c2
+      , timeLB = timeLB c1 `add` timeLB c2
+      , timeBCUB = timeBCUB c1 `add` timeBCUB c2
+      , timeBCLB = timeBCLB c1 `add` timeBCLB c2
+      }
   add (CertificateYesNo c1) (CertificateYesNo c2) = CertificateYesNo (c1 || c2)
   add _ _ = error "Certificate types cannot be added. Corrupted strategy?!?"
-  zero = Certificate zero zero zero zero
+  zero = Certificate zero zero zero zero zero zero
 
 instance Multiplicative Certificate where
-  mul c1@Certificate{} c2@Certificate{} = Certificate
-    { spaceUB = spaceUB c1 `mul` spaceUB c2
-    , spaceLB = spaceLB c1 `mul` spaceLB c2
-    , timeUB = timeUB c1 `mul` timeUB c2
-    , timeLB = timeLB c1 `mul` timeLB c2 }
+  mul c1@Certificate {} c2@Certificate {} =
+    Certificate
+      { spaceUB = spaceUB c1 `mul` spaceUB c2
+      , spaceLB = spaceLB c1 `mul` spaceLB c2
+      , timeUB = timeUB c1 `mul` timeUB c2
+      , timeLB = timeLB c1 `mul` timeLB c2
+      , timeBCUB = timeBCUB c1 `mul` timeBCUB c2
+      , timeBCLB = timeBCLB c1 `mul` timeBCLB c2
+      }
   mul (CertificateYesNo c1) (CertificateYesNo c2) = CertificateYesNo (c1 && c2)
   mul _ _ = error "Certificate types cannot be multipled. Corrupted strategy?!?"
-  one = Certificate zero zero zero zero
+  one = Certificate zero zero zero zero zero zero
 
 -- | Defines the identity 'Certificate'. Sets all components to 'Unknown'.
 unbounded :: Certificate
@@ -165,7 +181,10 @@ unbounded = Certificate
   { spaceUB = Unknown
   , spaceLB = Unknown
   , timeUB  = Unknown
-  , timeLB  = Unknown }
+  , timeLB  = Unknown
+  , timeBCUB  = Unknown
+  , timeBCLB  = Unknown
+  }
 
 -- | Checks wether all components of the given certificate are 'Unknown'.
 isUnbounded :: Certificate -> Bool
@@ -173,26 +192,33 @@ isUnbounded Certificate
   { spaceUB = Unknown
   , spaceLB = Unknown
   , timeUB  = Unknown
-  , timeLB  = Unknown } = True
+  , timeLB  = Unknown
+  , timeBCUB  = Unknown
+  , timeBCLB  = Unknown } = True
 isUnbounded _ = False
 
 -- | Constructs a 'Certificate' from the given 'Complexity'.
 -- Sets only the specified component; all others are set to 'Unknown'.
-spaceUBCert, spaceLBCert, timeUBCert, timeLBCert :: Complexity -> Certificate
+spaceUBCert, spaceLBCert, timeUBCert, timeLBCert, timeBCUBCert, timeBCLBCert :: Complexity -> Certificate
 spaceUBCert c = unbounded { spaceUB = c }
 spaceLBCert c = unbounded { spaceLB = c }
 timeUBCert c  = unbounded { timeUB  = c }
 timeLBCert c  = unbounded { timeLB  = c }
+timeBCUBCert c  = unbounded { timeBCUB  = c }
+timeBCLBCert c  = unbounded { timeBCLB  = c }
+
 yesNoCert :: Bool -> Certificate
 yesNoCert = CertificateYesNo
 
 -- | Updates a component in the 'Certificate'.
-updateSpaceUBCert, updateSpaceLBCert, updateTimeUBCert, updateTimeLBCert
-  :: Certificate -> (Complexity -> Complexity) -> Certificate
-updateSpaceUBCert cert f = cert { spaceUB = f $ spaceUB cert }
-updateSpaceLBCert cert f = cert { spaceLB = f $ spaceLB cert }
-updateTimeUBCert  cert f = cert { timeUB  = f $ timeUB  cert }
-updateTimeLBCert  cert f = cert { timeLB  = f $ timeLB  cert }
+updateSpaceUBCert, updateSpaceLBCert, updateTimeUBCert, updateTimeLBCert, updateTimeBCUBCert, updateTimeBCLBCert :: Certificate -> (Complexity -> Complexity) -> Certificate
+updateSpaceUBCert   cert f = cert { spaceUB   = f $ spaceUB  cert }
+updateSpaceLBCert   cert f = cert { spaceLB   = f $ spaceLB  cert }
+updateTimeUBCert    cert f = cert { timeUB    = f $ timeUB   cert }
+updateTimeLBCert    cert f = cert { timeLB    = f $ timeLB   cert }
+updateTimeBCUBCert  cert f = cert { timeBCUB  = f $ timeBCUB cert }
+updateTimeBCLBCert  cert f = cert { timeBCLB  = f $ timeBCLB cert }
+
 updateYesNoCert :: Certificate -> (Bool -> Bool) -> Certificate
 updateYesNoCert cert f = cert { outcome = f $ outcome cert }
 
@@ -214,8 +240,9 @@ instance PP.Pretty Complexity where
     where asym p = PP.char 'O' <> PP.parens p
 
 instance PP.Pretty Certificate where
-  pretty (Certificate su sl tu tl) =
+  pretty (Certificate su sl tu tl bcu bcl) =
     PP.text "TIME (" <> PP.pretty tl <> PP.char ',' <> PP.pretty tu <> PP.char ')' PP.<$$>
+    PP.text "BEST_CASE TIME (" <> PP.pretty bcl <> PP.char ',' <> PP.pretty bcu <> PP.char ')' PP.<$$>
     PP.text "SPACE(" <> PP.pretty sl <> PP.char ',' <> PP.pretty su <> PP.char ')'
   pretty (CertificateYesNo True) = PP.text "YES"
   pretty (CertificateYesNo False) = PP.text "NO"

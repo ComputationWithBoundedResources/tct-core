@@ -46,7 +46,8 @@ module Tct.Core.Interactive
 
 
 import           Tct.Core.Common.Pretty     as M (putPretty)
-import           Tct.Core.Data.Strategy     as M hiding (Strategy, StrategyDeclaration, evaluate, strategy)
+import           Tct.Core.Data.Strategy     as M hiding (Strategy, StrategyDeclaration,
+                                                  evaluate, strategy)
 
 import           Control.Monad
 import qualified Control.Monad              as W (when)
@@ -57,7 +58,8 @@ import           Data.IORef
 import qualified Data.Traversable           as F
 import           System.IO.Unsafe
 
-import           Tct.Core.Common.Error      (TctError (..), liftEither, runErroneousIO, tryIO)
+import           Tct.Core.Common.Error      (TctError (..), liftEither, runErroneousIO,
+                                             tryIO)
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml
 import           Tct.Core.Data              hiding (apply, proof)
@@ -306,9 +308,9 @@ welcome = putStrLn $ unlines
   ,"   ;Md   ;ONkc'.    ..,   .c0XNN' dM.    "
   ,"    N0 :NO,                c.  cNOMd     "
   ,"    ;d0N,                       .WX      "
-  ,"     KN.                        lM,      "
+  ,"     KN.      x         x       lM,      "
   ,"    cM,                         xd       "
-  ,"    OW                                   "
+  ,"    OW            y                      "
   ,"    OW       ..                          "
   ,"    :M:     .xOXN0kdc                    "
   ,"     OW.       kW..':        '           "
